@@ -914,6 +914,15 @@ static void pci_init_multifunction(PCIBus *bus, PCIDevice *dev, Error **errp)
         dev->config[PCI_HEADER_TYPE] |= PCI_HEADER_TYPE_MULTI_FUNCTION;
     }
 
+    /* With SR/IOV and ARI, a device at function 0 need not be a multifunction
+     * device, as it may just be a VF that ended up with function 0 in
+     * the legacy PCI interpretation. Avoid failing in such cases:
+     */
+    if (pci_is_vf(dev) &&
+        dev->exp.sriov_vf.pf->cap_present & QEMU_PCI_CAP_MULTIFUNCTION) {
+        return;
+    }
+
     /*
      * With SR/IOV and ARI, a device at function 0 need not be a multifunction
      * device, as it may just be a VF that ended up with function 0 in
