@@ -1490,6 +1490,7 @@ subdir('accel')
 subdir('plugins')
 subdir('bsd-user')
 subdir('linux-user')
+subdir('ebpf')
 
 bsd_user_ss.add(files('gdbstub.c'))
 specific_ss.add_all(when: 'CONFIG_BSD_USER', if_true: bsd_user_ss)
@@ -1761,7 +1762,7 @@ foreach target : target_dirs
          executable(exe['name'], exe['sources'],
                install: true,
                c_args: c_args,
-               dependencies: arch_deps + deps + exe['dependencies'],
+               dependencies: arch_deps + deps + exe['dependencies'] + [libbpf],
                objects: lib.extract_all_objects(recursive: true),
                link_language: link_language,
                link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),
