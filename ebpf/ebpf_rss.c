@@ -2,28 +2,46 @@
 #include <bpf/libbpf.h>
 
 #include "ebpf/ebpf_rss.h"
+#include "ebpf_rss_data.h"
 
 bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx)
 {
-    return ctx != NULL && ctx->program_fd >= 0;
+    return ctx != NULL && ctx->obj != NULL;
 }
 
 bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 {
     int err = 0;
     struct bpf_object *object = NULL;
+    struct bpf_program *prog  = NULL;
 
     if (ctx == NULL) {
         return false;
     }
 
-    /* TODO: remove hardcode - add proper elf path, like for seabios? */
-    err = bpf_prog_load("./rss.bpf.o", BPF_PROG_TYPE_SOCKET_FILTER,
-                        &object, &ctx->program_fd);
-    if (err) {
-        ctx->program_fd = -1;
+    object = bpf_object__open_mem(ebpf_rss_elf_data,
+                                  sizeof(ebpf_rss_elf_data), NULL);
+    if (object == NULL) {
         return false;
     }
+
+    prog = bpf_object__find_program_by_title(object, "tun_rss_steering");
+    if (prog == NULL) {
+        bpf_object__close(object);
+        return false;
+    }
+
+    bpf_program__set_socket_filter(prog);
+
+    err = bpf_object__load(object);
+
+    if (err) {
+        bpf_object__close(object);
+        return false;
+    }
+
+    ctx->obj = object;
+    ctx->program_fd = bpf_program__fd(prog);
 
     ctx->map_configuration =
             bpf_object__find_map_fd_by_name(object,
@@ -48,15 +66,15 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 
     return true;
 map_issue:
-    close(ctx->program_fd);
-    ctx->program_fd = -1;
+    bpf_object__close(object);
+    ctx->obj = NULL;
     return false;
 }
 
 bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
                          struct EBPFRSSConfig *config)
 {
-    if (ctx == NULL || ctx->program_fd < 0) {
+    if (!ebpf_rss_is_loaded(ctx)) {
         return false;
     }
 
@@ -72,7 +90,7 @@ bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
 bool ebpf_rss_set_inirection_table(struct EBPFRSSContext *ctx,
                                    uint16_t *indirection_table, size_t len)
 {
-    if (ctx == NULL || ctx->program_fd < 0 ||
+    if (!ebpf_rss_is_loaded(ctx) ||
        len > EBPF_RSS_INDIRECTION_TABLE_SIZE) {
         return false;
     }
@@ -90,7 +108,7 @@ bool ebpf_rss_set_inirection_table(struct EBPFRSSContext *ctx,
 
 bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
 {
-    if (ctx == NULL || ctx->program_fd < 0) {
+    if (!ebpf_rss_is_loaded(ctx)) {
         return false;
     }
 
@@ -106,8 +124,8 @@ bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
 bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
                       uint16_t *indirection_table, uint8_t *toeplitz_key)
 {
-    if (ctx == NULL || config == NULL || indirection_table == NULL ||
-       toeplitz_key == NULL || ctx->program_fd < 0) {
+    if (!ebpf_rss_is_loaded(ctx) || config == NULL ||
+        indirection_table == NULL || toeplitz_key == NULL) {
         return false;
     }
 
@@ -129,12 +147,10 @@ bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
 
 void ebpf_rss_unload(struct EBPFRSSContext *ctx)
 {
-    if (ctx == NULL || ctx->program_fd < 0) {
+    if (!ebpf_rss_is_loaded(ctx)) {
         return;
     }
 
-    close(ctx->program_fd);
-    close(ctx->map_configuration);
-    close(ctx->map_toeplitz_key);
-    close(ctx->map_indirections_table);
+    bpf_object__close(ctx->obj);
+    ctx->obj = NULL;
 }
