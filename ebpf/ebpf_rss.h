@@ -6,6 +6,7 @@
 #define EBPF_RSS_INDIRECTION_TABLE_SIZE 128
 
 struct EBPFRSSContext {
+    void *obj;
     int program_fd;
     int map_configuration;
     int map_toeplitz_key;
