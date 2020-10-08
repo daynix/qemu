@@ -703,6 +703,7 @@ static uint64_t virtio_net_get_features(VirtIODevice *vdev, uint64_t features,
 {
     VirtIONet *n = VIRTIO_NET(vdev);
     NetClientState *nc = qemu_get_queue(n->nic);
+    uint64_t vhost_rss_feature = 0;
 
     /* Firstly sync all virtio-net possible supported features */
     features |= n->host_features;
@@ -732,10 +733,14 @@ static uint64_t virtio_net_get_features(VirtIODevice *vdev, uint64_t features,
         return features;
     }
 
-    virtio_clear_feature(&features, VIRTIO_NET_F_RSS);
-    virtio_clear_feature(&features, VIRTIO_NET_F_HASH_REPORT);
+    vhost_rss_feature = features & (1UL << VIRTIO_NET_F_RSS);
+
+//    virtio_clear_feature(&features, VIRTIO_NET_F_RSS);
+//    virtio_clear_feature(&features, VIRTIO_NET_F_HASH_REPORT);
     features = vhost_net_get_features(get_vhost_net(nc->peer), features);
     vdev->backend_features = features;
+
+    features |= vhost_rss_feature;
 
     if (n->mtu_bypass_backend &&
             (n->host_features & 1ULL << VIRTIO_NET_F_MTU)) {
@@ -1340,11 +1345,15 @@ static uint16_t virtio_net_handle_rss(VirtIONet *n,
         goto error;
     }
     n->rss_data.enabled = true;
+
+    if (!virtio_net_configure_epbf_rss(n)) {
+        err_msg = "Can't configure ebpf";
+        goto error;
+    }
+
     trace_virtio_net_rss_enable(n->rss_data.hash_types,
                                 n->rss_data.indirections_len,
                                 temp.b);
-
-    virtio_net_configure_epbf_rss(n);
 
     return queues;
 error:
@@ -1709,6 +1718,8 @@ static int virtio_net_process_rss(NetClientState *nc, const uint8_t *buf,
         new_index = hash & (n->rss_data.indirections_len - 1);
         new_index = n->rss_data.indirections_table[new_index];
     }
+
+    fprintf(stderr, "Queue index new_index %d %d %x\n", index, new_index, hash);
 
     return (index == new_index) ? -1 : new_index;
 }
@@ -3508,7 +3519,7 @@ static void virtio_net_instance_init(Object *obj)
                                   "bootindex", "/ethernet-phy@0",
                                   DEVICE(n));
 
-    n->ebpf_rss.program_fd = -1;
+    n->ebpf_rss.obj = NULL;
 }
 
 static int virtio_net_pre_save(void *opaque)
