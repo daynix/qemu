@@ -35,6 +35,8 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 
     err = bpf_object__load(object);
 
+//    err = bpf_prog_load("/home/and/SRCS/tunSteering/rss.bpf.o", BPF_PROG_TYPE_SOCKET_FILTER, &object, &ctx->program_fd);
+
     if (err) {
         bpf_object__close(object);
         return false;
@@ -87,18 +89,18 @@ bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
     return true;
 }
 
-bool ebpf_rss_set_inirection_table(struct EBPFRSSContext *ctx,
-                                   uint16_t *indirection_table, size_t len)
+bool ebpf_rss_set_inirections_table(struct EBPFRSSContext *ctx,
+                                    uint16_t *indirections_table, size_t len)
 {
-    if (!ebpf_rss_is_loaded(ctx) ||
+    if (!ebpf_rss_is_loaded(ctx) || indirections_table == NULL ||
        len > EBPF_RSS_INDIRECTION_TABLE_SIZE) {
         return false;
     }
     uint32_t i = 0;
 
     for (; i < len; ++i) {
-        if (bpf_map_update_elem(ctx->map_configuration, &i,
-                                indirection_table + i, BPF_ANY) < 0) {
+        if (bpf_map_update_elem(ctx->map_indirections_table, &i,
+                                indirections_table + i, BPF_ANY) < 0) {
             return false;
         }
     }
@@ -108,12 +110,18 @@ bool ebpf_rss_set_inirection_table(struct EBPFRSSContext *ctx,
 
 bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
 {
-    if (!ebpf_rss_is_loaded(ctx)) {
+    if (!ebpf_rss_is_loaded(ctx) || toeplitz_key == NULL) {
         return false;
     }
 
     uint32_t map_key = 0;
-    if (bpf_map_update_elem(ctx->map_configuration, &map_key, toeplitz_key,
+
+    /* prepare toeplitz key */
+    uint8_t toe[40] = {};
+    memcpy(toe, toeplitz_key, 40);
+    *(uint32_t *)toe = ntohl(*(uint32_t *)toe);
+
+    if (bpf_map_update_elem(ctx->map_toeplitz_key, &map_key, toe,
                             BPF_ANY) < 0) {
         return false;
     }
@@ -122,10 +130,10 @@ bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
 }
 
 bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
-                      uint16_t *indirection_table, uint8_t *toeplitz_key)
+                      uint16_t *indirections_table, uint8_t *toeplitz_key)
 {
     if (!ebpf_rss_is_loaded(ctx) || config == NULL ||
-        indirection_table == NULL || toeplitz_key == NULL) {
+        indirections_table == NULL || toeplitz_key == NULL) {
         return false;
     }
 
@@ -133,7 +141,7 @@ bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
         return false;
     }
 
-    if (!ebpf_rss_set_inirection_table(ctx, indirection_table,
+    if (!ebpf_rss_set_inirections_table(ctx, indirections_table,
                                       config->indirections_len)) {
         return false;
     }
