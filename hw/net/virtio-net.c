@@ -1356,6 +1356,7 @@ static uint16_t virtio_net_handle_rss(VirtIONet *n,
                                 temp.b);
 
     return queues;
+//    return 2;
 error:
     trace_virtio_net_rss_error(err_msg, err_value);
     virtio_net_disable_rss(n);
@@ -3519,7 +3520,7 @@ static void virtio_net_instance_init(Object *obj)
                                   "bootindex", "/ethernet-phy@0",
                                   DEVICE(n));
 
-    n->ebpf_rss.obj = NULL;
+    n->ebpf_rss.program_fd = -1;
 }
 
 static int virtio_net_pre_save(void *opaque)

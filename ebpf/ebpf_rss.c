@@ -1,75 +1,60 @@
 #include <unistd.h>
-#include <bpf/libbpf.h>
 
 #include "ebpf/ebpf_rss.h"
-#include "ebpf_rss_data.h"
+
+#include "ebpf/ebpf.h"
+#include "ebpf/tun_rss_steering.h"
+
+#define EBPF_RSS_INDIRECTION_TABLE_SIZE 128
+#define EBPF_RSS_TOEPLITZ_KEYSIZE 40
 
 bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx)
 {
-    return ctx != NULL && ctx->obj != NULL;
+    return ctx != NULL && ctx->program_fd >= 0;
 }
 
 bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 {
-    int err = 0;
-    struct bpf_object *object = NULL;
-    struct bpf_program *prog  = NULL;
-
     if (ctx == NULL) {
         return false;
     }
 
-    object = bpf_object__open_mem(ebpf_rss_elf_data,
-                                  sizeof(ebpf_rss_elf_data), NULL);
-    if (object == NULL) {
-        return false;
-    }
-
-    prog = bpf_object__find_program_by_title(object, "tun_rss_steering");
-    if (prog == NULL) {
-        bpf_object__close(object);
-        return false;
-    }
-
-    bpf_program__set_socket_filter(prog);
-
-    err = bpf_object__load(object);
-
-//    err = bpf_prog_load("/home/and/SRCS/tunSteering/rss.bpf.o", BPF_PROG_TYPE_SOCKET_FILTER, &object, &ctx->program_fd);
-
-    if (err) {
-        bpf_object__close(object);
-        return false;
-    }
-
-    ctx->obj = object;
-    ctx->program_fd = bpf_program__fd(prog);
-
-    ctx->map_configuration =
-            bpf_object__find_map_fd_by_name(object,
-            "tap_rss_map_configurations");
+    ctx->map_configuration = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t), sizeof(struct EBPFRSSConfig), 1);
     if (ctx->map_configuration < 0) {
-        goto map_issue;
+        goto l_conf_create;
     }
-
-    ctx->map_toeplitz_key =
-            bpf_object__find_map_fd_by_name(object,
-            "tap_rss_map_toeplitz_key");
+    ctx->map_toeplitz_key = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t), EBPF_RSS_TOEPLITZ_KEYSIZE, 1);
     if (ctx->map_toeplitz_key < 0) {
-        goto map_issue;
+        goto l_toe_create;
+    }
+    ctx->map_indirections_table = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t), sizeof(__u16), EBPF_RSS_INDIRECTION_TABLE_SIZE);
+    if (ctx->map_indirections_table < 0) {
+        goto l_table_create;
     }
 
-    ctx->map_indirections_table =
-            bpf_object__find_map_fd_by_name(object,
-            "tap_rss_map_indirection_table");
-    if (ctx->map_indirections_table < 0) {
-        goto map_issue;
+    bpf_fixup_mapfd(reltun_rss_steering, sizeof(reltun_rss_steering)/sizeof(struct fixup_mapfd_t),
+            instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn),
+                    "tap_rss_map_configurations", ctx->map_configuration);
+    bpf_fixup_mapfd(reltun_rss_steering, sizeof(reltun_rss_steering)/sizeof(struct fixup_mapfd_t),
+            instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn),
+                    "tap_rss_map_toeplitz_key", ctx->map_toeplitz_key);
+    bpf_fixup_mapfd(reltun_rss_steering, sizeof(reltun_rss_steering)/sizeof(struct fixup_mapfd_t),
+            instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn),
+                    "tap_rss_map_indirection_table", ctx->map_indirections_table);
+
+    ctx->program_fd = bpf_prog_load(BPF_PROG_TYPE_SOCKET_FILTER, instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn), "GPL");
+    if (ctx->program_fd < 0) {
+        goto l_prog_load;
     }
 
     return true;
-map_issue:
-    bpf_object__close(object);
-    ctx->obj = NULL;
+l_prog_load:
+    close(ctx->map_indirections_table);
+l_table_create:
+    close(ctx->map_toeplitz_key);
+l_toe_create:
+    close(ctx->map_configuration);
+l_conf_create:
     return false;
 }
 
@@ -81,7 +66,7 @@ bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
     }
 
     uint32_t map_key = 0;
-    if (bpf_map_update_elem(ctx->map_configuration,
+    if (bpf_update_elem(ctx->map_configuration,
                             &map_key, config, BPF_ANY) < 0) {
         return false;
     }
@@ -99,7 +84,7 @@ bool ebpf_rss_set_inirections_table(struct EBPFRSSContext *ctx,
     uint32_t i = 0;
 
     for (; i < len; ++i) {
-        if (bpf_map_update_elem(ctx->map_indirections_table, &i,
+        if (bpf_update_elem(ctx->map_indirections_table, &i,
                                 indirections_table + i, BPF_ANY) < 0) {
             return false;
         }
@@ -117,11 +102,11 @@ bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
     uint32_t map_key = 0;
 
     /* prepare toeplitz key */
-    uint8_t toe[40] = {};
-    memcpy(toe, toeplitz_key, 40);
+    uint8_t toe[EBPF_RSS_TOEPLITZ_KEYSIZE] = {};
+    memcpy(toe, toeplitz_key, EBPF_RSS_TOEPLITZ_KEYSIZE);
     *(uint32_t *)toe = ntohl(*(uint32_t *)toe);
 
-    if (bpf_map_update_elem(ctx->map_toeplitz_key, &map_key, toe,
+    if (bpf_update_elem(ctx->map_toeplitz_key, &map_key, toe,
                             BPF_ANY) < 0) {
         return false;
     }
@@ -159,6 +144,8 @@ void ebpf_rss_unload(struct EBPFRSSContext *ctx)
         return;
     }
 
-    bpf_object__close(ctx->obj);
-    ctx->obj = NULL;
+    close(ctx->program_fd);
+    close(ctx->map_configuration);
+    close(ctx->map_toeplitz_key);
+    close(ctx->map_indirections_table);
 }

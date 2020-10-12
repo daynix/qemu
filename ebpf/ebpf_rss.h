@@ -1,12 +1,10 @@
 #ifndef QEMU_EBPF_RSS_H
 #define QEMU_EBPF_RSS_H
 
-#include <bpf/bpf.h>
-
-#define EBPF_RSS_INDIRECTION_TABLE_SIZE 128
+#include <stdint.h>
+#include <stdbool.h>
 
 struct EBPFRSSContext {
-    void *obj;
     int program_fd;
     int map_configuration;
     int map_toeplitz_key;
