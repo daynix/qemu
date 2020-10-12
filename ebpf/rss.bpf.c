@@ -11,11 +11,14 @@
 
 #include <bpf/bpf_helpers.h>
 
-// NOTES:
-// clang -O2 -g -fno-stack-protector -S -emit-llvm -c rss.bpf.c -o - | llc -march=bpf -filetype=obj -o rss.bpf.o
-// llvm-objcopy -j tun_rss_steering  -O binary -S -g rss.bpf.o rss.bpf.bin
-// puts open("rss.bpf.o", "r"){|f| f.read}.each_byte.map{|x| "0x%02x" %x}.each_slice(10).map{|x| x.join(", ")}.join(",\n")
-// cat /sys/kernel/debug/tracing/trace_pipe
+/*
+ * NOTES:
+ * clang -O2 -g -fno-stack-protector -S -emit-llvm -c rss.bpf.c -o - | llc -march=bpf -filetype=obj -o rss.bpf.o
+ * llvm-objcopy -j tun_rss_steering  -O binary -S -g rss.bpf.o rss.bpf.bin
+ * puts open("rss.bpf.o", "r"){|f| f.read}.each_byte.map{|x| "0x%02x" %x}.each_slice(10).map{|x| x.join(", ")}.join(",\n")
+ * cat /sys/kernel/debug/tracing/trace_pipe
+ * python EbpfElf_to_C.py rss.bpf.o tun_rss_steering
+ */
 
 #define VIRTIO_NET_RSS_HASH_TYPE_IPv4          (1 << 0)
 #define VIRTIO_NET_RSS_HASH_TYPE_TCPv4         (1 << 1)
@@ -376,10 +379,11 @@ int tun_rss_steering_prog(struct __sk_buff *skb) {
                 return *queue;
             }
         }
+
+        return config->default_queue;
     }
 
-    return 0;
-//    return -1;
+    return -1;
 }
 
 char _license[] SEC("license") = "GPL";
