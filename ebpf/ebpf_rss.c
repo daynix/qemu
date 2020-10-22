@@ -86,8 +86,8 @@ l_conf_create:
     return false;
 }
 
-bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
-                         struct EBPFRSSConfig *config)
+static bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
+                                struct EBPFRSSConfig *config)
 {
     if (!ebpf_rss_is_loaded(ctx)) {
         return false;
@@ -102,8 +102,9 @@ bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
     return true;
 }
 
-bool ebpf_rss_set_inirections_table(struct EBPFRSSContext *ctx,
-                                    uint16_t *indirections_table, size_t len)
+static bool ebpf_rss_set_indirections_table(struct EBPFRSSContext *ctx,
+                                            uint16_t *indirections_table,
+                                            size_t len)
 {
     if (!ebpf_rss_is_loaded(ctx) || indirections_table == NULL ||
        len > VIRTIO_NET_RSS_MAX_TABLE_LEN) {
@@ -121,7 +122,8 @@ bool ebpf_rss_set_inirections_table(struct EBPFRSSContext *ctx,
     return true;
 }
 
-bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
+static bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx,
+                                     uint8_t *toeplitz_key)
 {
     if (!ebpf_rss_is_loaded(ctx) || toeplitz_key == NULL) {
         return false;
@@ -154,7 +156,7 @@ bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
         return false;
     }
 
-    if (!ebpf_rss_set_inirections_table(ctx, indirections_table,
+    if (!ebpf_rss_set_indirections_table(ctx, indirections_table,
                                       config->indirections_len)) {
         return false;
     }
