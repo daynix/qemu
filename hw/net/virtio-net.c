@@ -1182,12 +1182,18 @@ static int virtio_net_handle_announce(VirtIONet *n, uint8_t cmd,
     }
 }
 
+static void virtio_net_unload_epbf_rss(VirtIONet *n);
+
 static void virtio_net_disable_rss(VirtIONet *n)
 {
     if (n->rss_data.enabled) {
         trace_virtio_net_rss_disable();
     }
     n->rss_data.enabled = false;
+
+    if (!n->rss_data.enabled_software_rss && ebpf_rss_is_loaded(&n->ebpf_rss)) {
+        virtio_net_unload_epbf_rss(n);
+    }
 }
 
 static bool virtio_net_attach_steering_ebpf(NICState *nic, int prog_fd)
@@ -1210,7 +1216,7 @@ static void rss_data_to_rss_config(struct VirtioNetRssData *data,
     config->default_queue = data->default_queue;
 }
 
-static bool virtio_net_configure_epbf_rss(VirtIONet *n)
+static bool virtio_net_load_epbf_rss(VirtIONet *n)
 {
     struct EBPFRSSConfig config = {};
 
@@ -1239,6 +1245,12 @@ static bool virtio_net_configure_epbf_rss(VirtIONet *n)
     }
 
     return true;
+}
+
+static void virtio_net_unload_epbf_rss(VirtIONet *n)
+{
+    virtio_net_attach_steering_ebpf(n->nic, -1);
+    ebpf_rss_unload(&n->ebpf_rss);
 }
 
 static uint16_t virtio_net_handle_rss(VirtIONet *n,
@@ -1272,6 +1284,7 @@ static uint16_t virtio_net_handle_rss(VirtIONet *n,
         err_value = (uint32_t)s;
         goto error;
     }
+    n->rss_data.enabled_software_rss = false;
     n->rss_data.hash_types = virtio_ldl_p(vdev, &cfg.hash_types);
     n->rss_data.indirections_len =
         virtio_lduw_p(vdev, &cfg.indirection_table_mask);
@@ -1354,9 +1367,23 @@ static uint16_t virtio_net_handle_rss(VirtIONet *n,
     }
     n->rss_data.enabled = true;
 
-    if (!virtio_net_configure_epbf_rss(n)) {
-        err_msg = "Can't configure ebpf";
-        goto error;
+    if (!n->rss_data.populate_hash) {
+        /* load EBPF RSS */
+        if (!virtio_net_load_epbf_rss(n)) {
+            /* EBPF mast be loaded for vhost */
+            if (get_vhost_net(qemu_get_queue(n->nic)->peer)) {
+                warn_report("Can't load eBPF RSS for vhost");
+                goto error;
+            }
+            /* fallback to software RSS */
+            warn_report("Can't load eBPF RSS - fallback to software RSS");
+            n->rss_data.enabled_software_rss = true;
+        }
+    } else {
+        /* use software RSS for hash populating */
+        /* and unload eBPF if was loaded before */
+        virtio_net_unload_epbf_rss(n);
+        n->rss_data.enabled_software_rss = true;
     }
 
     trace_virtio_net_rss_enable(n->rss_data.hash_types,
@@ -1747,7 +1774,7 @@ static ssize_t virtio_net_receive_rcu(NetClientState *nc, const uint8_t *buf,
         return -1;
     }
 
-    if (!no_rss && n->rss_data.enabled) {
+    if (!no_rss && n->rss_data.enabled && n->rss_data.enabled_software_rss) {
         int index = virtio_net_process_rss(nc, buf, size);
         if (index >= 0) {
             NetClientState *nc2 = qemu_get_subqueue(n->nic, index);
@@ -3048,6 +3075,7 @@ static const VMStateDescription vmstate_virtio_net_rss = {
     .needed = virtio_net_rss_needed,
     .fields = (VMStateField[]) {
         VMSTATE_BOOL(rss_data.enabled, VirtIONet),
+        VMSTATE_BOOL(rss_data.enabled_software_rss, VirtIONet),
         VMSTATE_BOOL(rss_data.redirect, VirtIONet),
         VMSTATE_BOOL(rss_data.populate_hash, VirtIONet),
         VMSTATE_UINT32(rss_data.hash_types, VirtIONet),
