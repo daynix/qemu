@@ -7,8 +7,6 @@
 #include "ebpf/ebpf.h"
 #include "ebpf/tun_rss_steering.h"
 
-#define EBPF_RSS_TOEPLITZ_KEYSIZE 40
-
 void ebpf_rss_init(struct EBPFRSSContext *ctx)
 {
     if (ctx != NULL) {
@@ -36,7 +34,7 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
     }
     ctx->map_toeplitz_key =
             bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
-                           EBPF_RSS_TOEPLITZ_KEYSIZE, 1);
+                           VIRTIO_NET_RSS_MAX_KEY_SIZE, 1);
     if (ctx->map_toeplitz_key < 0) {
         error_report("eBPF RSS - can't create MAP for toeplitz key");
         goto l_toe_create;
@@ -44,7 +42,7 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 
     ctx->map_indirections_table =
             bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
-                           sizeof(__u16), VIRTIO_NET_RSS_MAX_TABLE_LEN);
+                           sizeof(uint16_t), VIRTIO_NET_RSS_MAX_TABLE_LEN);
     if (ctx->map_indirections_table < 0) {
         error_report("eBPF RSS - can't create MAP for indirections table");
         goto l_table_create;
@@ -132,8 +130,8 @@ bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx, uint8_t *toeplitz_key)
     uint32_t map_key = 0;
 
     /* prepare toeplitz key */
-    uint8_t toe[EBPF_RSS_TOEPLITZ_KEYSIZE] = {};
-    memcpy(toe, toeplitz_key, EBPF_RSS_TOEPLITZ_KEYSIZE);
+    uint8_t toe[VIRTIO_NET_RSS_MAX_KEY_SIZE] = {};
+    memcpy(toe, toeplitz_key, VIRTIO_NET_RSS_MAX_KEY_SIZE);
     *(uint32_t *)toe = ntohl(*(uint32_t *)toe);
 
     if (bpf_update_elem(ctx->map_toeplitz_key, &map_key, toe,
