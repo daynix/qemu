@@ -1,10 +1,6 @@
-#include <sys/syscall.h>
-#include <unistd.h>
-
-#include "qemu/osdep.h"
-#include "qemu/error-report.h"
-
 #include "ebpf/ebpf.h"
+#include <sys/syscall.h>
+#include "qemu/error-report.h"
 
 #define ptr_to_u64(x) ((uint64_t)(uintptr_t)x)
 
