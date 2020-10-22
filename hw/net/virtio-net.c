@@ -698,12 +698,24 @@ static void virtio_net_set_queues(VirtIONet *n)
 
 static void virtio_net_set_multiqueue(VirtIONet *n, int multiqueue);
 
+static uint64_t fix_ebpf_vhost_features(uint64_t features)
+{
+    /* If vhost=on & CONFIG_EBPF doesn't set - disable RSS feature */
+    uint64_t ret = features;
+#ifndef CONFIG_EBPF
+    virtio_clear_feature(&ret, VIRTIO_NET_F_RSS);
+#endif
+    /* for now, there is no solution for populating the hash from eBPF */
+    virtio_clear_feature(&ret, VIRTIO_NET_F_HASH_REPORT);
+
+    return ret;
+}
+
 static uint64_t virtio_net_get_features(VirtIODevice *vdev, uint64_t features,
                                         Error **errp)
 {
     VirtIONet *n = VIRTIO_NET(vdev);
     NetClientState *nc = qemu_get_queue(n->nic);
-    uint64_t vhost_rss_feature = 0;
 
     /* Firstly sync all virtio-net possible supported features */
     features |= n->host_features;
@@ -733,14 +745,10 @@ static uint64_t virtio_net_get_features(VirtIODevice *vdev, uint64_t features,
         return features;
     }
 
-    vhost_rss_feature = features & (1UL << VIRTIO_NET_F_RSS);
+    features = fix_ebpf_vhost_features(
+            vhost_net_get_features(get_vhost_net(nc->peer), features));
 
-//    virtio_clear_feature(&features, VIRTIO_NET_F_RSS);
-//    virtio_clear_feature(&features, VIRTIO_NET_F_HASH_REPORT);
-    features = vhost_net_get_features(get_vhost_net(nc->peer), features);
     vdev->backend_features = features;
-
-    features |= vhost_rss_feature;
 
     if (n->mtu_bypass_backend &&
             (n->host_features & 1ULL << VIRTIO_NET_F_MTU)) {
