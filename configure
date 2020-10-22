@@ -6807,6 +6807,10 @@ if test "$safe_stack" = "yes"; then
   echo "CONFIG_SAFESTACK=y" >> $config_host_mak
 fi
 
+if test "$linux" = "yes" ; then
+  echo "CONFIG_EBPF=y" >> $config_host_mak
+fi
+
 # If we're using a separate build tree, set it up now.
 # DIRS are directories which we simply mkdir in the build tree;
 # LINKS are things to symlink back into the source tree

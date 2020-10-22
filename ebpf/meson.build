@@ -1,5 +1,2 @@
-ebpf_ss = ss.source_set()
-
-ebpf_ss.add(files('ebpf.c', 'ebpf_rss.c'))
-
-specific_ss.add_all(ebpf_ss)
+specific_ss.add(files('ebpf_rss.c'))
+specific_ss.add(when: 'CONFIG_EBPF', if_true: files('ebpf.c'), if_false: files('ebpf-stub.c'))

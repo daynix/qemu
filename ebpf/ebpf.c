@@ -1,13 +1,22 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include "qemu/osdep.h"
+#include "qemu/error-report.h"
+
 #include "ebpf/ebpf.h"
 
 #define ptr_to_u64(x) ((uint64_t)(uintptr_t)x)
 
-static inline int ebpf(enum bpf_cmd cmd, union bpf_attr *attr, unsigned int size)
+static inline int ebpf(enum bpf_cmd cmd, union bpf_attr *attr,
+        unsigned int size)
 {
-    return syscall(__NR_bpf, cmd, attr, size);
+    int ret = syscall(__NR_bpf, cmd, attr, size);
+    if (ret < 0) {
+        error_report("eBPF syscall error: %s", strerror(errno));
+    }
+
+    return ret;
 }
 
 int bpf_create_map(enum bpf_map_type map_type,
@@ -66,6 +75,7 @@ int bpf_prog_load(enum bpf_prog_type type,
                   const struct bpf_insn *insns, int insn_cnt,
                   const char *license)
 {
+    int ret = 0;
     union bpf_attr attr = {};
     attr.prog_type = type;
     attr.insns     = ptr_to_u64(insns);
@@ -75,7 +85,12 @@ int bpf_prog_load(enum bpf_prog_type type,
     attr.log_size  = BPF_LOG_BUF_SIZE;
     attr.log_level = 1;
 
-    return ebpf(BPF_PROG_LOAD, &attr, sizeof(attr));
+    ret = ebpf(BPF_PROG_LOAD, &attr, sizeof(attr));
+    if (ret < 0) {
+        error_report("eBPF program load error %s", bpf_log_buf);
+    }
+
+    return ret;
 }
 
 unsigned int bpf_fixup_mapfd(struct fixup_mapfd_t *table,
@@ -84,10 +99,8 @@ unsigned int bpf_fixup_mapfd(struct fixup_mapfd_t *table,
     unsigned int ret = 0;
     int i = 0;
 
-    for (; i < table_size; ++i)
-    {
-        if (strcmp(table[i].map_name, map_name) == 0)
-        {
+    for (; i < table_size; ++i) {
+        if (strcmp(table[i].map_name, map_name) == 0) {
             insn[table[i].instruction_num].src_reg = 1;
             insn[table[i].instruction_num].imm = fd;
             ++ret;
