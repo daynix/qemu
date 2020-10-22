@@ -19,6 +19,8 @@ struct EBPFRSSConfig {
     uint16_t default_queue;
 };
 
+void ebpf_rss_init(struct EBPFRSSContext *ctx);
+
 bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx);
 
 bool ebpf_rss_load(struct EBPFRSSContext *ctx);

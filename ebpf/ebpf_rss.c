@@ -1,12 +1,20 @@
-#include <unistd.h>
+#include "qemu/osdep.h"
+#include "qemu/error-report.h"
+
+#include "hw/virtio/virtio-net.h" /* VIRTIO_NET_RSS_MAX_TABLE_LEN */
 
 #include "ebpf/ebpf_rss.h"
-
 #include "ebpf/ebpf.h"
 #include "ebpf/tun_rss_steering.h"
 
-#define EBPF_RSS_INDIRECTION_TABLE_SIZE 128
 #define EBPF_RSS_TOEPLITZ_KEYSIZE 40
+
+void ebpf_rss_init(struct EBPFRSSContext *ctx)
+{
+    if (ctx != NULL) {
+        ctx->program_fd = -1;
+    }
+}
 
 bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx)
 {
@@ -19,31 +27,53 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
         return false;
     }
 
-    ctx->map_configuration = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t), sizeof(struct EBPFRSSConfig), 1);
+    ctx->map_configuration =
+            bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
+                           sizeof(struct EBPFRSSConfig), 1);
     if (ctx->map_configuration < 0) {
+        error_report("eBPF RSS - can't create MAP for configurations");
         goto l_conf_create;
     }
-    ctx->map_toeplitz_key = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t), EBPF_RSS_TOEPLITZ_KEYSIZE, 1);
+    ctx->map_toeplitz_key =
+            bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
+                           EBPF_RSS_TOEPLITZ_KEYSIZE, 1);
     if (ctx->map_toeplitz_key < 0) {
+        error_report("eBPF RSS - can't create MAP for toeplitz key");
         goto l_toe_create;
     }
-    ctx->map_indirections_table = bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t), sizeof(__u16), EBPF_RSS_INDIRECTION_TABLE_SIZE);
+
+    ctx->map_indirections_table =
+            bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
+                           sizeof(__u16), VIRTIO_NET_RSS_MAX_TABLE_LEN);
     if (ctx->map_indirections_table < 0) {
+        error_report("eBPF RSS - can't create MAP for indirections table");
         goto l_table_create;
     }
 
-    bpf_fixup_mapfd(reltun_rss_steering, sizeof(reltun_rss_steering)/sizeof(struct fixup_mapfd_t),
-            instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn),
-                    "tap_rss_map_configurations", ctx->map_configuration);
-    bpf_fixup_mapfd(reltun_rss_steering, sizeof(reltun_rss_steering)/sizeof(struct fixup_mapfd_t),
-            instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn),
-                    "tap_rss_map_toeplitz_key", ctx->map_toeplitz_key);
-    bpf_fixup_mapfd(reltun_rss_steering, sizeof(reltun_rss_steering)/sizeof(struct fixup_mapfd_t),
-            instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn),
-                    "tap_rss_map_indirection_table", ctx->map_indirections_table);
+    bpf_fixup_mapfd(reltun_rss_steering,
+            sizeof(reltun_rss_steering) / sizeof(struct fixup_mapfd_t),
+            instun_rss_steering,
+            sizeof(instun_rss_steering) / sizeof(struct bpf_insn),
+            "tap_rss_map_configurations", ctx->map_configuration);
 
-    ctx->program_fd = bpf_prog_load(BPF_PROG_TYPE_SOCKET_FILTER, instun_rss_steering, sizeof(instun_rss_steering)/sizeof(struct bpf_insn), "GPL");
+    bpf_fixup_mapfd(reltun_rss_steering,
+            sizeof(reltun_rss_steering) / sizeof(struct fixup_mapfd_t),
+            instun_rss_steering,
+            sizeof(instun_rss_steering) / sizeof(struct bpf_insn),
+            "tap_rss_map_toeplitz_key", ctx->map_toeplitz_key);
+
+    bpf_fixup_mapfd(reltun_rss_steering,
+            sizeof(reltun_rss_steering) / sizeof(struct fixup_mapfd_t),
+            instun_rss_steering,
+            sizeof(instun_rss_steering) / sizeof(struct bpf_insn),
+            "tap_rss_map_indirection_table", ctx->map_indirections_table);
+
+    ctx->program_fd =
+            bpf_prog_load(BPF_PROG_TYPE_SOCKET_FILTER, instun_rss_steering,
+                         sizeof(instun_rss_steering) / sizeof(struct bpf_insn),
+                         "GPL");
     if (ctx->program_fd < 0) {
+        error_report("eBPF RSS - can't load eBPF program");
         goto l_prog_load;
     }
 
@@ -78,7 +108,7 @@ bool ebpf_rss_set_inirections_table(struct EBPFRSSContext *ctx,
                                     uint16_t *indirections_table, size_t len)
 {
     if (!ebpf_rss_is_loaded(ctx) || indirections_table == NULL ||
-       len > EBPF_RSS_INDIRECTION_TABLE_SIZE) {
+       len > VIRTIO_NET_RSS_MAX_TABLE_LEN) {
         return false;
     }
     uint32_t i = 0;
@@ -148,4 +178,5 @@ void ebpf_rss_unload(struct EBPFRSSContext *ctx)
     close(ctx->map_configuration);
     close(ctx->map_toeplitz_key);
     close(ctx->map_indirections_table);
+    ctx->program_fd = -1;
 }
