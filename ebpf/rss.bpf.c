@@ -286,7 +286,7 @@ static inline __u32 calculate_rss_hash(struct __sk_buff *skb, struct rss_config_
     struct packet_hash_info_t packet_info = {};
 
     parse_packet(skb, &packet_info);
-    
+
     if (packet_info.is_ipv4) {
         if (packet_info.is_tcp && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv4)
         {
