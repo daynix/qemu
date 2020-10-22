@@ -25,15 +25,6 @@ bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx);
 
 bool ebpf_rss_load(struct EBPFRSSContext *ctx);
 
-bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
-                         struct EBPFRSSConfig *config);
-
-bool ebpf_rss_set_inirections_table(struct EBPFRSSContext *ctx,
-                                    uint16_t *indirections_table, size_t len);
-
-bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx,
-                              uint8_t *toeplitz_key);
-
 bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
                       uint16_t *indirections_table, uint8_t *toeplitz_key);
 
