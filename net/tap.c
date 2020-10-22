@@ -32,8 +32,6 @@
 #include <sys/socket.h>
 #include <net/if.h>
 
-#include <linux/if_tun.h> /* TODO: move to linux tap */
-
 #include "net/net.h"
 #include "clients.h"
 #include "monitor/monitor.h"
@@ -344,7 +342,7 @@ static bool tap_set_steering_ebpf(NetClientState *nc, int prog_fd)
     TAPState *s = DO_UPCAST(TAPState, nc, nc);
     assert(nc->info->type == NET_CLIENT_DRIVER_TAP);
 
-    return ioctl(s->fd, TUNSETSTEERINGEBPF, (void *) &prog_fd) == 0;
+    return tap_fd_set_steering_ebpf(s->fd, prog_fd) == 0;
 }
 
 int tap_get_fd(NetClientState *nc)
