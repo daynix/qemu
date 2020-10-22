@@ -5,7 +5,9 @@
 
 #include "ebpf/ebpf_rss.h"
 #include "ebpf/ebpf.h"
+#ifdef CONFIG_EBPF
 #include "ebpf/tun_rss_steering.h"
+#endif
 
 void ebpf_rss_init(struct EBPFRSSContext *ctx)
 {
@@ -25,6 +27,7 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
         return false;
     }
 
+#ifdef CONFIG_EBPF
     ctx->map_configuration =
             bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
                            sizeof(struct EBPFRSSConfig), 1);
@@ -84,6 +87,10 @@ l_toe_create:
     close(ctx->map_configuration);
 l_conf_create:
     return false;
+
+#else
+    return false;
+#endif  /* CONFIG_EBPF */
 }
 
 static bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
@@ -92,13 +99,13 @@ static bool ebpf_rss_set_config(struct EBPFRSSContext *ctx,
     if (!ebpf_rss_is_loaded(ctx)) {
         return false;
     }
-
+#ifdef CONFIG_EBPF
     uint32_t map_key = 0;
     if (bpf_update_elem(ctx->map_configuration,
                             &map_key, config, BPF_ANY) < 0) {
         return false;
     }
-
+#endif
     return true;
 }
 
@@ -110,6 +117,7 @@ static bool ebpf_rss_set_indirections_table(struct EBPFRSSContext *ctx,
        len > VIRTIO_NET_RSS_MAX_TABLE_LEN) {
         return false;
     }
+#ifdef CONFIG_EBPF
     uint32_t i = 0;
 
     for (; i < len; ++i) {
@@ -118,7 +126,7 @@ static bool ebpf_rss_set_indirections_table(struct EBPFRSSContext *ctx,
             return false;
         }
     }
-
+#endif
     return true;
 }
 
@@ -128,7 +136,7 @@ static bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx,
     if (!ebpf_rss_is_loaded(ctx) || toeplitz_key == NULL) {
         return false;
     }
-
+#ifdef CONFIG_EBPF
     uint32_t map_key = 0;
 
     /* prepare toeplitz key */
@@ -140,7 +148,7 @@ static bool ebpf_rss_set_toepliz_key(struct EBPFRSSContext *ctx,
                             BPF_ANY) < 0) {
         return false;
     }
-
+#endif
     return true;
 }
 
