@@ -1,9 +1,6 @@
 #ifndef QEMU_EBPF_RSS_H
 #define QEMU_EBPF_RSS_H
 
-#include <stdint.h>
-#include <stdbool.h>
-
 struct EBPFRSSContext {
     int program_fd;
     int map_configuration;
