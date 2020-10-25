@@ -1,39 +1,28 @@
-#include "ebpf/ebpf.h"
+#include "qemu/osdep.h"
+#include "ebpf/ebpf_rss.h"
 
-int bpf_create_map(enum bpf_map_type map_type,
-                   unsigned int key_size,
-                   unsigned int value_size,
-                   unsigned int max_entries)
+void ebpf_rss_init(struct EBPFRSSContext *ctx)
 {
-    return -1;
+
 }
 
-int bpf_lookup_elem(int fd, const void *key, void *value)
+bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx)
 {
-    return -1;
+    return false;
 }
 
-int bpf_update_elem(int fd, const void *key, const void *value,
-                    uint64_t flags)
+bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 {
-    return -1;
+    return false;
 }
 
-int bpf_delete_elem(int fd, const void *key)
+bool ebpf_rss_set_all(struct EBPFRSSContext *ctx, struct EBPFRSSConfig *config,
+                      uint16_t *indirections_table, uint8_t *toeplitz_key)
 {
-    return -1;
+    return false;
 }
 
-int bpf_prog_load(enum bpf_prog_type type,
-                  const struct bpf_insn *insns, int insn_cnt,
-                  const char *license)
+void ebpf_rss_unload(struct EBPFRSSContext *ctx)
 {
-    return -1;
-}
 
-unsigned int bpf_fixup_mapfd(struct fixup_mapfd_t *table,
-                             size_t table_size, struct bpf_insn *insn,
-                             size_t insn_len, const char *map_name, int fd)
-{
-    return 0;
 }

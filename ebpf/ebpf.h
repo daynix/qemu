@@ -4,12 +4,7 @@
 #include "qemu/osdep.h"
 
 #ifdef CONFIG_EBPF
-# include <linux/bpf.h>
-#else
-enum bpf_map_type { bpf_map_type_0 };
-enum bpf_prog_type { bpf_prog_type_0 };
-struct bpf_insn;
-#endif
+#include <linux/bpf.h>
 
 int bpf_create_map(enum bpf_map_type map_type,
                    unsigned int key_size,
@@ -36,4 +31,5 @@ unsigned int bpf_fixup_mapfd(struct fixup_mapfd_t *table,
                              size_t table_size, struct bpf_insn *insn,
                              size_t insn_len, const char *map_name, int fd);
 
+#endif /* CONFIG_EBPF */
 #endif /* QEMU_EBPF_H */
