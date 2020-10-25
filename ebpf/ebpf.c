@@ -1,6 +1,6 @@
 #include "ebpf/ebpf.h"
 #include <sys/syscall.h>
-#include "qemu/error-report.h"
+#include "trace.h"
 
 #define ptr_to_u64(x) ((uint64_t)(uintptr_t)x)
 
@@ -9,7 +9,7 @@ static inline int ebpf(enum bpf_cmd cmd, union bpf_attr *attr,
 {
     int ret = syscall(__NR_bpf, cmd, attr, size);
     if (ret < 0) {
-        error_report("eBPF syscall error: %s", strerror(errno));
+        trace_ebpf_error("eBPF syscall error", strerror(errno));
     }
 
     return ret;
@@ -83,7 +83,7 @@ int bpf_prog_load(enum bpf_prog_type type,
 
     ret = ebpf(BPF_PROG_LOAD, &attr, sizeof(attr));
     if (ret < 0) {
-        error_report("eBPF program load error %s", bpf_log_buf);
+        trace_ebpf_error("eBPF program load error:", bpf_log_buf);
     }
 
     return ret;
