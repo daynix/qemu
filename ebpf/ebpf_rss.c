@@ -6,6 +6,7 @@
 #include "ebpf/ebpf_rss.h"
 #include "ebpf/ebpf.h"
 #include "ebpf/tun_rss_steering.h"
+#include "trace.h"
 
 void ebpf_rss_init(struct EBPFRSSContext *ctx)
 {
@@ -29,14 +30,14 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
             bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
                            sizeof(struct EBPFRSSConfig), 1);
     if (ctx->map_configuration < 0) {
-        error_report("eBPF RSS - can't create MAP for configurations");
+        trace_ebpf_error("eBPF RSS", "can not create MAP for configurations");
         goto l_conf_create;
     }
     ctx->map_toeplitz_key =
             bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
                            VIRTIO_NET_RSS_MAX_KEY_SIZE, 1);
     if (ctx->map_toeplitz_key < 0) {
-        error_report("eBPF RSS - can't create MAP for toeplitz key");
+        trace_ebpf_error("eBPF RSS", "can not create MAP for toeplitz key");
         goto l_toe_create;
     }
 
@@ -44,7 +45,7 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
             bpf_create_map(BPF_MAP_TYPE_ARRAY, sizeof(uint32_t),
                            sizeof(uint16_t), VIRTIO_NET_RSS_MAX_TABLE_LEN);
     if (ctx->map_indirections_table < 0) {
-        error_report("eBPF RSS - can't create MAP for indirections table");
+        trace_ebpf_error("eBPF RSS", "can not create MAP for indirections table");
         goto l_table_create;
     }
 
@@ -71,7 +72,7 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
                          sizeof(instun_rss_steering) / sizeof(struct bpf_insn),
                          "GPL");
     if (ctx->program_fd < 0) {
-        error_report("eBPF RSS - can't load eBPF program");
+        trace_ebpf_error("eBPF RSS", "can not load eBPF program");
         goto l_prog_load;
     }
 
