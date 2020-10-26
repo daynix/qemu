@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # pip install pyelftools
 
 import sys
@@ -28,7 +28,10 @@ def process_file(filename, prog_name):
             w.write("struct bpf_insn ins%s[] = {\n" % prog_name)
             insns = [prog_sec.data()[i:i + 8] for i in range(0, prog_sec.data_size, 8)]
             for x in insns:
-                w.write('    {0x%02x, 0x%02x, 0x%02x, 0x%02x%02x, 0x%02x%02x%02x%02x},\n' % (x[0], x[1] & 0x0f, (x[1] >> 4) & 0x0f, x[3], x[2], x[7], x[6], x[5], x[4]))
+                w.write( \
+                    '    {0x%02x, 0x%02x, 0x%02x, 0x%02x%02x, 0x%02x%02x%02x%02x},\n' \
+                    % (x[0], x[1] & 0x0f, (x[1] >> 4) & 0x0f, \
+                       x[3], x[2], x[7], x[6], x[5], x[4]))
             w.write('};\n\n')
 
             reladyn_name = '.rel' + prog_name
@@ -39,7 +42,9 @@ def process_file(filename, prog_name):
 
             w.write('struct fixup_mapfd_t rel%s[] = {\n' % prog_name)
             for reloc in reladyn.iter_relocations():
-                w.write('    {"%s", %i},\n' % (symtab.get_symbol(reloc['r_info_sym']).name, (reloc['r_offset']/8)))
+                w.write('    {"%s", %i},\n' \
+                        % (symtab.get_symbol(reloc['r_info_sym']).name, \
+                           (reloc['r_offset']/8)))
             w.write('};\n\n')
             w.write('#endif /* %s */\n' % prog_name.upper())
 
