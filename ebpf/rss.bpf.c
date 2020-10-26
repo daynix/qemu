@@ -11,15 +11,6 @@
 
 #include <bpf/bpf_helpers.h>
 
-/*
- * NOTES:
- * clang -O2 -g -fno-stack-protector -S -emit-llvm -c rss.bpf.c -o - | llc -march=bpf -filetype=obj -o rss.bpf.o
- * llvm-objcopy -j tun_rss_steering  -O binary -S -g rss.bpf.o rss.bpf.bin
- * puts open("rss.bpf.o", "r"){|f| f.read}.each_byte.map{|x| "0x%02x" %x}.each_slice(10).map{|x| x.join(", ")}.join(",\n")
- * cat /sys/kernel/debug/tracing/trace_pipe
- * python EbpfElf_to_C.py rss.bpf.o tun_rss_steering
- */
-
 #define VIRTIO_NET_RSS_HASH_TYPE_IPv4          (1 << 0)
 #define VIRTIO_NET_RSS_HASH_TYPE_TCPv4         (1 << 1)
 #define VIRTIO_NET_RSS_HASH_TYPE_UDPv4         (1 << 2)
@@ -31,7 +22,7 @@
 #define VIRTIO_NET_RSS_HASH_TYPE_UDP_EX        (1 << 8)
 
 #define INDIRECTION_TABLE_SIZE 128
-#define HASH_CALCULATION_BUFFER_SIZE 36 /* max - 2 ipv6 addresses(32) + src/dst port(4) */
+#define HASH_CALCULATION_BUFFER_SIZE 36
 
 struct rss_config_t {
     __u8 redirect;
@@ -46,8 +37,7 @@ struct toeplitz_key_data_t {
     __u8 next_byte[HASH_CALCULATION_BUFFER_SIZE];
 };
 
-struct packet_hash_info_t
-{
+struct packet_hash_info_t {
     __u8 is_ipv4;
     __u8 is_ipv6;
     __u8 is_udp;
@@ -136,16 +126,16 @@ void net_toeplitz_add(__u32 *result,
 static inline int ip6_extension_header_type(__u8 hdr_type)
 {
     switch (hdr_type) {
-        case IPPROTO_HOPOPTS:
-        case IPPROTO_ROUTING:
-        case IPPROTO_FRAGMENT:
-        case IPPROTO_ICMPV6:
-        case IPPROTO_NONE:
-        case IPPROTO_DSTOPTS:
-        case IPPROTO_MH:
-            return 1;
-        default:
-            return 0;
+    case IPPROTO_HOPOPTS:
+    case IPPROTO_ROUTING:
+    case IPPROTO_FRAGMENT:
+    case IPPROTO_ICMPV6:
+    case IPPROTO_NONE:
+    case IPPROTO_DSTOPTS:
+    case IPPROTO_MH:
+        return 1;
+    default:
+        return 0;
     }
 }
 /*
@@ -158,8 +148,9 @@ static inline int ip6_extension_header_type(__u8 hdr_type)
 #define IP6_EXTENSIONS_COUNT 11
 #define IP6_OPTIONS_COUNT 30
 
-static inline void parse_ipv6_ext(struct __sk_buff *skb, struct packet_hash_info_t *info,
-                                           __u8 *l4_protocol, size_t *l4_offset)
+static inline void parse_ipv6_ext(struct __sk_buff *skb,
+        struct packet_hash_info_t *info,
+        __u8 *l4_protocol, size_t *l4_offset)
 {
     if (!ip6_extension_header_type(*l4_protocol)) {
         return;
@@ -167,22 +158,26 @@ static inline void parse_ipv6_ext(struct __sk_buff *skb, struct packet_hash_info
 
     struct ipv6_opt_hdr ext_hdr = {};
 
-    for (unsigned int i = 0; i < IP6_EXTENSIONS_COUNT; ++i)
-    {
+    for (unsigned int i = 0; i < IP6_EXTENSIONS_COUNT; ++i) {
 
-        bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_hdr, sizeof(ext_hdr), BPF_HDR_START_NET);
+        bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_hdr,
+                                    sizeof(ext_hdr), BPF_HDR_START_NET);
 
-        if (*l4_protocol == IPPROTO_ROUTING)
-        {
+        if (*l4_protocol == IPPROTO_ROUTING) {
             struct ipv6_rt_hdr ext_rt = {};
 
-            bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_rt, sizeof(ext_rt), BPF_HDR_START_NET);
+            bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_rt,
+                                        sizeof(ext_rt), BPF_HDR_START_NET);
 
-            if((ext_rt.type = IPV6_SRCRT_TYPE_2) &&
+            if ((ext_rt.type == IPV6_SRCRT_TYPE_2) &&
                     (ext_rt.hdrlen == sizeof(struct in6_addr) / 8) &&
                     (ext_rt.segments_left == 1)) {
 
-                bpf_skb_load_bytes_relative(skb, *l4_offset + offsetof(struct rt2_hdr, addr), &info->in6_ext_dst, sizeof(info->in6_ext_dst), BPF_HDR_START_NET);
+                bpf_skb_load_bytes_relative(skb,
+                    *l4_offset + offsetof(struct rt2_hdr, addr),
+                    &info->in6_ext_dst, sizeof(info->in6_ext_dst),
+                    BPF_HDR_START_NET);
+
                 info->is_ipv6_ext_dst = 1;
             }
 
@@ -195,16 +190,22 @@ static inline void parse_ipv6_ext(struct __sk_buff *skb, struct packet_hash_info
             size_t opt_offset = sizeof(ext_hdr);
 
             for (unsigned int j = 0; j < IP6_OPTIONS_COUNT; ++j) {
-                bpf_skb_load_bytes_relative(skb, *l4_offset + opt_offset, &opt, sizeof(opt), BPF_HDR_START_NET);
+                bpf_skb_load_bytes_relative(skb, *l4_offset + opt_offset,
+                                        &opt, sizeof(opt), BPF_HDR_START_NET);
 
-                opt_offset += opt.type == IPV6_TLV_PAD1 ? 1 : opt.length + sizeof(opt);
+                opt_offset += (opt.type == IPV6_TLV_PAD1) ?
+                        1 : opt.length + sizeof(opt);
+
                 if (opt_offset + 1 >= ext_hdr.hdrlen * 8) {
                     break;
                 }
 
                 if (opt.type == IPV6_TLV_HAO) {
-                    bpf_skb_load_bytes_relative(skb, *l4_offset + opt_offset + offsetof(struct ipv6_destopt_hao, addr),
-                            &info->is_ipv6_ext_src, sizeof(info->is_ipv6_ext_src), BPF_HDR_START_NET);
+                    bpf_skb_load_bytes_relative(skb,
+                        *l4_offset + opt_offset + offsetof(struct ipv6_destopt_hao, addr),
+                        &info->is_ipv6_ext_src, sizeof(info->is_ipv6_ext_src),
+                        BPF_HDR_START_NET);
+
                     info->is_ipv6_ext_src = 1;
                     break;
                 }
@@ -214,15 +215,16 @@ static inline void parse_ipv6_ext(struct __sk_buff *skb, struct packet_hash_info
         *l4_protocol = ext_hdr.nexthdr;
         *l4_offset += (ext_hdr.hdrlen + 1) * 8;
 
-        if(!ip6_extension_header_type(ext_hdr.nexthdr))
-        {
+        if (!ip6_extension_header_type(ext_hdr.nexthdr)) {
             return;
         }
     }
 }
 
-static inline void parse_packet(struct __sk_buff *skb, struct packet_hash_info_t *info) {
-    if(!info || !skb) {
+static inline void parse_packet(struct __sk_buff *skb,
+        struct packet_hash_info_t *info)
+{
+    if (!info || !skb) {
         return;
     }
 
@@ -234,7 +236,8 @@ static inline void parse_packet(struct __sk_buff *skb, struct packet_hash_info_t
         info->is_ipv4 = 1;
 
         struct iphdr ip = {};
-        bpf_skb_load_bytes_relative(skb, 0, &ip, sizeof(ip), BPF_HDR_START_NET);
+        bpf_skb_load_bytes_relative(skb, 0, &ip, sizeof(ip),
+                                    BPF_HDR_START_NET);
 
         info->in_src = ip.saddr;
         info->in_dst = ip.daddr;
@@ -245,7 +248,8 @@ static inline void parse_packet(struct __sk_buff *skb, struct packet_hash_info_t
         info->is_ipv6 = 1;
 
         struct ipv6hdr ip6 = {};
-        bpf_skb_load_bytes_relative(skb, 0, &ip6, sizeof(ip6), BPF_HDR_START_NET);
+        bpf_skb_load_bytes_relative(skb, 0, &ip6, sizeof(ip6),
+                                    BPF_HDR_START_NET);
 
         info->in6_src = ip6.saddr;
         info->in6_dst = ip6.daddr;
@@ -261,17 +265,17 @@ static inline void parse_packet(struct __sk_buff *skb, struct packet_hash_info_t
             info->is_tcp = 1;
 
             struct tcphdr tcp = {};
-            bpf_skb_load_bytes_relative(skb, l4_offset, &tcp, sizeof(tcp), BPF_HDR_START_NET);
+            bpf_skb_load_bytes_relative(skb, l4_offset, &tcp, sizeof(tcp),
+                                        BPF_HDR_START_NET);
 
             info->src_port = tcp.source;
             info->dst_port = tcp.dest;
-        }
-        else if (l4_protocol == IPPROTO_UDP) /* TODO: add udplite? */
-        {
+        } else if (l4_protocol == IPPROTO_UDP) { /* TODO: add udplite? */
             info->is_udp = 1;
 
             struct udphdr udp = {};
-            bpf_skb_load_bytes_relative(skb, l4_offset, &udp, sizeof(udp), BPF_HDR_START_NET);
+            bpf_skb_load_bytes_relative(skb, l4_offset, &udp, sizeof(udp),
+                                        BPF_HDR_START_NET);
 
             info->src_port = udp.source;
             info->dst_port = udp.dest;
@@ -279,69 +283,142 @@ static inline void parse_packet(struct __sk_buff *skb, struct packet_hash_info_t
     }
 }
 
-static inline __u32 calculate_rss_hash(struct __sk_buff *skb, struct rss_config_t *config, struct toeplitz_key_data_t *toe) {
+static inline __u32 calculate_rss_hash(struct __sk_buff *skb,
+        struct rss_config_t *config, struct toeplitz_key_data_t *toe)
+{
     __u8 rss_input[HASH_CALCULATION_BUFFER_SIZE] = {};
     size_t bytes_written = 0;
     __u32 result = 0;
     struct packet_hash_info_t packet_info = {};
 
     parse_packet(skb, &packet_info);
-    
+
     if (packet_info.is_ipv4) {
-        if (packet_info.is_tcp && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv4)
-        {
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in_src, sizeof(packet_info.in_src));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in_dst, sizeof(packet_info.in_dst));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.src_port, sizeof(packet_info.src_port));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.dst_port, sizeof(packet_info.dst_port));
-        } else if (packet_info.is_udp && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDPv4) {
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in_src, sizeof(packet_info.in_src));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in_dst, sizeof(packet_info.in_dst));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.src_port, sizeof(packet_info.src_port));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.dst_port, sizeof(packet_info.dst_port));
+        if (packet_info.is_tcp &&
+            config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv4) {
+
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.in_src,
+                                 sizeof(packet_info.in_src));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.in_dst,
+                                 sizeof(packet_info.in_dst));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.src_port,
+                                 sizeof(packet_info.src_port));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.dst_port,
+                                 sizeof(packet_info.dst_port));
+        } else if (packet_info.is_udp &&
+                   config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDPv4) {
+
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.in_src,
+                                 sizeof(packet_info.in_src));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.in_dst,
+                                 sizeof(packet_info.in_dst));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.src_port,
+                                 sizeof(packet_info.src_port));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.dst_port,
+                                 sizeof(packet_info.dst_port));
         } else if (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IPv4) {
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in_src, sizeof(packet_info.in_src));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in_dst, sizeof(packet_info.in_dst));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.in_src,
+                                 sizeof(packet_info.in_src));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.in_dst,
+                                 sizeof(packet_info.in_dst));
         }
     } else if (packet_info.is_ipv6) {
-        if (packet_info.is_tcp && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv6)
-        {
-            if(packet_info.is_ipv6_ext_src && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCP_EX) {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_ext_src, sizeof(packet_info.in6_ext_src));
-            } else {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_src, sizeof(packet_info.in6_src));
-            }
-            if(packet_info.is_ipv6_ext_dst && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCP_EX) {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_ext_dst, sizeof(packet_info.in6_ext_dst));
-            } else {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_dst, sizeof(packet_info.in6_dst));
-            }
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.src_port, sizeof(packet_info.src_port));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.dst_port, sizeof(packet_info.dst_port));
-        } else if (packet_info.is_udp && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDPv6) {
+        if (packet_info.is_tcp &&
+            config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv6) {
 
-            if(packet_info.is_ipv6_ext_src && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDP_EX) {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_ext_src, sizeof(packet_info.in6_ext_src));
+            if (packet_info.is_ipv6_ext_src &&
+                config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCP_EX) {
+
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_ext_src,
+                                     sizeof(packet_info.in6_ext_src));
             } else {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_src, sizeof(packet_info.in6_src));
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_src,
+                                     sizeof(packet_info.in6_src));
             }
-            if(packet_info.is_ipv6_ext_dst && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDP_EX) {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_ext_dst, sizeof(packet_info.in6_ext_dst));
+            if (packet_info.is_ipv6_ext_dst &&
+                config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCP_EX) {
+
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_ext_dst,
+                                     sizeof(packet_info.in6_ext_dst));
             } else {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_dst, sizeof(packet_info.in6_dst));
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_dst,
+                                     sizeof(packet_info.in6_dst));
             }
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.src_port, sizeof(packet_info.src_port));
-            net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.dst_port, sizeof(packet_info.dst_port));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.src_port,
+                                 sizeof(packet_info.src_port));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.dst_port,
+                                 sizeof(packet_info.dst_port));
+        } else if (packet_info.is_udp &&
+                   config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDPv6) {
+
+            if (packet_info.is_ipv6_ext_src &&
+               config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDP_EX) {
+
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_ext_src,
+                                     sizeof(packet_info.in6_ext_src));
+            } else {
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_src,
+                                     sizeof(packet_info.in6_src));
+            }
+            if (packet_info.is_ipv6_ext_dst &&
+               config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDP_EX) {
+
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_ext_dst,
+                                     sizeof(packet_info.in6_ext_dst));
+            } else {
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_dst,
+                                     sizeof(packet_info.in6_dst));
+            }
+
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.src_port,
+                                 sizeof(packet_info.src_port));
+            net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                 &packet_info.dst_port,
+                                 sizeof(packet_info.dst_port));
+
         } else if (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IPv6) {
-            if(packet_info.is_ipv6_ext_src && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IP_EX) {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_ext_src, sizeof(packet_info.in6_ext_src));
+            if (packet_info.is_ipv6_ext_src &&
+               config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IP_EX) {
+
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_ext_src,
+                                     sizeof(packet_info.in6_ext_src));
             } else {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_src, sizeof(packet_info.in6_src));
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_src,
+                                     sizeof(packet_info.in6_src));
             }
-            if(packet_info.is_ipv6_ext_dst && config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IP_EX) {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_ext_dst, sizeof(packet_info.in6_ext_dst));
+            if (packet_info.is_ipv6_ext_dst &&
+                config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IP_EX) {
+
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_ext_dst,
+                                     sizeof(packet_info.in6_ext_dst));
             } else {
-                net_rx_rss_add_chunk(rss_input, &bytes_written, &packet_info.in6_dst, sizeof(packet_info.in6_dst));
+                net_rx_rss_add_chunk(rss_input, &bytes_written,
+                                     &packet_info.in6_dst,
+                                     sizeof(packet_info.in6_dst));
             }
         }
     }
@@ -354,7 +431,8 @@ static inline __u32 calculate_rss_hash(struct __sk_buff *skb, struct rss_config_
 }
 
 SEC("tun_rss_steering")
-int tun_rss_steering_prog(struct __sk_buff *skb) {
+int tun_rss_steering_prog(struct __sk_buff *skb)
+{
 
     struct rss_config_t *config = 0;
     struct toeplitz_key_data_t *toe = 0;
@@ -365,15 +443,18 @@ int tun_rss_steering_prog(struct __sk_buff *skb) {
     config = bpf_map_lookup_elem(&tap_rss_map_configurations, &key);
     toe = bpf_map_lookup_elem(&tap_rss_map_toeplitz_key, &key);
 
-    if(config && toe)
-    {
+    if (config && toe) {
+        if (!config->redirect) {
+            return config->default_queue;
+        }
+
         hash = calculate_rss_hash(skb, config, toe);
-        bpf_printk("HASH: %x\n", hash);
         if (hash) {
             __u32 table_idx = hash % config->indirections_len;
             __u16 *queue = 0;
 
-            queue = bpf_map_lookup_elem(&tap_rss_map_indirection_table, &table_idx);
+            queue = bpf_map_lookup_elem(&tap_rss_map_indirection_table,
+                                        &table_idx);
 
             if (queue) {
                 return *queue;
