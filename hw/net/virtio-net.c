@@ -1754,8 +1754,6 @@ static int virtio_net_process_rss(NetClientState *nc, const uint8_t *buf,
         new_index = n->rss_data.indirections_table[new_index];
     }
 
-    fprintf(stderr, "Queue index new_index %d %d %x\n", index, new_index, hash);
-
     return (index == new_index) ? -1 : new_index;
 }
 
