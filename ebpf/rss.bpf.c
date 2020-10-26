@@ -1,7 +1,8 @@
+#include <stddef.h>
+#include <stdbool.h>
 #include <linux/bpf.h>
 
 #include <linux/in.h>
-#include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
@@ -10,25 +11,15 @@
 #include <linux/tcp.h>
 
 #include <bpf/bpf_helpers.h>
+#include <linux/virtio_net.h>
 
 /*
- * NOTES:
- * clang -O2 -g -fno-stack-protector -S -emit-llvm -c rss.bpf.c -o - | llc -march=bpf -filetype=obj -o rss.bpf.o
- * llvm-objcopy -j tun_rss_steering  -O binary -S -g rss.bpf.o rss.bpf.bin
- * puts open("rss.bpf.o", "r"){|f| f.read}.each_byte.map{|x| "0x%02x" %x}.each_slice(10).map{|x| x.join(", ")}.join(",\n")
- * cat /sys/kernel/debug/tracing/trace_pipe
- * python EbpfElf_to_C.py rss.bpf.o tun_rss_steering
+ * Prepare:
+ * Requires llvm, clang, python3 with pyelftools, linux kernel tree
+ *
+ * Build tun_rss_steering.h:
+ * make -f Mefile.ebpf clean all
  */
-
-#define VIRTIO_NET_RSS_HASH_TYPE_IPv4          (1 << 0)
-#define VIRTIO_NET_RSS_HASH_TYPE_TCPv4         (1 << 1)
-#define VIRTIO_NET_RSS_HASH_TYPE_UDPv4         (1 << 2)
-#define VIRTIO_NET_RSS_HASH_TYPE_IPv6          (1 << 3)
-#define VIRTIO_NET_RSS_HASH_TYPE_TCPv6         (1 << 4)
-#define VIRTIO_NET_RSS_HASH_TYPE_UDPv6         (1 << 5)
-#define VIRTIO_NET_RSS_HASH_TYPE_IP_EX         (1 << 6)
-#define VIRTIO_NET_RSS_HASH_TYPE_TCP_EX        (1 << 7)
-#define VIRTIO_NET_RSS_HASH_TYPE_UDP_EX        (1 << 8)
 
 #define INDIRECTION_TABLE_SIZE 128
 #define HASH_CALCULATION_BUFFER_SIZE 36 /* max - 2 ipv6 addresses(32) + src/dst port(4) */
