@@ -2,6 +2,7 @@
 # pip install pyelftools
 
 import sys
+import argparse
 
 from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import RelocationSection
@@ -20,10 +21,12 @@ def process_file(filename, prog_name):
             symtab = elffile.get_section_by_name(".symtab")
             if not isinstance(symtab, SymbolTableSection):
                 print('  The file has no %s section' % ".symtab")
+                return -1
 
             prog_sec = elffile.get_section_by_name(prog_name);
             if not isinstance(prog_sec, Section):
                 print('  The file has no %s section' % prog_name)
+                return -1
 
             w.write("struct bpf_insn ins%s[] = {\n" % prog_name)
             insns = [prog_sec.data()[i:i + 8] for i in range(0, prog_sec.data_size, 8)]
@@ -37,17 +40,27 @@ def process_file(filename, prog_name):
             reladyn_name = '.rel' + prog_name
             reladyn = elffile.get_section_by_name(reladyn_name)
 
-            if not isinstance(reladyn, RelocationSection):
-                print('  The file has no %s section' % reladyn_name)
-
-            w.write('struct fixup_mapfd_t rel%s[] = {\n' % prog_name)
-            for reloc in reladyn.iter_relocations():
-                w.write('    {"%s", %i},\n' \
+            if isinstance(reladyn, RelocationSection):
+                w.write('struct fixup_mapfd_t rel%s[] = {\n' % prog_name)
+                for reloc in reladyn.iter_relocations():
+                    w.write('    {"%s", %i},\n' \
                         % (symtab.get_symbol(reloc['r_info_sym']).name, \
                            (reloc['r_offset']/8)))
-            w.write('};\n\n')
+                w.write('};\n\n')
+            else:
+               print('  The file has no %s section' % reladyn_name)
+
             w.write('#endif /* %s */\n' % prog_name.upper())
 
+    return 0
+
 if __name__ == '__main__':
-    if len(sys.argv) > 2:
-        process_file(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser(
+        description='Convert eBPF ELF to C header. '
+                    'Section name will be used in C namings.')
+    parser.add_argument('--file', '-f', nargs=1, required=True,
+                        help='eBPF ELF file')
+    parser.add_argument('--section', '-s', nargs=1, required=True,
+                        help='section in ELF with eBPF program.')
+    args = parser.parse_args()
+    sys.exit(process_file(args.file[0], args.section[0]))

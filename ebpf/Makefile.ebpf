@@ -35,5 +35,5 @@ $(OBJS):  %.o:%.c
                 -Wno-unknown-warning-option \
                 -I../include $(LINUXINCLUDE) \
                 $(EXTRA_CFLAGS) -c $< -o -| $(LLC) -march=bpf -filetype=obj -o $@
-	python3 EbpfElf_to_C.py rss.bpf.o tun_rss_steering
+	python3 EbpfElf_to_C.py -f rss.bpf.o -s tun_rss_steering
 
