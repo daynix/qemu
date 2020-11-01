@@ -2878,6 +2878,7 @@ static int virtio_net_post_load_device(void *opaque, int version_id)
     }
 
     if (n->rss_data.enabled) {
+        n->rss_data.enabled_software_rss = n->rss_data.populate_hash;
         if (!n->rss_data.populate_hash) {
             if (!virtio_net_load_epbf_rss(n)) {
                 if (get_vhost_net(qemu_get_queue(n->nic)->peer)) {
@@ -2887,9 +2888,6 @@ static int virtio_net_post_load_device(void *opaque, int version_id)
                     n->rss_data.enabled_software_rss = true;
                 }
             }
-        } else {
-            virtio_net_unload_epbf_rss(n);
-            n->rss_data.enabled_software_rss = true;
         }
 
         trace_virtio_net_rss_enable(n->rss_data.hash_types,
@@ -3087,7 +3085,6 @@ static const VMStateDescription vmstate_virtio_net_rss = {
     .needed = virtio_net_rss_needed,
     .fields = (VMStateField[]) {
         VMSTATE_BOOL(rss_data.enabled, VirtIONet),
-        VMSTATE_BOOL(rss_data.enabled_software_rss, VirtIONet),
         VMSTATE_BOOL(rss_data.redirect, VirtIONet),
         VMSTATE_BOOL(rss_data.populate_hash, VirtIONet),
         VMSTATE_UINT32(rss_data.hash_types, VirtIONet),
