@@ -2,16 +2,18 @@
 eBPF RSS virtio-net support
 ===========================
 
-RSS(Receive Side Scaling) used to distribute network packets to guest queues by calculating packet hash.
-Usually, every queue is processed by a specific guest CPU core.
+RSS(Receive Side Scaling) is used to distribute network packets to guest virtqueues
+by calculating packet hash. Usually every queue is processed then by a specific guest CPU core.
 
-For now, there are 2 RSS implementations in qemu:
+For now there are 2 RSS implementations in qemu:
+- 'software' RSS (functions if qemu receives network packets, i.e. vhost=off)
+- eBPF RSS (can function with also with vhost=on)
 
-- 'software' RSS
-- eBPF RSS
-
-TAP + virtio-net queues usually linked in order. So packet from TAP queue 1 would be sent to virtio tx queue 1 etc.
-'software' RSS 're-steers' packets in qemu after reading it from the TAP device. eBPF RSS steers them by eBPF program in TAP device. The eBPF program sets by TAP's TUNSETSTEERINGEBPF ioctl.
+If steering BPF is not set for kernel's TUN module, the TUN uses automatic selection
+of rx virtqueue based on lookup table built according to calculated symmetric hash
+of transmitted packets.
+If steering BPF is set for TUN the BPF code calculates the hash of packet header and
+returns the virtqueue number to place the packet to.
 
 Simplified decision formula:
 
@@ -38,12 +40,12 @@ eBPF RSS turned on by different combinations of vhost-net, vitrio-net and tap co
 
         tap,vhost=off & virtio-net-pci,rss=on,hash=on
 
-- eBPF is used, hash population would be not reported as virtio-net feature to guest:
+- eBPF is used, hash population feature is not reported to the guest:
 
         tap,vhost=on & virtio-net-pci,rss=on,hash=on
 
-If CONFIG_EBPF doesn't set, then 'software' RSS is used in all cases.
-Also 'software' RSS, as a fallback, is used if the eBPF program failed to load or set to TAP.
+If CONFIG_EBPF is not set then only 'software' RSS is supported.
+Also 'software' RSS, as a fallback, is used if the eBPF program failed to load or set to TUN.
 
 RSS eBPF program
 ----------------
@@ -51,12 +53,15 @@ RSS eBPF program
 RSS program located in ebpf/tun_rss_steering.h as an array of 'struct bpf_insn'.
 So the program is part of the qemu binary.
 Initially, the eBPF program was compiled by clang and source code located at ebpf/rss.bpf.c.
+Prerequisites to recompile the eBPF program (regenerate ebpf/tun_rss_steering.h):
 
-To compile ebpf/rss.bpf.c:
+        llvm, clang, kernel source tree, python3 + (pip3 pyelftools)
+        Adjust 'linuxhdrs' in Makefile.ebpf to reflect the location of the kernel source tree
 
-        $ clang -O2 -g -fno-stack-protector -S -emit-llvm -c rss.bpf.c -o - | llc -march=bpf -filetype=obj -o rss.bpf.o
+        $ cd ebpf
+        $ make -f Makefile.ebpf
 
-Also, there is a python script for convertation from eBPF ELF object to '.h' file - Ebpf_to_C.py:
+Note the python script for convertation from eBPF ELF object to '.h' file - Ebpf_to_C.py:
 
         $ python EbpfElf_to_C.py rss.bpf.o tun_rss_steering
 
