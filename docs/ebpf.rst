@@ -2,11 +2,11 @@
 eBPF qemu support
 ===========================
 
-To enable eBPF support - need to add CONFIG_EBPF defined during compilation:
+eBPF support (CONFIG_EBPF) is enabled automatically by 'configure' script
+if 'bpf' system call is available.
+To disable eBPF support use './configure --disable-bpf'
 
-    $ ./configure --enable-bpf
-
-Basic eBPF functionality located in ebpf/ebpf.c and ebpf/ebpf.h.
+Basic eBPF functionality is located in ebpf/ebpf.c and ebpf/ebpf.h.
 There are basic functions to load the eBPF program into the kernel.
 Mostly, functions name are self-explanatory:
 
