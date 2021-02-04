@@ -983,6 +983,12 @@ if not get_option('fuse_lseek').disabled()
   endif
 endif
 
+# libbpf
+libbpf = not_found
+if 'CONFIG_EBPF' in config_host
+  libbpf = cc.find_library('bpf', required: true)
+endif
+
 if get_option('cfi')
   cfi_flags=[]
   # Check for dependency on LTO
@@ -1701,6 +1707,7 @@ if have_system
     'backends',
     'backends/tpm',
     'chardev',
+    'ebpf',
     'hw/9pfs',
     'hw/acpi',
     'hw/adc',
@@ -1867,6 +1874,9 @@ subdir('accel')
 subdir('plugins')
 subdir('bsd-user')
 subdir('linux-user')
+subdir('ebpf')
+
+common_ss.add(libbpf)
 
 bsd_user_ss.add(files('gdbstub.c'))
 specific_ss.add_all(when: 'CONFIG_BSD_USER', if_true: bsd_user_ss)
@@ -2424,6 +2434,7 @@ summary_info += {'madvise':           config_host.has_key('CONFIG_MADVISE')}
 summary_info += {'posix_madvise':     config_host.has_key('CONFIG_POSIX_MADVISE')}
 summary_info += {'posix_memalign':    config_host.has_key('CONFIG_POSIX_MEMALIGN')}
 summary_info += {'libcap-ng support': libcap_ng.found()}
+summary_info += {'bpf support': config_host.has_key('CONFIG_EBPF')}
 summary_info += {'vhost-kernel support': config_host.has_key('CONFIG_VHOST_KERNEL')}
 summary_info += {'vhost-net support': config_host.has_key('CONFIG_VHOST_NET')}
 summary_info += {'vhost-crypto support': config_host.has_key('CONFIG_VHOST_CRYPTO')}
