@@ -42,6 +42,7 @@
 #include "sysemu/sysemu.h"
 #include "hw/pci/pci.h"
 #include "hw/pci-host/gpex.h"
+#include "hw/misc/unimp.h"
 
 static const struct MemmapEntry {
     hwaddr base;
@@ -300,31 +301,37 @@ static void create_fdt(RISCVVirtState *s, const struct MemmapEntry *memmap,
         riscv_socket_fdt_write_id(mc, fdt, clint_name, socket);
         g_free(clint_name);
 
-        plic_phandle[socket] = phandle++;
-        plic_addr = memmap[VIRT_PLIC].base + (memmap[VIRT_PLIC].size * socket);
-        plic_name = g_strdup_printf("/soc/plic@%lx", plic_addr);
-        qemu_fdt_add_subnode(fdt, plic_name);
-        qemu_fdt_setprop_cell(fdt, plic_name,
-            "#address-cells", FDT_PLIC_ADDR_CELLS);
-        qemu_fdt_setprop_cell(fdt, plic_name,
-            "#interrupt-cells", FDT_PLIC_INT_CELLS);
-        qemu_fdt_setprop_string(fdt, plic_name, "compatible", "riscv,plic0");
-        qemu_fdt_setprop(fdt, plic_name, "interrupt-controller", NULL, 0);
-        qemu_fdt_setprop(fdt, plic_name, "interrupts-extended",
-            plic_cells, s->soc[socket].num_harts * sizeof(uint32_t) * 4);
-        qemu_fdt_setprop_cells(fdt, plic_name, "reg",
-            0x0, plic_addr, 0x0, memmap[VIRT_PLIC].size);
-        qemu_fdt_setprop_cell(fdt, plic_name, "riscv,ndev", VIRTIO_NDEV);
-        riscv_socket_fdt_write_id(mc, fdt, plic_name, socket);
-        qemu_fdt_setprop_cell(fdt, plic_name, "phandle", plic_phandle[socket]);
+        if (!s->ariane) {
+            plic_phandle[socket] = phandle++;
+            plic_addr = memmap[VIRT_PLIC].base + (memmap[VIRT_PLIC].size * socket);
+            plic_name = g_strdup_printf("/soc/plic@%lx", plic_addr);
+            qemu_fdt_add_subnode(fdt, plic_name);
+            qemu_fdt_setprop_cell(fdt, plic_name,
+                "#address-cells", FDT_PLIC_ADDR_CELLS);
+            qemu_fdt_setprop_cell(fdt, plic_name,
+                "#interrupt-cells", FDT_PLIC_INT_CELLS);
+            qemu_fdt_setprop_string(fdt, plic_name, "compatible", "riscv,plic0");
+            qemu_fdt_setprop(fdt, plic_name, "interrupt-controller", NULL, 0);
+            qemu_fdt_setprop(fdt, plic_name, "interrupts-extended",
+                plic_cells, s->soc[socket].num_harts * sizeof(uint32_t) * 4);
+            qemu_fdt_setprop_cells(fdt, plic_name, "reg",
+                0x0, plic_addr, 0x0, memmap[VIRT_PLIC].size);
+            qemu_fdt_setprop_cell(fdt, plic_name, "riscv,ndev", VIRTIO_NDEV);
+            riscv_socket_fdt_write_id(mc, fdt, plic_name, socket);
+            qemu_fdt_setprop_cell(fdt, plic_name, "phandle", plic_phandle[socket]);
+        } else {
+            plic_phandle[socket] = 0;
+            plic_addr = memmap[VIRT_PLIC].base + (memmap[VIRT_PLIC].size * socket);
+            plic_name = g_strdup_printf("/soc/plic@%lx", plic_addr);
+            puts("PLIC is disabled for BBL!");
+        }
         g_free(plic_name);
-
         g_free(clint_cells);
         g_free(plic_cells);
         g_free(clust_name);
     }
 
-    for (socket = 0; socket < riscv_socket_count(mc); socket++) {
+    for (socket = 0; !s->ariane && socket < riscv_socket_count(mc); socket++) {
         if (socket == 0) {
             plic_mmio_phandle = plic_phandle[socket];
             plic_virtio_phandle = plic_phandle[socket];
@@ -341,7 +348,7 @@ static void create_fdt(RISCVVirtState *s, const struct MemmapEntry *memmap,
 
     riscv_socket_fdt_write_distance_matrix(mc, fdt);
 
-    for (i = 0; i < VIRTIO_COUNT; i++) {
+    for (i = 0; !s->ariane && i < VIRTIO_COUNT; i++) {
         name = g_strdup_printf("/soc/virtio_mmio@%lx",
             (long)(memmap[VIRT_VIRTIO].base + i * memmap[VIRT_VIRTIO].size));
         qemu_fdt_add_subnode(fdt, name);
@@ -357,25 +364,27 @@ static void create_fdt(RISCVVirtState *s, const struct MemmapEntry *memmap,
 
     name = g_strdup_printf("/soc/pci@%lx",
         (long) memmap[VIRT_PCIE_ECAM].base);
-    qemu_fdt_add_subnode(fdt, name);
-    qemu_fdt_setprop_cell(fdt, name, "#address-cells", FDT_PCI_ADDR_CELLS);
-    qemu_fdt_setprop_cell(fdt, name, "#interrupt-cells", FDT_PCI_INT_CELLS);
-    qemu_fdt_setprop_cell(fdt, name, "#size-cells", 0x2);
-    qemu_fdt_setprop_string(fdt, name, "compatible", "pci-host-ecam-generic");
-    qemu_fdt_setprop_string(fdt, name, "device_type", "pci");
-    qemu_fdt_setprop_cell(fdt, name, "linux,pci-domain", 0);
-    qemu_fdt_setprop_cells(fdt, name, "bus-range", 0,
-        memmap[VIRT_PCIE_ECAM].size / PCIE_MMCFG_SIZE_MIN - 1);
-    qemu_fdt_setprop(fdt, name, "dma-coherent", NULL, 0);
-    qemu_fdt_setprop_cells(fdt, name, "reg", 0,
-        memmap[VIRT_PCIE_ECAM].base, 0, memmap[VIRT_PCIE_ECAM].size);
-    qemu_fdt_setprop_sized_cells(fdt, name, "ranges",
-        1, FDT_PCI_RANGE_IOPORT, 2, 0,
-        2, memmap[VIRT_PCIE_PIO].base, 2, memmap[VIRT_PCIE_PIO].size,
-        1, FDT_PCI_RANGE_MMIO,
-        2, memmap[VIRT_PCIE_MMIO].base,
-        2, memmap[VIRT_PCIE_MMIO].base, 2, memmap[VIRT_PCIE_MMIO].size);
-    create_pcie_irq_map(fdt, name, plic_pcie_phandle);
+    if (!s->ariane) {
+        qemu_fdt_add_subnode(fdt, name);
+        qemu_fdt_setprop_cell(fdt, name, "#address-cells", FDT_PCI_ADDR_CELLS);
+        qemu_fdt_setprop_cell(fdt, name, "#interrupt-cells", FDT_PCI_INT_CELLS);
+        qemu_fdt_setprop_cell(fdt, name, "#size-cells", 0x2);
+        qemu_fdt_setprop_string(fdt, name, "compatible", "pci-host-ecam-generic");
+        qemu_fdt_setprop_string(fdt, name, "device_type", "pci");
+        qemu_fdt_setprop_cell(fdt, name, "linux,pci-domain", 0);
+        qemu_fdt_setprop_cells(fdt, name, "bus-range", 0,
+            memmap[VIRT_PCIE_ECAM].size / PCIE_MMCFG_SIZE_MIN - 1);
+        qemu_fdt_setprop(fdt, name, "dma-coherent", NULL, 0);
+        qemu_fdt_setprop_cells(fdt, name, "reg", 0,
+            memmap[VIRT_PCIE_ECAM].base, 0, memmap[VIRT_PCIE_ECAM].size);
+        qemu_fdt_setprop_sized_cells(fdt, name, "ranges",
+            1, FDT_PCI_RANGE_IOPORT, 2, 0,
+            2, memmap[VIRT_PCIE_PIO].base, 2, memmap[VIRT_PCIE_PIO].size,
+            1, FDT_PCI_RANGE_MMIO,
+            2, memmap[VIRT_PCIE_MMIO].base,
+            2, memmap[VIRT_PCIE_MMIO].base, 2, memmap[VIRT_PCIE_MMIO].size);
+        create_pcie_irq_map(fdt, name, plic_pcie_phandle);
+    }
     g_free(name);
 
     test_phandle = phandle++;
