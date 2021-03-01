@@ -694,10 +694,27 @@ static void virt_machine_init(MachineState *machine)
                                   drive_get(IF_PFLASH, 0, i));
     }
     virt_flash_map(s, system_memory);
+    if (s->ariane) {
+        create_unimplemented_device("aaa.bbb.ccc", 0xf000000000, 0x1000);
+    }
 }
 
 static void virt_machine_instance_init(Object *obj)
 {
+    RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
+    s->ariane = false;
+}
+
+static bool virt_machine_get_ariane(Object *obj, Error **errp)
+{
+    RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
+    return s->ariane;
+}
+
+static void virt_machine_set_ariane(Object *obj, bool value, Error **errp)
+{
+    RISCVVirtState *s = RISCV_VIRT_MACHINE(obj);
+    s->ariane = value;
 }
 
 static void virt_machine_class_init(ObjectClass *oc, void *data)
@@ -713,6 +730,9 @@ static void virt_machine_class_init(ObjectClass *oc, void *data)
     mc->cpu_index_to_instance_props = riscv_numa_cpu_index_to_props;
     mc->get_default_cpu_node_id = riscv_numa_get_default_cpu_node_id;
     mc->numa_mem_supported = true;
+
+    object_class_property_add_bool(oc, "ariane",
+        virt_machine_get_ariane, virt_machine_set_ariane);
 }
 
 static const TypeInfo virt_machine_typeinfo = {

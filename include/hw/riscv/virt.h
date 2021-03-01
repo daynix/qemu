@@ -43,6 +43,7 @@ struct RISCVVirtState {
 
     void *fdt;
     int fdt_size;
+    bool ariane; // no PLIC + unimpl SPI
 };
 
 enum {
