@@ -287,7 +287,8 @@ static void riscv_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "htval ", env->htval);
         qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "mtval2 ", env->mtval2);
     }
-#endif
+    qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "satp ", env->satp);
+  #endif
 
     for (i = 0; i < 32; i++) {
         qemu_fprintf(f, " %s " TARGET_FMT_lx,
