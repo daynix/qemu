@@ -25,6 +25,8 @@ RUN apt update && \
         libsasl2-dev \
         libsnappy-dev \
         libvte-dev \
+        libbpf4.19 \
+        libbpf-dev \
         netcat-openbsd \
         openssh-client \
         python3-numpy \

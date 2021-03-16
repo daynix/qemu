@@ -986,7 +986,7 @@ endif
 # libbpf
 libbpf = not_found
 if 'CONFIG_EBPF' in config_host
-  libbpf = cc.find_library('bpf', required: true)
+  libbpf = dependency('libbpf')
 endif
 
 if get_option('cfi')
