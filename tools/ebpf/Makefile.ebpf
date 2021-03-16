@@ -5,17 +5,6 @@ CLANG ?= clang
 INC_FLAGS = `$(CLANG) -print-file-name=include`
 EXTRA_CFLAGS ?= -O2 -emit-llvm -fno-stack-protector
 
-ifdef linuxhdrs
-LINUXINCLUDE =  -I $(linuxhdrs)/arch/x86/include/uapi \
-                -I $(linuxhdrs)/arch/x86/include/generated/uapi \
-                -I $(linuxhdrs)/arch/x86/include/generated \
-                -I $(linuxhdrs)/include/generated/uapi \
-                -I $(linuxhdrs)/include/uapi \
-                -I $(linuxhdrs)/include \
-                -I $(linuxhdrs)/tools/lib
-INC_FLAGS += -nostdinc -isystem
-endif
-
 all: $(OBJS)
 
 .PHONY: clean
