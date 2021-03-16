@@ -36,3 +36,4 @@ Contents:
    clocks
    qom
    block-coroutine-wrapper
+   ebpf_rss

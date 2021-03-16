@@ -984,10 +984,7 @@ if not get_option('fuse_lseek').disabled()
 endif
 
 # libbpf
-libbpf = not_found
-if 'CONFIG_EBPF' in config_host
-  libbpf = dependency('libbpf')
-endif
+libbpf = dependency('libbpf', required: get_option('bpf'))
 
 if get_option('cfi')
   cfi_flags=[]
@@ -1086,6 +1083,7 @@ endif
 config_host_data.set('CONFIG_GTK', gtk.found())
 config_host_data.set('CONFIG_LIBATTR', have_old_libattr)
 config_host_data.set('CONFIG_LIBCAP_NG', libcap_ng.found())
+config_host_data.set('CONFIG_EBPF', libbpf.found())
 config_host_data.set('CONFIG_LIBISCSI', libiscsi.found())
 config_host_data.set('CONFIG_LIBNFS', libnfs.found())
 config_host_data.set('CONFIG_RBD', rbd.found())
@@ -2434,7 +2432,7 @@ summary_info += {'madvise':           config_host.has_key('CONFIG_MADVISE')}
 summary_info += {'posix_madvise':     config_host.has_key('CONFIG_POSIX_MADVISE')}
 summary_info += {'posix_memalign':    config_host.has_key('CONFIG_POSIX_MEMALIGN')}
 summary_info += {'libcap-ng support': libcap_ng.found()}
-summary_info += {'bpf support': config_host.has_key('CONFIG_EBPF')}
+summary_info += {'bpf support': libbpf.found()}
 summary_info += {'vhost-kernel support': config_host.has_key('CONFIG_VHOST_KERNEL')}
 summary_info += {'vhost-net support': config_host.has_key('CONFIG_VHOST_NET')}
 summary_info += {'vhost-crypto support': config_host.has_key('CONFIG_VHOST_CRYPTO')}

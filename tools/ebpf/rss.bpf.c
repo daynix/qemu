@@ -30,6 +30,7 @@
 #include <linux/tcp.h>
 
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 #include <linux/virtio_net.h>
 
 #define INDIRECTION_TABLE_SIZE 128
@@ -161,35 +162,43 @@ static inline int ip6_extension_header_type(__u8 hdr_type)
 #define IP6_EXTENSIONS_COUNT 11
 #define IP6_OPTIONS_COUNT 30
 
-static inline void parse_ipv6_ext(struct __sk_buff *skb,
+static inline int parse_ipv6_ext(struct __sk_buff *skb,
         struct packet_hash_info_t *info,
         __u8 *l4_protocol, size_t *l4_offset)
 {
+    int err = 0;
+
     if (!ip6_extension_header_type(*l4_protocol)) {
-        return;
+        return 0;
     }
 
     struct ipv6_opt_hdr ext_hdr = {};
 
     for (unsigned int i = 0; i < IP6_EXTENSIONS_COUNT; ++i) {
 
-        bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_hdr,
+        err = bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_hdr,
                                     sizeof(ext_hdr), BPF_HDR_START_NET);
+        if (err)
+            goto error;
 
         if (*l4_protocol == IPPROTO_ROUTING) {
             struct ipv6_rt_hdr ext_rt = {};
 
-            bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_rt,
+            err = bpf_skb_load_bytes_relative(skb, *l4_offset, &ext_rt,
                                         sizeof(ext_rt), BPF_HDR_START_NET);
+            if (err)
+                goto error;
 
             if ((ext_rt.type == IPV6_SRCRT_TYPE_2) &&
                     (ext_rt.hdrlen == sizeof(struct in6_addr) / 8) &&
                     (ext_rt.segments_left == 1)) {
 
-                bpf_skb_load_bytes_relative(skb,
+                err = bpf_skb_load_bytes_relative(skb,
                     *l4_offset + offsetof(struct rt2_hdr, addr),
                     &info->in6_ext_dst, sizeof(info->in6_ext_dst),
                     BPF_HDR_START_NET);
+                if (err)
+                    goto error;
 
                 info->is_ipv6_ext_dst = 1;
             }
@@ -203,8 +212,10 @@ static inline void parse_ipv6_ext(struct __sk_buff *skb,
             size_t opt_offset = sizeof(ext_hdr);
 
             for (unsigned int j = 0; j < IP6_OPTIONS_COUNT; ++j) {
-                bpf_skb_load_bytes_relative(skb, *l4_offset + opt_offset,
+                err = bpf_skb_load_bytes_relative(skb, *l4_offset + opt_offset,
                                         &opt, sizeof(opt), BPF_HDR_START_NET);
+                if (err)
+                    goto error;
 
                 opt_offset += (opt.type == IPV6_TLV_PAD1) ?
                         1 : opt.length + sizeof(opt);
@@ -214,10 +225,12 @@ static inline void parse_ipv6_ext(struct __sk_buff *skb,
                 }
 
                 if (opt.type == IPV6_TLV_HAO) {
-                    bpf_skb_load_bytes_relative(skb,
+                    err = bpf_skb_load_bytes_relative(skb,
                         *l4_offset + opt_offset + offsetof(struct ipv6_destopt_hao, addr),
                         &info->is_ipv6_ext_src, sizeof(info->is_ipv6_ext_src),
                         BPF_HDR_START_NET);
+                    if (err)
+                        goto error;
 
                     info->is_ipv6_ext_src = 1;
                     break;
@@ -229,50 +242,68 @@ static inline void parse_ipv6_ext(struct __sk_buff *skb,
         *l4_offset += (ext_hdr.hdrlen + 1) * 8;
 
         if (!ip6_extension_header_type(ext_hdr.nexthdr)) {
-            return;
+            return 0;
         }
     }
+
+    return 0;
+error:
+    return err;
 }
 
 static __be16 parse_eth_type(struct __sk_buff *skb)
 {
     unsigned int offset = 12;
     __be16 ret = 0;
+    int err = 0;
 
-    bpf_skb_load_bytes_relative(skb, offset, &ret, sizeof(ret),
+    err = bpf_skb_load_bytes_relative(skb, offset, &ret, sizeof(ret),
                                 BPF_HDR_START_MAC);
+    if (err)
+        return 0;
 
-    switch (__be16_to_cpu(ret)) {
+    switch (bpf_ntohs(ret)) {
     case ETH_P_8021AD:
         offset += 4;
     case ETH_P_8021Q:
         offset += 4;
-        bpf_skb_load_bytes_relative(skb, offset, &ret, sizeof(ret),
+        err = bpf_skb_load_bytes_relative(skb, offset, &ret, sizeof(ret),
                                     BPF_HDR_START_MAC);
     default:
         break;
     }
 
+    if (err)
+        return 0;
+
     return ret;
 }
 
-static inline void parse_packet(struct __sk_buff *skb,
+static inline int parse_packet(struct __sk_buff *skb,
         struct packet_hash_info_t *info)
 {
+    int err = 0;
+
     if (!info || !skb) {
-        return;
+        return -1;
     }
 
     size_t l4_offset = 0;
     __u8 l4_protocol = 0;
-    __u16 l3_protocol = __be16_to_cpu(parse_eth_type(skb));
+    __u16 l3_protocol = bpf_ntohs(parse_eth_type(skb));
+    if (l3_protocol == 0) {
+        err = -1;
+        goto error;
+    }
 
     if (l3_protocol == ETH_P_IP) {
         info->is_ipv4 = 1;
 
         struct iphdr ip = {};
-        bpf_skb_load_bytes_relative(skb, 0, &ip, sizeof(ip),
+        err = bpf_skb_load_bytes_relative(skb, 0, &ip, sizeof(ip),
                                     BPF_HDR_START_NET);
+        if (err)
+            goto error;
 
         info->in_src = ip.saddr;
         info->in_dst = ip.daddr;
@@ -283,8 +314,10 @@ static inline void parse_packet(struct __sk_buff *skb,
         info->is_ipv6 = 1;
 
         struct ipv6hdr ip6 = {};
-        bpf_skb_load_bytes_relative(skb, 0, &ip6, sizeof(ip6),
+        err = bpf_skb_load_bytes_relative(skb, 0, &ip6, sizeof(ip6),
                                     BPF_HDR_START_NET);
+        if (err)
+            goto error;
 
         info->in6_src = ip6.saddr;
         info->in6_dst = ip6.daddr;
@@ -292,7 +325,9 @@ static inline void parse_packet(struct __sk_buff *skb,
         l4_protocol = ip6.nexthdr;
         l4_offset = sizeof(ip6);
 
-        parse_ipv6_ext(skb, info, &l4_protocol, &l4_offset);
+        err = parse_ipv6_ext(skb, info, &l4_protocol, &l4_offset);
+        if (err)
+            goto error;
     }
 
     if (l4_protocol != 0) {
@@ -300,8 +335,10 @@ static inline void parse_packet(struct __sk_buff *skb,
             info->is_tcp = 1;
 
             struct tcphdr tcp = {};
-            bpf_skb_load_bytes_relative(skb, l4_offset, &tcp, sizeof(tcp),
+            err = bpf_skb_load_bytes_relative(skb, l4_offset, &tcp, sizeof(tcp),
                                         BPF_HDR_START_NET);
+            if (err)
+                goto error;
 
             info->src_port = tcp.source;
             info->dst_port = tcp.dest;
@@ -309,13 +346,20 @@ static inline void parse_packet(struct __sk_buff *skb,
             info->is_udp = 1;
 
             struct udphdr udp = {};
-            bpf_skb_load_bytes_relative(skb, l4_offset, &udp, sizeof(udp),
+            err = bpf_skb_load_bytes_relative(skb, l4_offset, &udp, sizeof(udp),
                                         BPF_HDR_START_NET);
+            if (err)
+                goto error;
 
             info->src_port = udp.source;
             info->dst_port = udp.dest;
         }
     }
+
+    return 0;
+
+error:
+    return err;
 }
 
 static inline __u32 calculate_rss_hash(struct __sk_buff *skb,
@@ -324,9 +368,12 @@ static inline __u32 calculate_rss_hash(struct __sk_buff *skb,
     __u8 rss_input[HASH_CALCULATION_BUFFER_SIZE] = {};
     size_t bytes_written = 0;
     __u32 result = 0;
+    int err = 0;
     struct packet_hash_info_t packet_info = {};
 
-    parse_packet(skb, &packet_info);
+    err = parse_packet(skb, &packet_info);
+    if (err)
+        return 0;
 
     if (packet_info.is_ipv4) {
         if (packet_info.is_tcp &&

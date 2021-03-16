@@ -346,7 +346,7 @@ vhost_vsock="$default_feature"
 vhost_user="no"
 vhost_user_blk_server="auto"
 vhost_user_fs="$default_feature"
-bpf=""
+bpf="auto"
 kvm="auto"
 hax="auto"
 hvf="auto"
@@ -1237,9 +1237,9 @@ for opt do
   ;;
   --enable-membarrier) membarrier="yes"
   ;;
-  --disable-bpf) bpf="no"
+  --disable-bpf) bpf="disabled"
   ;;
-  --enable-bpf) bpf="yes"
+  --enable-bpf) bpf="enabled"
   ;;
   --disable-blobs) blobs="false"
   ;;
@@ -5005,27 +5005,6 @@ else
 fi
 
 ##########################################
-# check for usable bpf system call
-if test "$bpf" = ""; then
-    have_bpf=no
-    if test "$linux" = "yes" -a "$bigendian" != "yes"; then
-        cat > $TMPC << EOF
-    #include <stdlib.h>
-    #include <bpf/libbpf.h>
-    int main(void) {
-        struct bpf_object *obj = NULL;
-        bpf_object__load(obj);
-        exit(0);
-    }
-EOF
-        if compile_prog "" "-lbpf" ; then
-            have_bpf=yes
-            bpf=yes
-        fi
-    fi
-fi
-
-##########################################
 # check if rtnetlink.h exists and is useful
 have_rtnetlink=no
 cat > $TMPC << EOF
@@ -5860,9 +5839,6 @@ fi
 if test "$membarrier" = "yes" ; then
   echo "CONFIG_MEMBARRIER=y" >> $config_host_mak
 fi
-if test "$bpf" = "yes" -a "$bigendian" != "yes" -a "$linux" = "yes" ; then
-  echo "CONFIG_EBPF=y" >> $config_host_mak
-fi
 if test "$signalfd" = "yes" ; then
   echo "CONFIG_SIGNALFD=y" >> $config_host_mak
 fi
@@ -6492,7 +6468,7 @@ NINJA=$ninja $meson setup \
         -Dattr=$attr -Ddefault_devices=$default_devices \
         -Ddocs=$docs -Dsphinx_build=$sphinx_build -Dinstall_blobs=$blobs \
         -Dvhost_user_blk_server=$vhost_user_blk_server \
-        -Dfuse=$fuse -Dfuse_lseek=$fuse_lseek \
+        -Dfuse=$fuse -Dfuse_lseek=$fuse_lseek -Dbpf=$bpf \
         $(if test "$default_features" = no; then echo "-Dauto_features=disabled"; fi) \
         $cross_arg \
         "$PWD" "$source_path"
