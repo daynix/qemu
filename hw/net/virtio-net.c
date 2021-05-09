@@ -45,6 +45,10 @@
 #include "net_rx_pkt.h"
 #include "hw/virtio/vhost.h"
 
+#ifndef VIRTIO_NET_F_HOST_USO
+#define VIRTIO_NET_F_HOST_USO     56    /* Host can handle USO packets */
+#endif
+
 #define VIRTIO_NET_VM_VERSION    11
 
 #define MAC_TABLE_ENTRIES    64
@@ -539,6 +543,7 @@ static void virtio_net_reset(VirtIODevice *vdev)
     n->nomulti = 0;
     n->nouni = 0;
     n->nobcast = 0;
+    n->has_uso = 0;
     /* multiqueue is disabled by default */
     n->curr_queues = 1;
     timer_del(n->announce_timer.tm);
@@ -589,6 +594,15 @@ static int peer_has_ufo(VirtIONet *n)
     n->has_ufo = qemu_has_ufo(qemu_get_queue(n->nic)->peer);
 
     return n->has_ufo;
+}
+
+static int peer_has_uso(VirtIONet *n)
+{
+    if (!peer_has_vnet_hdr(n)) {
+        return 0;
+    }
+
+    return qemu_has_uso(qemu_get_queue(n->nic)->peer);
 }
 
 static void virtio_net_set_mrg_rx_bufs(VirtIONet *n, int mergeable_rx_bufs,
@@ -731,6 +745,10 @@ static uint64_t virtio_net_get_features(VirtIODevice *vdev, uint64_t features,
     if (!peer_has_vnet_hdr(n) || !peer_has_ufo(n)) {
         virtio_clear_feature(&features, VIRTIO_NET_F_GUEST_UFO);
         virtio_clear_feature(&features, VIRTIO_NET_F_HOST_UFO);
+    }
+
+    if (!peer_has_uso(n)) {
+        virtio_clear_feature(&features, VIRTIO_NET_F_HOST_USO);
     }
 
     if (!get_vhost_net(nc->peer)) {
@@ -933,6 +951,8 @@ static void virtio_net_set_features(VirtIODevice *vdev, uint64_t features)
     } else {
         memset(n->vlans, 0xff, MAX_VLAN >> 3);
     }
+
+    n->has_uso = virtio_has_feature(features, VIRTIO_NET_F_HOST_USO);
 
     if (virtio_has_feature(features, VIRTIO_NET_F_STANDBY)) {
         qapi_event_send_failover_negotiated(n->netclient_name);
@@ -3473,6 +3493,8 @@ static Property virtio_net_properties[] = {
                     VIRTIO_NET_F_HOST_ECN, true),
     DEFINE_PROP_BIT64("host_ufo", VirtIONet, host_features,
                     VIRTIO_NET_F_HOST_UFO, true),
+    DEFINE_PROP_BIT64("host_uso", VirtIONet, host_features,
+                    VIRTIO_NET_F_HOST_USO, true),
     DEFINE_PROP_BIT64("mrg_rxbuf", VirtIONet, host_features,
                     VIRTIO_NET_F_MRG_RXBUF, true),
     DEFINE_PROP_BIT64("status", VirtIONet, host_features,
