@@ -2855,6 +2855,7 @@ struct VirtIONetMigTmp {
     VirtIONetQueue *vqs_1;
     uint16_t        curr_queues_1;
     uint8_t         has_ufo;
+    uint8_t         has_uso;
     uint32_t        has_vnet_hdr;
 };
 
@@ -3001,6 +3002,58 @@ static const VMStateDescription vmstate_virtio_net_rss = {
     },
 };
 
+/* if the USO is in use on the source ensure we have it on the destination */
+static int virtio_net_uso_post_load(void *opaque, int version_id)
+{
+    struct VirtIONetMigTmp *tmp = opaque;
+
+    if (tmp->has_uso) {
+        if (!peer_has_uso(tmp->parent)) {
+            error_report("virtio-net: saved image requires TUN_F_USO support");
+            return -EINVAL;
+        }
+        tmp->parent->has_uso = 1;
+    }
+
+    return 0;
+}
+
+static int virtio_net_uso_pre_save(void *opaque)
+{
+    struct VirtIONetMigTmp *tmp = opaque;
+
+    tmp->has_uso = tmp->parent->has_uso;
+
+    return 0;
+}
+
+static const VMStateDescription vmstate_virtio_net_has_uso = {
+    .name      = "virtio-net-uso",
+    .post_load = virtio_net_uso_post_load,
+    .pre_save  = virtio_net_uso_pre_save,
+    .fields    = (VMStateField[]) {
+        VMSTATE_UINT8(has_uso, struct VirtIONetMigTmp),
+        VMSTATE_END_OF_LIST()
+    },
+};
+
+static bool virtio_net_uso_needed(void *opaque)
+{
+    return VIRTIO_NET(opaque)->has_uso != 0;
+}
+
+static const VMStateDescription vmstate_virtio_net_uso = {
+    .name      = "virtio-net-device/uso",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .needed = virtio_net_uso_needed,
+    .fields = (VMStateField[]) {
+        VMSTATE_WITH_TMP(VirtIONet, struct VirtIONetMigTmp,
+                         vmstate_virtio_net_has_uso),
+        VMSTATE_END_OF_LIST()
+    },
+};
+
 static const VMStateDescription vmstate_virtio_net_device = {
     .name = "virtio-net-device",
     .version_id = VIRTIO_NET_VM_VERSION,
@@ -3053,6 +3106,7 @@ static const VMStateDescription vmstate_virtio_net_device = {
    },
     .subsections = (const VMStateDescription * []) {
         &vmstate_virtio_net_rss,
+        &vmstate_virtio_net_uso,
         NULL
     }
 };
