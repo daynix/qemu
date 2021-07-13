@@ -36,19 +36,6 @@
 #define INDIRECTION_TABLE_SIZE 128
 #define HASH_CALCULATION_BUFFER_SIZE 36
 
-struct rss_config_t {
-    __u8 redirect;
-    __u8 populate_hash;
-    __u32 hash_types;
-    __u16 indirections_len;
-    __u16 default_queue;
-} __attribute__((packed));
-
-struct toeplitz_key_data_t {
-    __u32 leftmost_32_bits;
-    __u8 next_byte[HASH_CALCULATION_BUFFER_SIZE];
-};
-
 struct packet_hash_info_t {
     __u8 is_ipv4;
     __u8 is_ipv6;
@@ -76,28 +63,30 @@ struct packet_hash_info_t {
     };
 };
 
+struct toeplitz_key_data_t {
+    __u32 leftmost_32_bits;
+    __u8 next_byte[HASH_CALCULATION_BUFFER_SIZE];
+};
+
+struct rss_config_t {
+    __u8 redirect;
+    __u8 populate_hash;
+    __u32 hash_types;
+    __u16 indirections_len;
+    __u16 default_queue;
+
+    struct toeplitz_key_data_t toeplitz_key;
+
+    __u16 indirections_table[INDIRECTION_TABLE_SIZE];
+} __attribute__((packed));
+
 struct bpf_map_def SEC("maps")
 tap_rss_map_configurations = {
         .type        = BPF_MAP_TYPE_ARRAY,
         .key_size    = sizeof(__u32),
         .value_size  = sizeof(struct rss_config_t),
         .max_entries = 1,
-};
-
-struct bpf_map_def SEC("maps")
-tap_rss_map_toeplitz_key = {
-        .type        = BPF_MAP_TYPE_ARRAY,
-        .key_size    = sizeof(__u32),
-        .value_size  = sizeof(struct toeplitz_key_data_t),
-        .max_entries = 1,
-};
-
-struct bpf_map_def SEC("maps")
-tap_rss_map_indirection_table = {
-        .type        = BPF_MAP_TYPE_ARRAY,
-        .key_size    = sizeof(__u32),
-        .value_size  = sizeof(__u16),
-        .max_entries = INDIRECTION_TABLE_SIZE,
+        .map_flags = BPF_F_MMAPABLE,
 };
 
 static inline void net_rx_rss_add_chunk(__u8 *rss_input, size_t *bytes_written,
@@ -381,7 +370,7 @@ error:
 }
 
 static inline __u32 calculate_rss_hash(struct __sk_buff *skb,
-        struct rss_config_t *config, struct toeplitz_key_data_t *toe)
+        struct rss_config_t *config)
 {
     __u8 rss_input[HASH_CALCULATION_BUFFER_SIZE] = {};
     size_t bytes_written = 0;
@@ -525,7 +514,8 @@ static inline __u32 calculate_rss_hash(struct __sk_buff *skb,
     }
 
     if (bytes_written) {
-        net_toeplitz_add(&result, rss_input, bytes_written, toe);
+        net_toeplitz_add(&result, rss_input,
+                         bytes_written, &config->toeplitz_key);
     }
 
     return result;
@@ -536,29 +526,24 @@ int tun_rss_steering_prog(struct __sk_buff *skb)
 {
 
     struct rss_config_t *config;
-    struct toeplitz_key_data_t *toe;
 
     __u32 key = 0;
     __u32 hash = 0;
 
     config = bpf_map_lookup_elem(&tap_rss_map_configurations, &key);
-    toe = bpf_map_lookup_elem(&tap_rss_map_toeplitz_key, &key);
 
-    if (config && toe) {
+    if (config) {
         if (!config->redirect) {
             return config->default_queue;
         }
 
-        hash = calculate_rss_hash(skb, config, toe);
+        hash = calculate_rss_hash(skb, config);
         if (hash) {
             __u32 table_idx = hash % config->indirections_len;
-            __u16 *queue = 0;
 
-            queue = bpf_map_lookup_elem(&tap_rss_map_indirection_table,
-                                        &table_idx);
-
-            if (queue) {
-                return *queue;
+            if (table_idx < INDIRECTION_TABLE_SIZE
+                && table_idx < config->indirections_len) {
+                return config->indirections_table[table_idx];
             }
         }
 
