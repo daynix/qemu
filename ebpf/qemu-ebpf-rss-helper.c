@@ -25,6 +25,10 @@
 
 #include "ebpf_rss.h"
 
+#include "qemu-helper-stamp.h"
+
+void QEMU_HELPER_STAMP(void) {}
+
 static int send_fds(int socket, int *fds, int n)
 {
     struct msghdr msg = {};
@@ -99,8 +103,6 @@ int main(int argc, char **argv)
         print_help_and_exit(argv[0], EXIT_FAILURE);
     }
 
-    fprintf(stderr, "FD %s\n", fd_string);
-
     unix_fd = atoi(fd_string);
 
     if (!unix_fd) {
@@ -115,8 +117,6 @@ int main(int argc, char **argv)
     }
     fds[0] = ctx.program_fd;
     fds[1] = ctx.map_configuration;
-    fds[2] = ctx.map_toeplitz_key;
-    fds[3] = ctx.map_indirections_table;
 
     ret = send_fds(unix_fd, fds, EBPF_RSS_MAX_FDS);
     if (ret < 0) {

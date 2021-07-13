@@ -1760,6 +1760,16 @@ foreach d : hx_headers
 endforeach
 genh += hxdep
 
+helper_stamp = custom_target(
+    'qemu-helper-stamp.h',
+    output : 'qemu-helper-stamp.h',
+    input : 'ebpf/rss.bpf.skeleton.h',
+    command : [python, '-c', 'import hashlib; print(\'#define QEMU_HELPER_STAMP qemuHelperStamp_{}\'.format(hashlib.sha1(open(\'@INPUT@\', \'rb\').read()).hexdigest()))'],
+    capture: true,
+)
+
+genh += helper_stamp
+
 ###################
 # Collect sources #
 ###################

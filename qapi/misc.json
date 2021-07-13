@@ -531,9 +531,13 @@
 ##
 # @query-helper-paths:
 #
-# Query specific eBPF RSS helper for current qemu binary.
+# Query helper paths. Initially, this command was added for
+# qemu-ebpf-rss-helper. The qemu would check "the stamp" and
+# returns proper helper.
 #
 # Returns: list of object that contains name and path for helper.
+#
+# Since: 6.1
 #
 # Example:
 #

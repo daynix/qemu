@@ -40,6 +40,7 @@
 #include "qapi/qmp/qerror.h"
 #include "hw/mem/memory-device.h"
 #include "hw/acpi/acpi_dev_interface.h"
+#include "qemu-helper-stamp-utils.h"
 
 NameInfo *qmp_query_name(Error **errp)
 {
@@ -352,67 +353,28 @@ void qmp_display_reload(DisplayReloadOptions *arg, Error **errp)
     }
 }
 
-#ifdef CONFIG_LINUX
-
-static const char *get_dirname(char *path)
-{
-    char *sep;
-
-    sep = strrchr(path, '/');
-    if (sep == path) {
-        return "/";
-    } else if (sep) {
-        *sep = 0;
-        return path;
-    }
-    return ".";
-}
-
-static char *find_helper(const char *name)
-{
-    char qemu_exec[PATH_MAX];
-    const char *qemu_dir = NULL;
-    char *helper = NULL;
-
-    if (name == NULL) {
-        return NULL;
-    }
-
-    if (readlink("/proc/self/exe", qemu_exec, PATH_MAX) > 0) {
-        qemu_dir = get_dirname(qemu_exec);
-
-        helper = g_strdup_printf("%s/%s", qemu_dir, name);
-        if (access(helper, F_OK) == 0) {
-            return helper;
-        }
-        g_free(helper);
-    }
-
-    helper = g_strdup_printf("%s/%s", CONFIG_QEMU_HELPERDIR, name);
-    if (access(helper, F_OK) == 0) {
-        return helper;
-    }
-    g_free(helper);
-
-    return NULL;
-}
-
 HelperPathList *qmp_query_helper_paths(Error **errp)
 {
     HelperPathList *ret = NULL;
-    const char *helpers_list[] = {
+    struct {
+        const char *helper;
+        bool check_stamp;
+    } helpers_list[] = {
 #ifdef CONFIG_EBPF
-        "qemu-ebpf-rss-helper",
+        { "qemu-ebpf-rss-helper", true },
 #endif
-        NULL
-    };
-    const char **helper_iter = helpers_list;
+        { "qemu-pr-helper", false },
+        { "qemu-bridge-helper", false },
+        { NULL, false },
+    }, *helper_iter;
+    helper_iter = helpers_list;
 
-    for (; *helper_iter != NULL; ++helper_iter) {
-        char *path = find_helper(*helper_iter);
+    for (; helper_iter->helper != NULL; ++helper_iter) {
+        char *path = qemu_find_helper(helper_iter->helper,
+                                      helper_iter->check_stamp);
         if (path) {
             HelperPath *helper = g_new0(HelperPath, 1);
-            helper->name = g_strdup(*helper_iter);
+            helper->name = g_strdup(helper_iter->helper);
             helper->path = path;
 
             QAPI_LIST_PREPEND(ret, helper);
@@ -421,11 +383,3 @@ HelperPathList *qmp_query_helper_paths(Error **errp)
 
     return ret;
 }
-#else
-
-HelperPathList *qmp_query_helper_paths(Error **errp)
-{
-    return NULL;
-}
-
-#endif

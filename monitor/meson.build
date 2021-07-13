@@ -5,5 +5,6 @@ softmmu_ss.add(files(
   'hmp.c',
 ))
 softmmu_ss.add([spice_headers, files('qmp-cmds.c')])
+softmmu_ss.add(files('qemu-helper-stamp-utils.c'))
 
 specific_ss.add(when: 'CONFIG_SOFTMMU', if_true: [files('misc.c'), spice])

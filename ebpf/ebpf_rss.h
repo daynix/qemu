@@ -14,14 +14,13 @@
 #ifndef QEMU_EBPF_RSS_H
 #define QEMU_EBPF_RSS_H
 
-#define EBPF_RSS_MAX_FDS 4
+#define EBPF_RSS_MAX_FDS 2
 
 struct EBPFRSSContext {
     void *obj;
     int program_fd;
     int map_configuration;
-    int map_toeplitz_key;
-    int map_indirections_table;
+    void *mmap_configuration;
 };
 
 struct EBPFRSSConfig {
