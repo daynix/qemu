@@ -1181,10 +1181,18 @@ void pci_register_bar(PCIDevice *pci_dev, int region_num,
     pcibus_t size = memory_region_size(memory);
     uint8_t hdr_type;
 
-    assert(!pci_is_vf(pci_dev)); /* VFs must use pcie_sriov_vf_register_bar */
     assert(region_num >= 0);
     assert(region_num < PCI_NUM_REGIONS);
     assert(is_power_of_2(size));
+
+    if (pci_is_vf(pci_dev)) {
+        printf("%s: region_num = %d, type = 0x%x\n", __func__, region_num, type);
+        assert(type == pci_dev->exp.sriov_vf.pf->exp.sriov_pf.vf_bar_type[region_num]);
+
+        pcie_sriov_vf_register_bar(pci_dev, region_num, memory);
+
+        return;
+    }
 
     /* A PCI bridge device (with Type 1 header) may only have at most 2 BARs */
     hdr_type =

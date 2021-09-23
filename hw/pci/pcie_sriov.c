@@ -91,6 +91,8 @@ void pcie_sriov_pf_init_vf_bar(PCIDevice *dev, int region_num,
     assert(region_num < PCI_NUM_REGIONS);
     assert(region_num != PCI_ROM_SLOT);
 
+    printf("%s: region_num = %d, type = 0x%x\n", __func__, region_num, type);
+
     wmask = ~(size - 1);
     addr = sriov_cap + PCI_SRIOV_BAR + region_num * 4;
 

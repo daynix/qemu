@@ -23,6 +23,7 @@
 #include "qapi/error.h"
 #include "qemu/module.h"
 #include "qom/object.h"
+#include "hw/pci/pcie_sriov.h"
 
 typedef struct VirtIONetPCI VirtIONetPCI;
 
@@ -52,6 +53,18 @@ static void virtio_net_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
     VirtIONetPCI *dev = VIRTIO_NET_PCI(vpci_dev);
     DeviceState *vdev = DEVICE(&dev->vdev);
     VirtIONet *net = VIRTIO_NET(vdev);
+    PCIDevice *pci_dev = &vpci_dev->pci_dev;
+
+    pcie_sriov_pf_init(pci_dev, 0x100, "virtio-net-pci-vf",
+        0x1041, 2, 2, 0x80, 2);
+
+    pcie_sriov_pf_init_vf_bar(pci_dev, 1,
+        PCI_BASE_ADDRESS_SPACE_MEMORY,
+        4 * 1024);
+
+    pcie_sriov_pf_init_vf_bar(pci_dev, 4,
+        PCI_BASE_ADDRESS_MEM_TYPE_64 | PCI_BASE_ADDRESS_MEM_PREFETCH,
+        16 * 1024);
 
     if (vpci_dev->nvectors == DEV_NVECTORS_UNSPECIFIED) {
         vpci_dev->nvectors = 2 * MAX(net->nic_conf.peers.queues, 1)

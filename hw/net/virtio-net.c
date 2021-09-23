@@ -3202,6 +3202,8 @@ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
     NetClientState *nc;
     int i;
 
+    n->host_features |= (1ULL << VIRTIO_F_SR_IOV);
+
     if (n->net_conf.mtu) {
         n->host_features |= (1ULL << VIRTIO_NET_F_MTU);
     }
