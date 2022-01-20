@@ -237,9 +237,10 @@ int tap_fd_set_vnet_be(int fd, int is_be)
 }
 
 void tap_fd_set_offload(int fd, int csum, int tso4,
-                        int tso6, int ecn, int ufo)
+                        int tso6, int ecn, int ufo, int uso4, int uso6)
 {
     unsigned int offload = 0;
+    unsigned int supported_offloads = 0;
 
     /* Check if our kernel supports TUNSETOFFLOAD */
     if (ioctl(fd, TUNSETOFFLOAD, 0) != 0 && errno == EINVAL) {
@@ -256,6 +257,19 @@ void tap_fd_set_offload(int fd, int csum, int tso4,
             offload |= TUN_F_TSO_ECN;
         if (ufo)
             offload |= TUN_F_UFO;
+        if (uso4)
+            offload |= TUN_F_USO4;
+        if (uso6)
+            offload |= TUN_F_USO6;
+    }
+
+    if (ioctl(fd, TUNGETSUPPORTEDOFFLOADS, supported_offloads) != 0) {
+        if (offload != (offload & supported_offloads)) {
+            warn_report("TUNGETSUPPORTEDOFFLOADS ioctl() support offload issue: %x.", offload ^ (offload & supported_offloads));
+        }
+        offload &= supported_offloads;
+        ioctl(fd, TUNSETOFFLOAD, offload);
+        return;
     }
 
     if (ioctl(fd, TUNSETOFFLOAD, offload) != 0) {
