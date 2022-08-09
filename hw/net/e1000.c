@@ -39,6 +39,7 @@
 #include "qemu/range.h"
 
 #include "e1000x_common.h"
+#include "e1000x_enums.h"
 #include "trace.h"
 #include "qom/object.h"
 
