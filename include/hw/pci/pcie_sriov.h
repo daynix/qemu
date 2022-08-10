@@ -74,4 +74,10 @@ PCIDevice *pcie_sriov_get_pf(PCIDevice *dev);
  */
 PCIDevice *pcie_sriov_get_vf_at_index(PCIDevice *dev, int n);
 
+/* Returns TRUE if SR/IOV is enabled for the physical function. */
+bool pcie_sriov_is_iov(PCIDevice *dev);
+
+/* Returns the current number of virtual functions. */
+uint16_t pcie_sriov_vfs_count(PCIDevice *dev);
+
 #endif /* QEMU_PCIE_SRIOV_H */
