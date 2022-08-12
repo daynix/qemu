@@ -266,6 +266,7 @@ qos_test_ss.add(
   'virtio-serial-test.c',
   'virtio-iommu-test.c',
   'vmxnet3-test.c',
+  'igb-test.c',
 )
 if have_virtfs
   qos_test_ss.add(files('virtio-9p-test.c'))
