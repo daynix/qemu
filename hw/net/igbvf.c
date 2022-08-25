@@ -199,7 +199,13 @@ static const MemoryRegionOps mmio_ops = {
 static void igbvf_pci_realize(PCIDevice *dev, Error **errp)
 {
     IgbVfState *s = IGBVF(dev);
+    int ret;
     int i;
+
+    if (!pci_is_vf(dev)) {
+        error_setg(errp, "The bus is not a virtual function");
+        return;
+    }
 
     dev->config_write = igbvf_write_config;
 
@@ -210,14 +216,14 @@ static void igbvf_pci_realize(PCIDevice *dev, Error **errp)
     memory_region_init(&s->msix, OBJECT(dev), "igbvf-msix", IGBVF_MSIX_SIZE);
     pcie_sriov_vf_register_bar(dev, IGBVF_MSIX_BAR_IDX, &s->msix);
 
-    (void)msix_init(dev, IGBVF_MSIX_VECTORS, &s->msix, IGBVF_MSIX_BAR_IDX, 0,
+    ret = msix_init(dev, IGBVF_MSIX_VECTORS, &s->msix, IGBVF_MSIX_BAR_IDX, 0,
         &s->msix, IGBVF_MSIX_BAR_IDX, 0x2000, 0x70, errp);
+    if (ret) {
+        return;
+    }
 
     for (i = 0; i < IGBVF_MSIX_VECTORS; i++) {
-        if (msix_vector_use(dev, i) < 0) {
-            msix_unuse_all_vectors(dev);
-            msix_uninit(dev, &s->msix, &s->msix);
-        }
+        assert(!msix_vector_use(dev, i));
     }
 
     if (pcie_endpoint_cap_init(dev, 0xa0) < 0) {

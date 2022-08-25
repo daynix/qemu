@@ -336,10 +336,7 @@ static void pci_igb_realize(PCIDevice *dev, Error **err)
         &s->msix);
 
     /* Add PCI capabilities in reverse order */
-    ret = pcie_endpoint_cap_init(dev, 0xa0);
-    if (ret < 0) {
-        goto err_pcie_cap;
-    }
+    assert(pcie_endpoint_cap_init(dev, 0xa0) > 0);
 
     ret = msix_init(dev, IGB_MSIX_VECTORS,  &s->msix, IGB_MSIX_BAR_IDX, 0,
         &s->msix, IGB_MSIX_BAR_IDX, 0x2000, 0x70, err);
@@ -353,10 +350,7 @@ static void pci_igb_realize(PCIDevice *dev, Error **err)
     }
 
     for (i = 0; i < IGB_MSIX_VECTORS; i++) {
-        ret = msix_vector_use(dev, i);
-        if (ret) {
-            goto err_pcie_cap;
-        }
+        assert(!msix_vector_use(dev, i));
     }
 
     if (igb_add_pm_capability(dev, 0x40, PCI_PM_CAP_DSI) < 0) {
@@ -404,7 +398,6 @@ err_msi:
     msix_uninit(dev, &s->msix, &s->msix);
 err_msix:
     pcie_cap_exit(dev);
-err_pcie_cap:
     return;
 }
 
