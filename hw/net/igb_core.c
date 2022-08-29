@@ -1758,8 +1758,32 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
         }
     }
 
+    total_size = net_rx_pkt_get_total_len(core->rx_pkt) +
+        e1000x_fcs_len(core->mac);
+
+    retval = orig_size;
+
     for (i = 0; i < E1000E_NUM_QUEUES; i++) {
-        if (queues & BIT(i)) {
+        if (!(queues & BIT(i))) {
+            continue;
+        }
+
+        igb_rx_ring_init(core, &rxr, i);
+
+        trace_e1000e_rx_rss_dispatched_to_queue(rxr.i->idx);
+
+        if (!e1000e_has_rxbufs(core, rxr.i, total_size)) {
+            //n |= E1000_ICS_RXO;
+            retval = 0;
+        }
+    }
+
+    if (retval) {
+        for (i = 0; i < E1000E_NUM_QUEUES; i++) {
+            if (!(queues & BIT(i))) {
+                continue;
+            }
+
             rss_info.enabled = false;
             rss_info.hash = 0;
             rss_info.queue = i;
@@ -1767,28 +1791,16 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
 
             igb_rx_ring_init(core, &rxr, i);
 
-            trace_e1000e_rx_rss_dispatched_to_queue(rxr.i->idx);
+            e1000e_write_packet_to_guest(core, core->rx_pkt, &rxr, &rss_info);
 
-            total_size = net_rx_pkt_get_total_len(core->rx_pkt) +
-                e1000x_fcs_len(core->mac);
-
-            if (e1000e_has_rxbufs(core, rxr.i, total_size)) {
-                e1000e_write_packet_to_guest(core, core->rx_pkt, &rxr,
-                    &rss_info);
-
-                retval = orig_size;
-
-                /* Check if receive descriptor minimum threshold hit */
-                rdmts_hit = e1000e_rx_descr_threshold_hit(core, rxr.i);
-                n |= igb_rx_wb_interrupt_cause(core, rxr.i->idx, rdmts_hit);
-
-                trace_e1000e_rx_written_to_guest(n);
-            } else {
-                //n |= E1000_ICS_RXO;
-                retval = 0;
-                trace_e1000e_rx_not_written_to_guest(n);
-            }
+            /* Check if receive descriptor minimum threshold hit */
+            rdmts_hit = e1000e_rx_descr_threshold_hit(core, rxr.i);
+            n |= igb_rx_wb_interrupt_cause(core, rxr.i->idx, rdmts_hit);
         }
+
+        trace_e1000e_rx_written_to_guest(n);
+    } else {
+        trace_e1000e_rx_not_written_to_guest(n);
     }
 
     if (!e1000e_intrmgr_delay_rx_causes(core, &n)) {
