@@ -278,6 +278,20 @@ enum e1000_state_t {
 	__IGB_PTP_TX_IN_PROGRESS,
 };
 
+/* from e1000_82575.h */
+
+/* Per VM Offload register setup */
+#define E1000_VMOLR_RLPML_MASK 0x00003FFF /* Long Packet Maximum Length mask */
+#define E1000_VMOLR_LPE        0x00010000 /* Accept Long packet */
+#define E1000_VMOLR_RSSE       0x00020000 /* Enable RSS */
+#define E1000_VMOLR_AUPE       0x01000000 /* Accept untagged packets */
+#define E1000_VMOLR_ROMPE      0x02000000 /* Accept overflow multicast */
+#define E1000_VMOLR_ROPE       0x04000000 /* Accept overflow unicast */
+#define E1000_VMOLR_BAM        0x08000000 /* Accept Broadcast packets */
+#define E1000_VMOLR_MPME       0x10000000 /* Multicast promiscuous mode */
+#define E1000_VMOLR_STRVLAN    0x40000000 /* Vlan stripping enable */
+#define E1000_VMOLR_STRCRC     0x80000000 /* CRC stripping enable */
+
 /* from e1000_defines.h */
 
 #define E1000_RAH_POOL_MASK 0x03FC0000

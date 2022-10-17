@@ -76,11 +76,6 @@ struct E1000Core {
 
     QEMUTimer *autoneg_timer;
 
-    struct vf_select_table {
-        uint64_t macaddr;
-        uint8_t vf;         /* VF bit map (bit per VM) */
-    } vf_select_table[8];
-
     struct e1000e_tx {
         struct NetTxPkt *tx_pkt;
 

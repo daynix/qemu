@@ -55,6 +55,7 @@
                                      second according to spec 10.2.4.2 */
 #define E1000E_MAX_TX_FRAGS (64)
 
+static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehdr);
 static void igb_update_interrupt_state(E1000ECore *core);
 
 static inline void
@@ -480,10 +481,8 @@ e1000e_setup_tx_offloads(E1000ECore *core, struct e1000e_tx *tx)
 static bool igb_tx_pkt_switch(E1000ECore *core, struct e1000e_tx *tx,
     NetClientState *nc)
 {
-    struct vf_select_table *vst;
     struct eth_header *ehdr;
     bool ret, send_both;
-    int i;
 
 	/* TX switching is only used to serve VM to VM traffic. */
 	if (!pcie_sriov_is_iov(core->owner)) {
@@ -497,12 +496,9 @@ static bool igb_tx_pkt_switch(E1000ECore *core, struct e1000e_tx *tx,
 
     if (net_tx_pkt_get_packet_type(tx->tx_pkt) == ETH_PKT_UCAST) {
         ehdr = net_tx_pkt_get_eth_hdr(tx->tx_pkt);
-        for (i = ARRAY_SIZE(core->vf_select_table)-1; i >= 0; i--) {
-            vst = &core->vf_select_table[i];
-            if (!memcmp(ehdr->h_dest, &vst->macaddr, 6)) {
-                send_both = false;
-                goto send_back;
-            }
+        if (igb_receive_route(core, ehdr)) {
+            send_both = false;
+            goto send_back;
         }
         /* Unicast packet which doesn't target a VF is send to lan. */
         goto send_out;
@@ -936,70 +932,91 @@ e1000e_rx_l4_cso_enabled(E1000ECore *core)
     return !!(core->mac[RXCSUM] & E1000_RXCSUM_TUOFLD);
 }
 
-static bool igb_vf_receive_filter(E1000ECore *core, const uint8_t *buf)
+static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehdr)
 {
-    uint32_t ra[2], *rp;
+    static const int mta_shift[] = { 4, 3, 2, 0 };
+    uint32_t f, ra[2], *rp, rctl = core->mac[RCTL];
+    uint16_t queues = 0;
+    int i;
+
+    if (e1000x_is_vlan_packet(ehdr->h_dest, core->vet) &&
+        e1000x_vlan_rx_filter_enabled(core->mac)) {
+        uint16_t vid = lduw_be_p(ehdr->h_dest + 14);
+        uint32_t vfta = ldl_le_p((uint32_t *)(core->mac + VFTA) +
+                                 ((vid >> 5) & 0x7f));
+        if ((vfta & (1 << (vid & 0x1f))) == 0) {
+            trace_e1000e_rx_flt_vlan_mismatch(vid);
+            return queues;
+        } else {
+            trace_e1000e_rx_flt_vlan_match(vid);
+        }
+    }
+
+    if (is_broadcast_ether_addr(ehdr->h_dest)) {
+        for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+            if (core->mac[VMOLR + i] & E1000_VMOLR_BAM) {
+                queues |= BIT(i);
+            }
+        }
+
+        return queues;
+    }
+
+    for (rp = core->mac + RA; rp < core->mac + RA + 32; rp += 2) {
+        if (!(rp[1] & E1000_RAH_AV)) {
+            continue;
+        }
+        ra[0] = cpu_to_le32(rp[0]);
+        ra[1] = cpu_to_le32(rp[1]);
+        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, 6)) {
+            trace_e1000x_rx_flt_ucast_match((int)(rp - core->mac - RA) / 2,
+                                            MAC_ARG(ehdr->h_dest));
+
+            queues |= (rp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
+        }
+    }
 
     for (rp = core->mac + RA_VF; rp < core->mac + RA_VF + 16; rp += 2) {
         if (!(rp[1] & E1000_RAH_AV)) {
             continue;
         }
         ra[0] = cpu_to_le32(rp[0]);
-        ra[1] = cpu_to_le16(rp[1] & 0xFFFF);
+        ra[1] = cpu_to_le32(rp[1]);
+        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, 6)) {
+            trace_e1000x_rx_flt_ucast_match((int)(rp - core->mac - RA_VF) / 2,
+                                            MAC_ARG(ehdr->h_dest));
 
-        if (!memcmp(buf, (uint8_t *)ra, 6)) {
-            return true;
+            queues |= (rp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
         }
     }
 
-    return false;
-}
-
-static bool e1000e_receive_filter(E1000ECore *core, const uint8_t *buf)
-{
-    uint32_t rctl = core->mac[RCTL];
-
-    if (e1000x_is_vlan_packet(buf, core->vet) &&
-        e1000x_vlan_rx_filter_enabled(core->mac)) {
-        uint16_t vid = lduw_be_p(buf + 14);
-        uint32_t vfta = ldl_le_p((uint32_t *)(core->mac + VFTA) +
-                                 ((vid >> 5) & 0x7f));
-        if ((vfta & (1 << (vid & 0x1f))) == 0) {
-            trace_e1000e_rx_flt_vlan_mismatch(vid);
-            return false;
-        } else {
-            trace_e1000e_rx_flt_vlan_match(vid);
-        }
+    if (queues) {
+        return queues;
     }
 
-    switch (net_rx_pkt_get_packet_type(core->rx_pkt)) {
-    case ETH_PKT_UCAST:
-        if (rctl & E1000_RCTL_UPE) {
-            return true; /* promiscuous ucast */
+    if (is_multicast_ether_addr(ehdr->h_dest)) {
+        f = mta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
+        f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
+        if (core->mac[MTA + (f >> 5)] & (1 << (f & 0x1f))) {
+            for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+                if (core->mac[VMOLR + i] & E1000_VMOLR_ROMPE) {
+                    queues |= BIT(i);
+                }
+            }
         }
-        break;
 
-    case ETH_PKT_BCAST:
-        if (rctl & E1000_RCTL_BAM) {
-            return true; /* broadcast enabled */
+        if (queues) {
+            e1000x_inc_reg_if_not_full(core->mac, MPRC);
+            return queues;
         }
-        break;
 
-    case ETH_PKT_MCAST:
-        if (rctl & E1000_RCTL_MPE) {
-            return true; /* promiscuous mcast */
-        }
-        break;
-
-    default:
-        g_assert_not_reached();
+        trace_e1000x_rx_flt_inexact_mismatch(MAC_ARG(ehdr->h_dest),
+                                             (rctl >> E1000_RCTL_MO_SHIFT) & 3,
+                                             f >> 5,
+                                             core->mac[MTA + (f >> 5)]);
     }
 
-    if (e1000x_rx_group_filter(core->mac, buf)) {
-        return true;
-    }
-
-    return igb_vf_receive_filter(core, buf);
+    return queues;
 }
 
 static inline void
@@ -1663,7 +1680,6 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
     /* Min. octets in an ethernet frame sans FCS */
     static const int min_buf_size = 60;
 
-    struct vf_select_table *vst;
     uint16_t queues = 0;
     uint32_t n = 0;
     uint8_t min_buf[min_buf_size];
@@ -1677,7 +1693,6 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
     size_t total_size;
     ssize_t retval;
     bool rdmts_hit;
-    bool is_brd;
     int i;
 
     trace_e1000e_rx_receive_iov(iovcnt);
@@ -1714,7 +1729,8 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
     ehdr = PKT_GET_ETH_HDR(filter_buf);
     net_rx_pkt_set_packet_type(core->rx_pkt, get_eth_packet_type(ehdr));
 
-    if (!e1000e_receive_filter(core, filter_buf)) {
+    queues = igb_receive_route(core, ehdr);
+    if (!queues) {
         trace_e1000e_rx_flt_dropped();
         return orig_size;
     }
@@ -1722,30 +1738,10 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
     net_rx_pkt_attach_iovec_ex(core->rx_pkt, iov, iovcnt, iov_ofs,
                                e1000x_vlan_enabled(core->mac), core->vet);
 
+    // TODO: Fix RETA for virtualized environment
     if (!pcie_sriov_is_iov(core->owner)) {
         e1000e_rss_parse_packet(core, core->rx_pkt, &rss_info);
-        queues |= BIT(rss_info.queue);
-    } else {
-        is_brd = is_broadcast_ether_addr(ehdr->h_dest);
-
-        for (i = ARRAY_SIZE(core->vf_select_table)-1; i >= 0; i--) {
-            vst = &core->vf_select_table[i];
-            if ((vst->vf != 0) &&
-                (is_brd || !memcmp(ehdr->h_dest, &vst->macaddr, 6))) {
-                queues |= vst->vf;
-                /* Stop scan if an unicast address belong to a vf was found */
-                if (!is_brd) {
-                    break;
-                }
-            }
-        }
-
-        if (is_brd || (queues == 0)) {
-            //e1000e_rss_parse_packet(core, core->rx_pkt, &rss_info);
-			// TODO: fix RETA?
-			rss_info.queue = pcie_sriov_vfs_count(core->owner);
-            queues |= BIT(rss_info.queue);
-        }
+        queues = BIT(rss_info.queue);
     }
 
     total_size = net_rx_pkt_get_total_len(core->rx_pkt) +
@@ -1929,36 +1925,6 @@ e1000e_set_rfctl(E1000ECore *core, int index, uint32_t val)
     }
 
     core->mac[RFCTL] = val;
-}
-
-static void update_vf_select_table(E1000ECore *core)
-{
-    struct vf_select_table *vst;
-    uint64_t macaddr;
-    uint32_t rah;
-    int i;
-
-    for (i = 0; i < ARRAY_SIZE(core->vf_select_table); i++) {
-        rah = core->mac[RA_VF + i*2 + 1];
-        if (rah & E1000_RAH_AV) {
-            macaddr = cpu_to_le16(rah & 0xFFFF);
-            macaddr = (macaddr << 32) | cpu_to_le32(core->mac[RA_VF + i*2]);
-
-            vst = &core->vf_select_table[i];
-            vst->macaddr = macaddr;
-            vst->vf = (rah & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
-        }
-    }
-}
-
-static void igb_mac_set_recv_addr(E1000ECore *core, int index, uint32_t val)
-{
-    core->mac[index] = val;
-
-    /* Update the VF-Select table only after a write to a High register */
-    if ((index % 2) == 1) {
-        update_vf_select_table(core);
-    }
 }
 
 static void
@@ -3911,7 +3877,7 @@ static const writeops e1000e_macreg_writeops[] = {
     [RA]                     = e1000e_mac_writereg,
     [RA + 1]                 = igb_mac_set_macaddr,
     [RA + 2 ... RA + 31]     = e1000e_mac_writereg,
-    [RA_VF ... RA_VF + 31]   = igb_mac_set_recv_addr,
+    [RA_VF ... RA_VF + 31]   = e1000e_mac_writereg,
     [WUPM ... WUPM + 31]     = e1000e_mac_writereg,
     [MTA ... MTA + 127]      = e1000e_mac_writereg,
     [VFTA ... VFTA + 127]    = e1000e_mac_writereg,
