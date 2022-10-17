@@ -278,4 +278,9 @@ enum e1000_state_t {
 	__IGB_PTP_TX_IN_PROGRESS,
 };
 
+/* from e1000_defines.h */
+
+#define E1000_RAH_POOL_MASK 0x03FC0000
+#define E1000_RAH_POOL_1 0x00040000
+
 #endif

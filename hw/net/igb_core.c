@@ -47,6 +47,7 @@
 #include "e1000x_common.h"
 #include "igb_enums.h"
 #include "igb_core.h"
+#include "igb_regs.h"
 
 #include "trace.h"
 
@@ -1945,7 +1946,7 @@ static void update_vf_select_table(E1000ECore *core)
 
             vst = &core->vf_select_table[i];
             vst->macaddr = macaddr;
-            vst->vf = (rah >> 18) & 0xFF;
+            vst->vf = (rah & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
         }
     }
 }
