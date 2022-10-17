@@ -1939,7 +1939,7 @@ static void update_vf_select_table(E1000ECore *core)
 
     for (i = 0; i < ARRAY_SIZE(core->vf_select_table); i++) {
         rah = core->mac[RA_VF + i*2 + 1];
-        if (rah & 0x80000000) { /* Address Valid */
+        if (rah & E1000_RAH_AV) {
             macaddr = cpu_to_le16(rah & 0xFFFF);
             macaddr = (macaddr << 32) | cpu_to_le32(core->mac[RA_VF + i*2]);
 
