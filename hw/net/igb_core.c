@@ -1656,16 +1656,6 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
     e1000e_update_rx_stats(core, size, total_size);
 }
 
-static uint8_t get_vf_queue(uint8_t vf)
-{
-    const uint8_t bit_to_vf[] = {
-        [0x01] = 0, [0x02] = 1, [0x04] = 2, [0x08] = 3,
-        [0x10] = 4, [0x20] = 5, [0x40] = 6, [0x80] = 7
-    };
-
-    return bit_to_vf[vf];
-}
-
 ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
 {
     static const uint64_t brd_addr = 0xFFFFFFFFFFFFL;
@@ -1742,7 +1732,7 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
             vst = &core->vf_select_table[i];
             if ((vst->vf != 0) &&
                 (is_brd || !memcmp(ehdr->h_dest, &vst->macaddr, 6))) {
-                queues |= BIT(get_vf_queue(vst->vf));
+                queues |= vst->vf;
                 /* Stop scan if an unicast address belong to a vf was found */
                 if (!is_brd) {
                     break;
