@@ -1658,7 +1658,6 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
 
 ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
 {
-    static const uint64_t brd_addr = 0xFFFFFFFFFFFFL;
     static const int maximum_ethernet_hdr_len = (14 + 4);
     /* Min. octets in an ethernet frame sans FCS */
     static const int min_buf_size = 60;
@@ -1726,7 +1725,7 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
         e1000e_rss_parse_packet(core, core->rx_pkt, &rss_info);
         queues |= BIT(rss_info.queue);
     } else {
-        is_brd = !memcmp(ehdr->h_dest, &brd_addr, 6);
+        is_brd = is_broadcast_ether_addr(ehdr->h_dest);
 
         for (i = ARRAY_SIZE(core->vf_select_table)-1; i >= 0; i--) {
             vst = &core->vf_select_table[i];
