@@ -24,7 +24,9 @@
 #ifndef HW_IGB_REGS_H_
 #define HW_IGB_REGS_H_
 
-/* from e1000_hw.h */
+#include "e1000x_regs.h"
+
+/* from igb/e1000_hw.h */
 
 #define E1000_DEV_ID_82576                 0x10C9
 #define E1000_DEV_ID_82576_FIBER           0x10E6
@@ -35,7 +37,68 @@
 #define E1000_DEV_ID_82576_NS_SERDES               0x1518
 #define E1000_DEV_ID_82576_SERDES_QUAD             0x150D
 
-/* from driver igb.h */
+/* Context Descriptor */
+struct e1000_adv_tx_context_desc {
+    __le32 vlan_macip_lens;
+    __le32 seqnum_seed;
+    __le32 type_tucmd_mlhl;
+    __le32 mss_l4len_idx;
+};
+
+/* Advanced Transmit Descriptor */
+union e1000_adv_tx_desc {
+    struct {
+        __le64 buffer_addr;     /* Address of descriptor's data buffer */
+        __le32 cmd_type_len;
+        __le32 olinfo_status;
+    } read;
+    struct {
+        __le64 rsvd;            /* Reserved */
+        __le32 nxtseq_seed;
+        __le32 status;
+    } wb;
+};
+
+#define E1000_ADVTXD_DTYP_CTXT  0x00200000 /* Advanced Context Descriptor */
+#define E1000_ADVTXD_DTYP_DATA  0x00300000 /* Advanced Data Descriptor */
+#define E1000_ADVTXD_DCMD_DEXT  0x20000000 /* Descriptor Extension (1=Adv) */
+#define E1000_ADVTXD_DCMD_TSE   0x80000000 /* TCP/UDP Segmentation Enable */
+
+#define E1000_ADVTXD_POTS_IXSM  0x00000100 /* Insert TCP/UDP Checksum */
+#define E1000_ADVTXD_POTS_TXSM  0x00000200 /* Insert TCP/UDP Checksum */
+
+#define E1000_TXD_POPTS_IXSM 0x00000001 /* Insert IP checksum */
+#define E1000_TXD_POPTS_TXSM 0x00000002 /* Insert TCP/UDP checksum */
+
+/* Receive Descriptor - Advanced */
+union e1000_adv_rx_desc {
+    struct {
+        __le64 pkt_addr;                /* Packet Buffer Address */
+        __le64 hdr_addr;                /* Header Buffer Address */
+    } read;
+    struct {
+        struct {
+            struct {
+                __le16 pkt_info;        /* RSS Type, Packet Type */
+                __le16 hdr_info;        /* Split Head, Buffer Length */
+            } lo_dword;
+            union {
+                __le32 rss;             /* RSS Hash */
+                struct {
+                        __le16 ip_id;   /* IP Id */
+                        __le16 csum;    /* Packet Checksum */
+                } csum_ip;
+            } hi_dword;
+        } lower;
+        struct {
+            __le32 status_error;        /* Ext Status/Error */
+            __le16 length;              /* Packet Length */
+            __le16 vlan;                /* VLAN tag */
+        } upper;
+    } wb;  /* writeback */
+};
+
+/* from igb/igb.h */
 
 #define E1000_PCS_CFG_IGN_SD	1
 
@@ -278,7 +341,7 @@ enum e1000_state_t {
 	__IGB_PTP_TX_IN_PROGRESS,
 };
 
-/* from e1000_82575.h */
+/* from igb/e1000_82575.h */
 
 /* Per VM Offload register setup */
 #define E1000_VMOLR_RLPML_MASK 0x00003FFF /* Long Packet Maximum Length mask */
@@ -292,9 +355,476 @@ enum e1000_state_t {
 #define E1000_VMOLR_STRVLAN    0x40000000 /* Vlan stripping enable */
 #define E1000_VMOLR_STRCRC     0x80000000 /* CRC stripping enable */
 
-/* from e1000_defines.h */
+/* from igb/e1000_defines.h */
+
+#define E1000_GPIE_NSICR     0x00000001
+#define E1000_GPIE_MSIX_MODE 0x00000010
+#define E1000_GPIE_EIAME     0x40000000
+#define E1000_GPIE_PBA       0x80000000
 
 #define E1000_RAH_POOL_MASK 0x03FC0000
 #define E1000_RAH_POOL_1 0x00040000
+
+#define E1000_ICR_VMMB         0x00000100 /* VM MB event */
+#define E1000_ICR_TS           0x00080000 /* Time Sync Interrupt */
+#define E1000_ICR_DRSTA        0x40000000 /* Device Reset Asserted */
+/* If this bit asserted, the driver should claim the interrupt */
+#define E1000_ICR_INT_ASSERTED 0x80000000
+/* LAN connected device generates an interrupt */
+#define E1000_ICR_DOUTSYNC     0x10000000 /* NIC DMA out of sync */
+
+/* Extended Interrupt Cause Read */
+#define E1000_EICR_RX_QUEUE0    0x00000001 /* Rx Queue 0 Interrupt */
+#define E1000_EICR_RX_QUEUE1    0x00000002 /* Rx Queue 1 Interrupt */
+#define E1000_EICR_RX_QUEUE2    0x00000004 /* Rx Queue 2 Interrupt */
+#define E1000_EICR_RX_QUEUE3    0x00000008 /* Rx Queue 3 Interrupt */
+#define E1000_EICR_TX_QUEUE0    0x00000100 /* Tx Queue 0 Interrupt */
+#define E1000_EICR_TX_QUEUE1    0x00000200 /* Tx Queue 1 Interrupt */
+#define E1000_EICR_TX_QUEUE2    0x00000400 /* Tx Queue 2 Interrupt */
+#define E1000_EICR_TX_QUEUE3    0x00000800 /* Tx Queue 3 Interrupt */
+#define E1000_EICR_OTHER        0x80000000 /* Interrupt Cause Active */
+
+/* from igb/e1000_mbox.h */
+
+#define E1000_P2VMAILBOX_STS  0x00000001 /* Initiate message send to VF */
+#define E1000_P2VMAILBOX_ACK  0x00000002 /* Ack message recv'd from VF */
+#define E1000_P2VMAILBOX_VFU  0x00000004 /* VF owns the mailbox buffer */
+#define E1000_P2VMAILBOX_PFU  0x00000008 /* PF owns the mailbox buffer */
+#define E1000_P2VMAILBOX_RVFU 0x00000010 /* Reset VFU - used when VF stuck */
+
+#define E1000_MBVFICR_VFREQ_MASK 0x000000FF /* bits for VF messages */
+#define E1000_MBVFICR_VFREQ_VF1  0x00000001 /* bit for VF 1 message */
+#define E1000_MBVFICR_VFACK_MASK 0x00FF0000 /* bits for VF acks */
+#define E1000_MBVFICR_VFACK_VF1  0x00010000 /* bit for VF 1 ack */
+
+#define E1000_V2PMAILBOX_SIZE 16 /* 16 32 bit words - 64 bytes */
+
+/* If it's a E1000_VF_* msg then it originates in the VF and is sent to the
+ * PF.  The reverse is true if it is E1000_PF_*.
+ * Message ACK's are the value or'd with 0xF0000000
+ */
+/* Messages below or'd with this are the ACK */
+#define E1000_VT_MSGTYPE_ACK 0x80000000
+/* Messages below or'd with this are the NACK */
+#define E1000_VT_MSGTYPE_NACK 0x40000000
+/* Indicates that VF is still clear to send requests */
+#define E1000_VT_MSGTYPE_CTS 0x20000000
+#define E1000_VT_MSGINFO_SHIFT 16
+/* bits 23:16 are used for exra info for certain messages */
+#define E1000_VT_MSGINFO_MASK (0xFF << E1000_VT_MSGINFO_SHIFT)
+
+#define E1000_VF_RESET                 0x01 /* VF requests reset */
+#define E1000_VF_SET_MAC_ADDR          0x02 /* VF requests to set MAC addr */
+/* VF requests to clear all unicast MAC filters */
+#define E1000_VF_MAC_FILTER_CLR        (0x01 << E1000_VT_MSGINFO_SHIFT)
+/* VF requests to add unicast MAC filter */
+#define E1000_VF_MAC_FILTER_ADD        (0x02 << E1000_VT_MSGINFO_SHIFT)
+#define E1000_VF_SET_MULTICAST         0x03 /* VF requests to set MC addr */
+#define E1000_VF_SET_VLAN              0x04 /* VF requests to set VLAN */
+#define E1000_VF_SET_LPE               0x05 /* VF requests to set VMOLR.LPE */
+#define E1000_VF_SET_PROMISC           0x06 /*VF requests to clear VMOLR.ROPE/MPME*/
+#define E1000_VF_SET_PROMISC_MULTICAST (0x02 << E1000_VT_MSGINFO_SHIFT)
+
+#define E1000_PF_CONTROL_MSG 0x0100 /* PF control message */
+
+/* from igb/e1000_regs.h */
+
+#define E1000_EIAC      0x0152C  /* Ext. Interrupt Auto Clear - RW */
+#define E1000_IVAR0     0x01700  /* Interrupt Vector Allocation Register - RW */
+#define E1000_IVAR_MISC 0x01740  /* Interrupt Vector Allocation Register (last) - RW */
+#define E1000_EITR(_n)  (0x01680 + (0x4 * (_n)))
+#define E1000_GPIE      0x01514  /* General Purpose Interrupt Enable; RW */
+#define E1000_EICS      0x01520  /* Ext. Interrupt Cause Set - W0 */
+#define E1000_EIMS      0x01524  /* Ext. Interrupt Mask Set/Read - RW */
+#define E1000_EIMC      0x01528  /* Ext. Interrupt Mask Clear - WO */
+#define E1000_EIAM      0x01530  /* Ext. Interrupt Ack Auto Clear Mask - RW */
+#define E1000_EICR      0x01580  /* Ext. Interrupt Cause Read - R/clr */
+
+#define E1000_RQDPC(_n) (0x0C030 + ((_n) * 0x40))
+
+/* Convenience macros
+ *
+ * Note: "_n" is the queue number of the register to be written to.
+ *
+ * Example usage:
+ * E1000_RDBAL_REG(current_rx_queue)
+ */
+#define E1000_RDBAL(_n)   ((_n) < 4 ? (0x02800 + ((_n) * 0x100)) \
+                                    : (0x0C000 + ((_n) * 0x40)))
+#define E1000_RDBAH(_n)   ((_n) < 4 ? (0x02804 + ((_n) * 0x100)) \
+                                    : (0x0C004 + ((_n) * 0x40)))
+#define E1000_RDLEN(_n)   ((_n) < 4 ? (0x02808 + ((_n) * 0x100)) \
+                                    : (0x0C008 + ((_n) * 0x40)))
+#define E1000_SRRCTL(_n)  ((_n) < 4 ? (0x0280C + ((_n) * 0x100)) \
+                                    : (0x0C00C + ((_n) * 0x40)))
+#define E1000_RDH(_n)     ((_n) < 4 ? (0x02810 + ((_n) * 0x100)) \
+                                    : (0x0C010 + ((_n) * 0x40)))
+#define E1000_RDT(_n)     ((_n) < 4 ? (0x02818 + ((_n) * 0x100)) \
+                                    : (0x0C018 + ((_n) * 0x40)))
+#define E1000_RXDCTL(_n)  ((_n) < 4 ? (0x02828 + ((_n) * 0x100)) \
+                                    : (0x0C028 + ((_n) * 0x40)))
+#define E1000_TDBAL(_n)   ((_n) < 4 ? (0x03800 + ((_n) * 0x100)) \
+                                    : (0x0E000 + ((_n) * 0x40)))
+#define E1000_TDBAH(_n)   ((_n) < 4 ? (0x03804 + ((_n) * 0x100)) \
+                                    : (0x0E004 + ((_n) * 0x40)))
+#define E1000_TDLEN(_n)   ((_n) < 4 ? (0x03808 + ((_n) * 0x100)) \
+                                    : (0x0E008 + ((_n) * 0x40)))
+#define E1000_TDH(_n)     ((_n) < 4 ? (0x03810 + ((_n) * 0x100)) \
+                                    : (0x0E010 + ((_n) * 0x40)))
+#define E1000_TDT(_n)     ((_n) < 4 ? (0x03818 + ((_n) * 0x100)) \
+                                    : (0x0E018 + ((_n) * 0x40)))
+#define E1000_TXDCTL(_n)  ((_n) < 4 ? (0x03828 + ((_n) * 0x100)) \
+                                    : (0x0E028 + ((_n) * 0x40)))
+#define E1000_RXCTL(_n)   ((_n) < 4 ? (0x02814 + ((_n) * 0x100)) : \
+                                      (0x0C014 + ((_n) * 0x40)))
+#define E1000_DCA_RXCTRL(_n) E1000_RXCTL(_n)
+#define E1000_TXCTL(_n)   ((_n) < 4 ? (0x03814 + ((_n) * 0x100)) : \
+                                      (0x0E014 + ((_n) * 0x40)))
+#define E1000_DCA_TXCTRL(_n) E1000_TXCTL(_n)
+#define E1000_TDWBAL(_n)  ((_n) < 4 ? (0x03838 + ((_n) * 0x100)) \
+                                    : (0x0E038 + ((_n) * 0x40)))
+#define E1000_TDWBAH(_n)  ((_n) < 4 ? (0x0383C + ((_n) * 0x100)) \
+                                    : (0x0E03C + ((_n) * 0x40)))
+
+#define E1000_RXPBS    0x02404  /* Rx Packet Buffer Size - RW */
+#define E1000_TXPBS    0x03404  /* Tx Packet Buffer Size - RW */
+
+#define E1000_DTXCTL   0x03590  /* DMA TX Control - RW */
+
+#define E1000_HTCBDPC     0x04124  /* Host TX Circuit Breaker Dropped Count */
+#define E1000_RLPML    0x05004  /* RX Long Packet Max Length */
+#define E1000_RA       0x05400  /* Receive Address - RW Array */
+#define E1000_RA2      0x054E0  /* 2nd half of Rx address array - RW Array */
+
+/* VT Registers */
+#define E1000_MBVFICR   0x00C80 /* Mailbox VF Cause - RWC */
+#define E1000_MBVFIMR   0x00C84 /* Mailbox VF int Mask - RW */
+#define E1000_VFLRE     0x00C88 /* VF Register Events - RWC */
+#define E1000_VFRE      0x00C8C /* VF Receive Enables */
+#define E1000_VFTE      0x00C90 /* VF Transmit Enables */
+#define E1000_QDE       0x02408 /* Queue Drop Enable - RW */
+#define E1000_DTXSWC    0x03500 /* DMA Tx Switch Control - RW */
+#define E1000_WVBR      0x03554 /* VM Wrong Behavior - RWS */
+#define E1000_RPLOLR    0x05AF0 /* Replication Offload - RW */
+#define E1000_UTA       0x0A000 /* Unicast Table Array - RW */
+#define E1000_IOVTCL    0x05BBC /* IOV Control Register */
+#define E1000_TXSWC     0x05ACC /* Tx Switch Control */
+#define E1000_LVMMC	0x03548 /* Last VM Misbehavior cause */
+/* These act per VF so an array friendly macro is used */
+#define E1000_P2VMAILBOX(_n)   (0x00C00 + (4 * (_n)))
+#define E1000_VMBMEM(_n)       (0x00800 + (64 * (_n)))
+#define E1000_VMOLR(_n)        (0x05AD0 + (4 * (_n)))
+#define E1000_DVMOLR(_n)       (0x0C038 + (64 * (_n)))
+#define E1000_VLVF(_n)         (0x05D00 + (4 * (_n))) /* VLAN VM Filter */
+#define E1000_VMVIR(_n)        (0x03700 + (4 * (_n)))
+
+/* from igb/phy.h */
+
+/* IGP01E1000 Specific Registers */
+#define IGP01E1000_PHY_PORT_CONFIG	0x10	/* Port Config */
+#define IGP01E1000_PHY_PORT_STATUS	0x11	/* Status */
+#define IGP01E1000_PHY_PORT_CTRL	0x12	/* Control */
+#define IGP01E1000_PHY_LINK_HEALTH	0x13	/* PHY Link Health */
+#define IGP02E1000_PHY_POWER_MGMT	0x19	/* Power Management */
+#define IGP01E1000_PHY_PAGE_SELECT	0x1F	/* Page Select */
+
+/* from igbvf/mbox.h */
+
+#define E1000_V2PMAILBOX_REQ	0x00000001 /* Request for PF Ready bit */
+#define E1000_V2PMAILBOX_ACK	0x00000002 /* Ack PF message received */
+#define E1000_V2PMAILBOX_VFU	0x00000004 /* VF owns the mailbox buffer */
+#define E1000_V2PMAILBOX_PFU	0x00000008 /* PF owns the mailbox buffer */
+#define E1000_V2PMAILBOX_PFSTS	0x00000010 /* PF wrote a message in the MB */
+#define E1000_V2PMAILBOX_PFACK	0x00000020 /* PF ack the previous VF msg */
+#define E1000_V2PMAILBOX_RSTI	0x00000040 /* PF has reset indication */
+#define E1000_V2PMAILBOX_RSTD	0x00000080 /* PF has indicated reset done */
+#define E1000_V2PMAILBOX_R2C_BITS 0x000000B0 /* All read to clear bits */
+
+#define E1000_VFMAILBOX_SIZE	16 /* 16 32 bit words - 64 bytes */
+
+/* If it's a E1000_VF_* msg then it originates in the VF and is sent to the
+ * PF.  The reverse is true if it is E1000_PF_*.
+ * Message ACK's are the value or'd with 0xF0000000
+ */
+/* Messages below or'd with this are the ACK */
+#define E1000_VT_MSGTYPE_ACK	0x80000000
+/* Messages below or'd with this are the NACK */
+#define E1000_VT_MSGTYPE_NACK	0x40000000
+/* Indicates that VF is still clear to send requests */
+#define E1000_VT_MSGTYPE_CTS	0x20000000
+
+/* We have a total wait time of 1s for vf mailbox posted messages */
+#define E1000_VF_MBX_INIT_TIMEOUT	2000 /* retry count for mbx timeout */
+#define E1000_VF_MBX_INIT_DELAY		500  /* usec delay between retries */
+
+#define E1000_VT_MSGINFO_SHIFT	16
+/* bits 23:16 are used for exra info for certain messages */
+#define E1000_VT_MSGINFO_MASK	(0xFF << E1000_VT_MSGINFO_SHIFT)
+
+#define E1000_VF_RESET		0x01 /* VF requests reset */
+#define E1000_VF_SET_MAC_ADDR	0x02 /* VF requests PF to set MAC addr */
+/* VF requests PF to clear all unicast MAC filters */
+#define E1000_VF_MAC_FILTER_CLR (0x01 << E1000_VT_MSGINFO_SHIFT)
+/* VF requests PF to add unicast MAC filter */
+#define E1000_VF_MAC_FILTER_ADD (0x02 << E1000_VT_MSGINFO_SHIFT)
+#define E1000_VF_SET_MULTICAST	0x03 /* VF requests PF to set MC addr */
+#define E1000_VF_SET_VLAN	0x04 /* VF requests PF to set VLAN */
+#define E1000_VF_SET_LPE	0x05 /* VF requests PF to set VMOLR.LPE */
+
+#define E1000_PF_CONTROL_MSG	0x0100 /* PF control message */
+
+/* from igbvf/regs.h */
+
+/* Statistics registers */
+#define E1000_VFGPRC   0x00F10
+#define E1000_VFGORC   0x00F18
+#define E1000_VFMPRC   0x00F3C
+#define E1000_VFGPTC   0x00F14
+#define E1000_VFGOTC   0x00F34
+#define E1000_VFGOTLBC 0x00F50
+#define E1000_VFGPTLBC 0x00F44
+#define E1000_VFGORLBC 0x00F48
+#define E1000_VFGPRLBC 0x00F40
+
+/* These act per VF so an array friendly macro is used */
+#define E1000_V2PMAILBOX(_n) (0x00C40 + (4 * (_n)))
+#define E1000_VMBMEM(_n)     (0x00800 + (64 * (_n)))
+
+/* new */
+
+#define E1000_RDBAL0_ALT    0x2800
+#define E1000_RDBAH0_ALT    0x2804
+#define E1000_RDLEN0_ALT    0x2808
+#define E1000_SRRCTL0_ALT   0x280C
+#define E1000_RDH0_ALT      0x2810
+#define E1000_RDT0_ALT      0x2818
+#define E1000_RXDCTL0_ALT   0x2828
+#define E1000_RXCTL0_ALT    0x2814
+#define E1000_RQDPC0_ALT    0x2830
+#define E1000_RDBAL1_ALT    0x2900
+#define E1000_RDBAL2_ALT    0x2A00
+#define E1000_RDBAL3_ALT    0x2B00
+#define E1000_RDBAH1_ALT    0x2904
+#define E1000_RDBAH2_ALT    0x2A04
+#define E1000_RDBAH3_ALT    0x2B04
+#define E1000_RDLEN1_ALT    0x2908
+#define E1000_RDLEN2_ALT    0x2A08
+#define E1000_RDLEN3_ALT    0x2B08
+#define E1000_SRRCTL1_ALT   0x290C
+#define E1000_SRRCTL2_ALT   0x2A0C
+#define E1000_SRRCTL3_ALT   0x2B0C
+#define E1000_RDH1_ALT      0x2910
+#define E1000_RDH2_ALT      0x2A10
+#define E1000_RDH3_ALT      0x2B10
+#define E1000_RDT1_ALT      0x2918
+#define E1000_RDT2_ALT      0x2A18
+#define E1000_RDT3_ALT      0x2B18
+#define E1000_RXDCTL1_ALT   0x2928
+#define E1000_RXDCTL2_ALT   0x2A28
+#define E1000_RXDCTL3_ALT   0x2B28
+#define E1000_RXCTL1_ALT    0x2914
+#define E1000_RXCTL2_ALT    0x2A14
+#define E1000_RXCTL3_ALT    0x2B14
+#define E1000_RQDPC1_ALT    0x2930
+#define E1000_RQDPC2_ALT    0x2A30
+#define E1000_RQDPC3_ALT    0x2B30
+#define E1000_RA_ALT        0x0040 /* */
+#define E1000_TDBAL0_ALT    0x3800
+#define E1000_TDBAH0_ALT    0x3804
+#define E1000_TDLEN0_ALT    0x3808
+#define E1000_TDH0_ALT      0x3810
+#define E1000_TDT0_ALT      0x3818
+#define E1000_TXDCTL0_ALT   0x3828
+#define E1000_TXCTL0_ALT    0x3814
+#define E1000_TDWBAL0_ALT   0x3838
+#define E1000_TDWBAH0_ALT   0x383C
+#define E1000_TDBAL1_ALT    0x3900
+#define E1000_TDBAL2_ALT    0x3A00
+#define E1000_TDBAL3_ALT    0x3B00
+#define E1000_TDBAH1_ALT    0x3904
+#define E1000_TDBAH2_ALT    0x3A04
+#define E1000_TDBAH3_ALT    0x3B04
+#define E1000_TDLEN1_ALT    0x3908
+#define E1000_TDLEN2_ALT    0x3A08
+#define E1000_TDLEN3_ALT    0x3B08
+#define E1000_TDH1_ALT      0x3910
+#define E1000_TDH2_ALT      0x3A10
+#define E1000_TDH3_ALT      0x3B10
+#define E1000_TDT1_ALT      0x3918
+#define E1000_TDT2_ALT      0x3A18
+#define E1000_TDT3_ALT      0x3B18
+#define E1000_TXDCTL1_ALT   0x3928
+#define E1000_TXDCTL2_ALT   0x3A28
+#define E1000_TXDCTL3_ALT   0x3B28
+#define E1000_TXCTL1_ALT    0x3914
+#define E1000_TXCTL2_ALT    0x3A14
+#define E1000_TXCTL3_ALT    0x3B14
+#define E1000_TDWBAL1_ALT   0x3938
+#define E1000_TDWBAL2_ALT   0x3A38
+#define E1000_TDWBAL3_ALT   0x3B38
+#define E1000_TDWBAH1_ALT   0x393C
+#define E1000_TDWBAH2_ALT   0x3A3C
+#define E1000_TDWBAH3_ALT   0x3B3C
+
+#define E1000_CTRL_ALT      0x0004
+#define E1000_ICR_ALT       0x00C0
+#define E1000_ICS_ALT       0x00C8
+#define E1000_IMS_ALT       0x00D0
+#define E1000_IMC_ALT       0x00D8
+#define E1000_IAM_ALT       0x00E0
+#define E1000_FCRTL_ALT     0x0168
+#define E1000_RDBAH0_ALT    0x2804
+#define E1000_RDLEN0_ALT    0x2808
+#define E1000_SRRCTL0_ALT   0x280C
+#define E1000_RDH0_ALT      0x2810
+#define E1000_RDT0_ALT      0x2818
+#define E1000_RXDCTL0_ALT   0x2828
+#define E1000_RXCTL0_ALT    0x2814
+#define E1000_RQDPC0_ALT    0x2830
+#define E1000_RDBAH1_ALT    0x2904
+#define E1000_RDBAH2_ALT    0x2A04
+#define E1000_RDBAH3_ALT    0x2B04
+#define E1000_RDLEN1_ALT    0x2908
+#define E1000_RDLEN2_ALT    0x2A08
+#define E1000_RDLEN3_ALT    0x2B08
+#define E1000_SRRCTL1_ALT   0x290C
+#define E1000_SRRCTL2_ALT   0x2A0C
+#define E1000_SRRCTL3_ALT   0x2B0C
+#define E1000_RDH1_ALT      0x2910
+#define E1000_RDH2_ALT      0x2A10
+#define E1000_RDH3_ALT      0x2B10
+#define E1000_RDT1_ALT      0x2918
+#define E1000_RDT2_ALT      0x2A18
+#define E1000_RDT3_ALT      0x2B18
+#define E1000_RXDCTL1_ALT   0x2928
+#define E1000_RXDCTL2_ALT   0x2A28
+#define E1000_RXDCTL3_ALT   0x2B28
+#define E1000_RXCTL1_ALT    0x2914
+#define E1000_RXCTL2_ALT    0x2A14
+#define E1000_RXCTL3_ALT    0x2B14
+#define E1000_RQDPC1_ALT    0x2930
+#define E1000_RQDPC2_ALT    0x2A30
+#define E1000_RQDPC3_ALT    0x2B30
+#define E1000_MTA_ALT       0x0200
+#define E1000_VFTA_ALT      0x0600
+
+#define E1000_TDBAL0_ALT    0x3800
+#define E1000_TDBAH0_ALT    0x3804
+#define E1000_TDLEN0_ALT    0x3808
+#define E1000_TDH0_ALT      0x3810
+#define E1000_TDT0_ALT      0x3818
+#define E1000_TXDCTL0_ALT   0x3828
+#define E1000_TXCTL0_ALT    0x3814
+#define E1000_TDWBAL0_ALT   0x3838
+#define E1000_TDWBAH0_ALT   0x383C
+#define E1000_TDBAL1_ALT    0x3900
+#define E1000_TDBAL2_ALT    0x3A00
+#define E1000_TDBAL3_ALT    0x3B00
+#define E1000_TDBAH1_ALT    0x3904
+#define E1000_TDBAH2_ALT    0x3A04
+#define E1000_TDBAH3_ALT    0x3B04
+#define E1000_TDLEN1_ALT    0x3908
+#define E1000_TDLEN2_ALT    0x3A08
+#define E1000_TDLEN3_ALT    0x3B08
+#define E1000_TDH1_ALT      0x3910
+#define E1000_TDH2_ALT      0x3A10
+#define E1000_TDH3_ALT      0x3B10
+#define E1000_TDT1_ALT      0x3918
+#define E1000_TDT2_ALT      0x3A18
+#define E1000_TDT3_ALT      0x3B18
+#define E1000_TXDCTL1_ALT   0x3928
+#define E1000_TXDCTL2_ALT   0x3A28
+#define E1000_TXDCTL3_ALT   0x3B28
+#define E1000_TXCTL1_ALT    0x3914
+#define E1000_TXCTL2_ALT    0x3A14
+#define E1000_TXCTL3_ALT    0x3B14
+#define E1000_TDWBAL1_ALT   0x3938
+#define E1000_TDWBAL2_ALT   0x3A38
+#define E1000_TDWBAL3_ALT   0x3B38
+#define E1000_TDWBAH1_ALT   0x393C
+#define E1000_TDWBAH2_ALT   0x3A3C
+#define E1000_TDWBAH3_ALT   0x3B3C
+
+#define E1000_XDBAL_MASK  (~(BIT(5) - 1)) /* TDBAL and RDBAL Registers Mask */
+
+#define E1000_ICR_MACSEC   0x00000020 /* MACSec */
+#define E1000_ICR_RX0      0x00000040 /* Receiver Overrun */
+#define E1000_ICR_GPI_SDP0 0x00000800 /* General Purpose, SDP0 pin */
+#define E1000_ICR_GPI_SDP1 0x00001000 /* General Purpose, SDP1 pin */
+#define E1000_ICR_GPI_SDP2 0x00002000 /* General Purpose, SDP2 pin */
+#define E1000_ICR_GPI_SDP3 0x00004000 /* General Purpose, SDP3 pin */
+#define E1000_ICR_PTRAP    0x00008000 /* Probe Trap */
+#define E1000_ICR_MNG      0x00040000 /* Management Event */
+#define E1000_ICR_OMED     0x00100000 /* Other Media Energy Detected */
+#define E1000_ICR_FER      0x00400000 /* Fatal Error */
+#define E1000_ICR_NFER     0x00800000 /* Non Fatal Error */
+#define E1000_ICR_CSRTO    0x01000000 /* CSR access Time Out Indication */
+#define E1000_ICR_SCE      0x02000000 /* Storm Control Event */
+#define E1000_ICR_SW_WD    0x04000000 /* Software Watchdog */
+
+/* Extended Interrupts */
+
+#define E1000_EICR_MSIX_MASK   0x01FFFFFF /* Bits used in MSI-X mode */
+#define E1000_EICR_LEGACY_MASK 0x4000FFFF /* Bits used in non MSI-X mode */
+
+/* Mirror VF Control (only RST bit); RW */
+#define E1000_PVTCTRL(_n) (0x10000 + (_n) * 0x100)
+
+/* Mirror Good Packets Received Count; RO */
+#define E1000_PVFGPRC(_n) (0x10010 + (_n) * 0x100)
+
+/* Mirror Good Packets Transmitted Count; RO */
+#define E1000_PVFGPTC(_n) (0x10014 + (_n) * 0x100)
+
+/* Mirror Good Octets Received Count; RO */
+#define E1000_PVFGORC(_n) (0x10018 + (_n) * 0x100)
+
+/* Mirror Extended Interrupt Cause Set; WO */
+#define E1000_PVTEICS(_n) (0x10020 + (_n) * 0x100)
+
+/* Mirror Extended Interrupt Mask Set/Read; RW */
+#define E1000_PVTEIMS(_n) (0x10024 + (_n) * 0x100)
+
+/* Mirror Extended Interrupt Mask Clear; WO */
+#define E1000_PVTEIMC(_n) (0x10028 + (_n) * 0x100)
+
+/* Mirror Extended Interrupt Auto Clear; RW */
+#define E1000_PVTEIAC(_n) (0x1002C + (_n) * 0x100)
+
+/* Mirror Extended Interrupt Auto Mask Enable; RW */
+#define E1000_PVTEIAM(_n) (0x10030 + (_n) * 0x100)
+
+/* Mirror Good Octets Transmitted Count; RO */
+#define E1000_PVFGOTC(_n) (0x10034 + (_n) * 0x100)
+
+/* Mirror Multicast Packets Received Count; RO */
+#define E1000_PVFMPRC(_n) (0x1003C + (_n) * 0x100)
+
+/* Mirror Good RX Packets loopback Count; RO */
+#define E1000_PVFGPRLBC(_n) (0x10040 + (_n) * 0x100)
+
+/* Mirror Good TX packets loopback Count; RO */
+#define E1000_PVFGPTLBC(_n) (0x10044 + (_n) * 0x100)
+
+/* Mirror Good RX Octets loopback Count; RO */
+#define E1000_PVFGORLBC(_n) (0x10048 + (_n) * 0x100)
+
+/* Mirror Good TX Octets loopback Count; RO */
+#define E1000_PVFGOTLBC(_n) (0x10050 + (_n) * 0x100)
+
+/* Mirror Extended Interrupt Cause Set; RC/W1C */
+#define E1000_PVTEICR(_n) (0x10080 + (_n) * 0x100)
+
+/* These are fake addresses that, according to the specification, the device
+   is not using. They are used to distinguish between the PF and the VFs
+   accessing their VTIVAR register (which is the same address, 0x1700) */
+#define E1000_VTIVAR      0x11700
+#define E1000_VTIVAR_MISC 0x11720
+
+#define E1000_RSS_QUEUE(reta, hash) (E1000_RETA_VAL(reta, hash) & 0x0F)
+
+#define E1000_STATUS_IOV_MODE 0x00040000
+
+#define E1000_STATUS_NUM_VFS_SHIFT 14
 
 #endif

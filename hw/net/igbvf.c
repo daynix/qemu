@@ -29,8 +29,7 @@
 #include "hw/pci/pci.h"
 #include "hw/pci/pcie.h"
 #include "hw/pci/msix.h"
-#include "igb_regs_new.h"
-#include "igb_regs_tmp.h"
+#include "igb_regs.h"
 #include "igb_common.h"
 #include "trace.h"
 #include "qapi/error.h"
@@ -83,7 +82,7 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
         case 0x1684:
         case 0x1688: /* E1000_EITR 0-2 */
             return 0x16E0 - (0x1688 - addr) - vfn * 0xC;
-        case E1000_IVAR:
+        case E1000_IVAR0:
             return 0x11700 + vfn * 4;
         case E1000_IVAR_MISC:
             return 0x11720 + vfn * 4;
@@ -91,7 +90,7 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
             return 0x5B68;
         case 0x0F0C: /* E1000_PSRTYPE */
             return 0x5480 + vfn * 4;
-        case E1000_VFMAILBOX:
+        case E1000_V2PMAILBOX(0):
             return 0x0C40 + vfn * 4;
         case 0x0800 ... 0x083F: /* VMBMEM */
             return addr + vfn * 0x40;
