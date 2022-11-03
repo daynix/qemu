@@ -24,6 +24,7 @@
 
 #include "qemu/osdep.h"
 #include "qemu/units.h"
+#include "hw/net/mii.h"
 #include "hw/pci/pci.h"
 #include "net/net.h"
 
@@ -78,15 +79,15 @@ int e1000x_fcs_len(uint32_t *mac)
 void e1000x_update_regs_on_link_down(uint32_t *mac, uint16_t *phy)
 {
     mac[STATUS] &= ~E1000_STATUS_LU;
-    phy[PHY_STATUS] &= ~MII_SR_LINK_STATUS;
-    phy[PHY_STATUS] &= ~MII_SR_AUTONEG_COMPLETE;
-    phy[PHY_LP_ABILITY] &= ~MII_LPAR_LPACK;
+    phy[MII_BMSR] &= ~MII_BMSR_LINK_ST;
+    phy[MII_BMSR] &= ~MII_BMSR_AN_COMP;
+    phy[MII_ANLPAR] &= ~MII_ANLPAR_ACK;
 }
 
 void e1000x_update_regs_on_link_up(uint32_t *mac, uint16_t *phy)
 {
     mac[STATUS] |= E1000_STATUS_LU;
-    phy[PHY_STATUS] |= MII_SR_LINK_STATUS;
+    phy[MII_BMSR] |= MII_BMSR_LINK_ST;
 }
 
 bool e1000x_rx_ready(PCIDevice *d, uint32_t *mac)
@@ -210,8 +211,8 @@ void e1000x_reset_mac_addr(NICState *nic, uint32_t *mac_regs,
 void e1000x_update_regs_on_autoneg_done(uint32_t *mac, uint16_t *phy)
 {
     e1000x_update_regs_on_link_up(mac, phy);
-    phy[PHY_LP_ABILITY] |= MII_LPAR_LPACK;
-    phy[PHY_STATUS] |= MII_SR_AUTONEG_COMPLETE;
+    phy[MII_ANLPAR] |= MII_ANLPAR_ACK;
+    phy[MII_BMSR] |= MII_BMSR_AN_COMP;
     trace_e1000x_link_negotiation_done();
 }
 
