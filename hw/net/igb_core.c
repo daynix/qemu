@@ -847,9 +847,9 @@ static inline void igb_rx_ring_init(E1000ECore *core, E1000E_RxRing *rxr,
 
 static void igb_start_xmit(E1000ECore *core, const E1000E_TxRing *txr)
 {
-    const E1000E_RingInfo *txi = txr->i;
-    union e1000_adv_tx_desc tx_desc;
     dma_addr_t base;
+    union e1000_adv_tx_desc desc;
+    const E1000E_RingInfo *txi = txr->i;
     uint32_t cause = 0;
 
     // TODO: check if the queue itself is enabled too.
@@ -860,10 +860,14 @@ static void igb_start_xmit(E1000ECore *core, const E1000E_TxRing *txr)
 
     while (!e1000e_ring_empty(core, txi)) {
         base = e1000e_ring_head_descr(core, txi);
-        pci_dma_read(core->owner, base, &tx_desc, sizeof(tx_desc));
 
-        igb_process_tx_desc(core, txr->tx, &tx_desc, txi->idx);
-        cause |= igb_txdesc_writeback(core, base, &tx_desc, txi->idx);
+        pci_dma_read(core->owner, base, &desc, sizeof(desc));
+
+        trace_e1000e_tx_descr((void *)(intptr_t)desc.read.buffer_addr,
+                              desc.read.cmd_type_len, desc.wb.status);
+
+        igb_process_tx_desc(core, txr->tx, &desc, txi->idx);
+        cause |= igb_txdesc_writeback(core, base, &desc, txi->idx);
 
         e1000e_ring_advance(core, txi, 1);
     }
