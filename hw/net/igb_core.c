@@ -48,7 +48,6 @@
 #include "e1000x_common.h"
 #include "igb_enums.h"
 #include "igb_core.h"
-#include "igb_regs.h"
 
 #include "trace.h"
 

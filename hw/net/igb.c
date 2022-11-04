@@ -40,7 +40,6 @@
 #include "hw/pci/msix.h"
 #include "hw/qdev-properties.h"
 #include "migration/vmstate.h"
-#include "igb_regs.h"
 #include "e1000x_common.h"
 #include "igb_enums.h"
 #include "igb_core.h"
