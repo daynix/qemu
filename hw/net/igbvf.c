@@ -60,7 +60,7 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
     switch (addr)
     {
         case E1000_CTRL:
-        case 0x0004: /* E1000_CTRL_ALT */
+        case E1000_CTRL_DUP:
             return 0x10000 + vfn * 0x100;
         case E1000_STATUS:
             return 0x0008;
@@ -94,41 +94,41 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
             return 0x0C40 + vfn * 4;
         case 0x0800 ... 0x083F: /* VMBMEM */
             return addr + vfn * 0x40;
-        case E1000_RDBAL0_ALT:
+        case E1000_RDBAL_ALT(0):
             return 0xC000 + vfn * 0x40;
-        case E1000_RDBAH0_ALT:
+        case E1000_RDBAH_ALT(0):
             return 0xC004 + vfn * 0x40;
-        case E1000_RDLEN0_ALT:
+        case E1000_RDLEN_ALT(0):
             return 0xC008 + vfn * 0x40;
-        case E1000_SRRCTL0_ALT:
+        case E1000_SRRCTL_ALT(0):
             return 0xC00C + vfn * 0x40;
-        case E1000_RDH0_ALT:
+        case E1000_RDH_ALT(0):
             return 0xC010 + vfn * 0x40;
-        case E1000_RXCTL0_ALT:
+        case E1000_RXCTL_ALT(0):
             return 0xC014 + vfn * 0x40;
-        case E1000_RDT0_ALT:
+        case E1000_RDT_ALT(0):
             return 0xC018 + vfn * 0x40;
-        case E1000_RXDCTL0_ALT:
+        case E1000_RXDCTL_ALT(0):
             return 0xC028 + vfn * 0x40;
-        case E1000_RQDPC0_ALT:
+        case E1000_RQDPC_ALT(0):
             return 0xC030 + vfn * 0x40;
-        case E1000_TDBAL0_ALT:
+        case E1000_TDBAL_ALT(0):
             return 0xE000 + vfn * 0x40;
-        case E1000_TDBAH0_ALT:
+        case E1000_TDBAH_ALT(0):
             return 0xE004 + vfn * 0x40;
-        case E1000_TDLEN0_ALT:
+        case E1000_TDLEN_ALT(0):
             return 0xE008 + vfn * 0x40;
-        case E1000_TDH0_ALT:
+        case E1000_TDH_ALT(0):
             return 0xE010 + vfn * 0x40;
-        case E1000_TXCTL0_ALT:
+        case E1000_TXCTL_ALT(0):
             return 0xE014 + vfn * 0x40;
-        case E1000_TDT0_ALT:
+        case E1000_TDT_ALT(0):
             return 0xE018 + vfn * 0x40;
-        case E1000_TXDCTL0_ALT:
+        case E1000_TXDCTL_ALT(0):
             return 0xE028 + vfn * 0x40;
-        case E1000_TDWBAL0_ALT:
+        case E1000_TDWBAL_ALT(0):
             return 0xE038 + vfn * 0x40;
-        case E1000_TDWBAH0_ALT:
+        case E1000_TDWBAH_ALT(0):
             return 0xE03C + vfn * 0x40;
         case E1000_VFGPRC:
             return 0x10010 + vfn * 0x100;

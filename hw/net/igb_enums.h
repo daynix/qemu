@@ -29,19 +29,22 @@
 
 #define defreg(x) x = (E1000_##x >> 2)
 #define defreg_indexed(x, i) x##i = (E1000_##x(i) >> 2)
+#define defreg_indexeda(x, i) x##i##_ALT = (E1000_##x##_ALT(i) >> 2)
 
-#define defregd(x) defreg_indexed(x, 0), defreg_indexed(x, 1), \
-                   defreg_indexed(x, 2), defreg_indexed(x, 3), \
-                   defreg_indexed(x, 4), defreg_indexed(x, 5), \
-                   defreg_indexed(x, 6), defreg_indexed(x, 7), \
-                   defreg_indexed(x, 8), defreg_indexed(x, 9), \
+#define defregd(x) defreg_indexed(x, 0),  defreg_indexed(x, 1),   \
+                   defreg_indexed(x, 2),  defreg_indexed(x, 3),   \
+                   defreg_indexed(x, 4),  defreg_indexed(x, 5),   \
+                   defreg_indexed(x, 6),  defreg_indexed(x, 7),   \
+                   defreg_indexed(x, 8),  defreg_indexed(x, 9),   \
                    defreg_indexed(x, 10), defreg_indexed(x, 11), \
                    defreg_indexed(x, 12), defreg_indexed(x, 13), \
-                   defreg_indexed(x, 14), defreg_indexed(x, 15)
+                   defreg_indexed(x, 14), defreg_indexed(x, 15), \
+                   defreg_indexeda(x, 0), defreg_indexeda(x, 1),  \
+                   defreg_indexeda(x, 2), defreg_indexeda(x, 3)
 
-#define defregv(x) defreg_indexed(x, 0), defreg_indexed(x, 1), \
-                   defreg_indexed(x, 2), defreg_indexed(x, 3), \
-                   defreg_indexed(x, 4), defreg_indexed(x, 5), \
+#define defregv(x) defreg_indexed(x, 0), defreg_indexed(x, 1),   \
+                   defreg_indexed(x, 2), defreg_indexed(x, 3),   \
+                   defreg_indexed(x, 4), defreg_indexed(x, 5),   \
                    defreg_indexed(x, 6), defreg_indexed(x, 7)
 
 enum {
@@ -106,7 +109,7 @@ enum {
     /* Aliases */
     defreg(RDFH_A),
     defreg(RDFT_A),
-    defreg(TDFH_A),  defreg(TDFT_A),  defreg(RA_ALT),
+    defreg(TDFH_A),  defreg(TDFT_A),  defreg(RA_A),
     defreg(VFTA_A),
     defreg(FCRTL_A), defreg(FCRTH_A),
 
@@ -114,13 +117,15 @@ enum {
     defreg(FWSM),   defreg(SW_FW_SYNC), defreg(HTCBDPC), defreg(GPIE),
     defreg(EICR),   defreg(EICS),       defreg(EIMS),    defreg(EIAM),
     defreg(EIMC),   defreg(TXPBS),      defreg(TCTL_EXT),
-    defreg(DTXCTL), defreg(RXPBS),      defreg_indexed(RQDPC, 0), defreg(RA2),
+    defreg(DTXCTL), defreg(RXPBS),      defreg(RA2),
 
     defregd(RDBAL), defregd(RDBAH), defregd(RDLEN), defregd(SRRCTL),
-    defregd(RDH), defregd(RDT), defregd(RXDCTL),
+    defregd(RDH),   defregd(RXCTL), defregd(RDT),   defregd(RXDCTL),
+    defregd(RQDPC),
 
-    defregd(TDBAL), defregd(TDBAH), defregd(TDLEN), defregd(TDH),
-    defregd(TDT), defregd(TXDCTL), defregd(TXCTL),
+    defregd(TDBAL),  defregd(TDBAH), defregd(TDLEN), defregd(TDH),
+    defregd(TXCTL),  defregd(TDT),   defregd(TXDCTL),
+    defregd(TDWBAL), defregd(TDWBAH),
 
     defregv(P2VMAILBOX),      defregv(V2PMAILBOX), defreg(MBVFICR), defregv(VMBMEM),
     defreg(MBVFIMR),          defreg(VFLRE),  defreg(VFRE),   defreg(VFTE),
@@ -135,87 +140,7 @@ enum {
 
     defreg(IVAR_MISC),  defreg(VTIVAR), defreg(VTIVAR_MISC),
 
-    defreg(CTRL_ALT),
-    defreg(ICR_ALT),
-    defreg(ICS_ALT),
-    defreg(IMS_ALT),
-    defreg(IMC_ALT),
-    defreg(IAM_ALT),
-    defreg(FCRTL_ALT),
-    defreg(RDBAL0_ALT),
-    defreg(RDBAH0_ALT),
-    defreg(RDLEN0_ALT),
-    defreg(SRRCTL0_ALT),
-    defreg(RDH0_ALT),
-    defreg(RDT0_ALT),
-    defreg(RXDCTL0_ALT),
-    defreg(RXCTL0_ALT),
-    defreg(RQDPC0_ALT),
-    defreg(RDBAL1_ALT),
-    defreg(RDBAL2_ALT),
-    defreg(RDBAL3_ALT),
-    defreg(RDBAH1_ALT),
-    defreg(RDBAH2_ALT),
-    defreg(RDBAH3_ALT),
-    defreg(RDLEN1_ALT),
-    defreg(RDLEN2_ALT),
-    defreg(RDLEN3_ALT),
-    defreg(SRRCTL1_ALT),
-    defreg(SRRCTL2_ALT),
-    defreg(SRRCTL3_ALT),
-    defreg(RDH1_ALT),
-    defreg(RDH2_ALT),
-    defreg(RDH3_ALT),
-    defreg(RDT1_ALT),
-    defreg(RDT2_ALT),
-    defreg(RDT3_ALT),
-    defreg(RXDCTL1_ALT),
-    defreg(RXDCTL2_ALT),
-    defreg(RXDCTL3_ALT),
-    defreg(RXCTL1_ALT),
-    defreg(RXCTL2_ALT),
-    defreg(RXCTL3_ALT),
-    defreg(RQDPC1_ALT),
-    defreg(RQDPC2_ALT),
-    defreg(RQDPC3_ALT),
     defreg(MTA_ALT),
-    defreg(VFTA_ALT),
-    defreg(TDBAL0_ALT),
-    defreg(TDBAH0_ALT),
-    defreg(TDLEN0_ALT),
-    defreg(TDH0_ALT),
-    defreg(TDT0_ALT),
-    defreg(TXCTL0_ALT),
-    defreg(TDWBAL0_ALT),
-    defreg(TDWBAH0_ALT),
-    defreg(TDBAL1_ALT),
-    defreg(TDBAL2_ALT),
-    defreg(TDBAL3_ALT),
-    defreg(TDBAH1_ALT),
-    defreg(TDBAH2_ALT),
-    defreg(TDBAH3_ALT),
-    defreg(TDLEN1_ALT),
-    defreg(TDLEN2_ALT),
-    defreg(TDLEN3_ALT),
-    defreg(TDH1_ALT),
-    defreg(TDH2_ALT),
-    defreg(TDH3_ALT),
-    defreg(TDT1_ALT),
-    defreg(TDT2_ALT),
-    defreg(TDT3_ALT),
-    defreg(TXDCTL0_ALT),
-    defreg(TXDCTL1_ALT),
-    defreg(TXDCTL2_ALT),
-    defreg(TXDCTL3_ALT),
-    defreg(TXCTL1_ALT),
-    defreg(TXCTL2_ALT),
-    defreg(TXCTL3_ALT),
-    defreg(TDWBAL1_ALT),
-    defreg(TDWBAL2_ALT),
-    defreg(TDWBAL3_ALT),
-    defreg(TDWBAH1_ALT),
-    defreg(TDWBAH2_ALT),
-    defreg(TDWBAH3_ALT),
 };
 
 #endif

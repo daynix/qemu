@@ -270,6 +270,8 @@
 #define E1000_MAVTV2   0x05018  /* Management VLAN TAG Value 2 */
 #define E1000_MAVTV3   0x0501c  /* Management VLAN TAG Value 3 */
 #define E1000_MTA      0x05200  /* Multicast Table Array - RW Array */
+#define E1000_RA       0x05400  /* Receive Address - RW Array */
+#define E1000_RA_A     0x00040  /* Alias to RA */
 #define E1000_VFTA     0x05600  /* VLAN Filter Table Array - RW Array */
 #define E1000_VFTA_A   0x00600  /* Alias to VFTA */
 #define E1000_WUC      0x05800  /* Wakeup Control - RW */

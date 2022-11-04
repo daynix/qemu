@@ -442,50 +442,6 @@ enum e1000_state_t {
 
 #define E1000_RQDPC(_n) (0x0C030 + ((_n) * 0x40))
 
-/* Convenience macros
- *
- * Note: "_n" is the queue number of the register to be written to.
- *
- * Example usage:
- * E1000_RDBAL_REG(current_rx_queue)
- */
-#define E1000_RDBAL(_n)   ((_n) < 4 ? (0x02800 + ((_n) * 0x100)) \
-                                    : (0x0C000 + ((_n) * 0x40)))
-#define E1000_RDBAH(_n)   ((_n) < 4 ? (0x02804 + ((_n) * 0x100)) \
-                                    : (0x0C004 + ((_n) * 0x40)))
-#define E1000_RDLEN(_n)   ((_n) < 4 ? (0x02808 + ((_n) * 0x100)) \
-                                    : (0x0C008 + ((_n) * 0x40)))
-#define E1000_SRRCTL(_n)  ((_n) < 4 ? (0x0280C + ((_n) * 0x100)) \
-                                    : (0x0C00C + ((_n) * 0x40)))
-#define E1000_RDH(_n)     ((_n) < 4 ? (0x02810 + ((_n) * 0x100)) \
-                                    : (0x0C010 + ((_n) * 0x40)))
-#define E1000_RDT(_n)     ((_n) < 4 ? (0x02818 + ((_n) * 0x100)) \
-                                    : (0x0C018 + ((_n) * 0x40)))
-#define E1000_RXDCTL(_n)  ((_n) < 4 ? (0x02828 + ((_n) * 0x100)) \
-                                    : (0x0C028 + ((_n) * 0x40)))
-#define E1000_TDBAL(_n)   ((_n) < 4 ? (0x03800 + ((_n) * 0x100)) \
-                                    : (0x0E000 + ((_n) * 0x40)))
-#define E1000_TDBAH(_n)   ((_n) < 4 ? (0x03804 + ((_n) * 0x100)) \
-                                    : (0x0E004 + ((_n) * 0x40)))
-#define E1000_TDLEN(_n)   ((_n) < 4 ? (0x03808 + ((_n) * 0x100)) \
-                                    : (0x0E008 + ((_n) * 0x40)))
-#define E1000_TDH(_n)     ((_n) < 4 ? (0x03810 + ((_n) * 0x100)) \
-                                    : (0x0E010 + ((_n) * 0x40)))
-#define E1000_TDT(_n)     ((_n) < 4 ? (0x03818 + ((_n) * 0x100)) \
-                                    : (0x0E018 + ((_n) * 0x40)))
-#define E1000_TXDCTL(_n)  ((_n) < 4 ? (0x03828 + ((_n) * 0x100)) \
-                                    : (0x0E028 + ((_n) * 0x40)))
-#define E1000_RXCTL(_n)   ((_n) < 4 ? (0x02814 + ((_n) * 0x100)) : \
-                                      (0x0C014 + ((_n) * 0x40)))
-#define E1000_DCA_RXCTRL(_n) E1000_RXCTL(_n)
-#define E1000_TXCTL(_n)   ((_n) < 4 ? (0x03814 + ((_n) * 0x100)) : \
-                                      (0x0E014 + ((_n) * 0x40)))
-#define E1000_DCA_TXCTRL(_n) E1000_TXCTL(_n)
-#define E1000_TDWBAL(_n)  ((_n) < 4 ? (0x03838 + ((_n) * 0x100)) \
-                                    : (0x0E038 + ((_n) * 0x40)))
-#define E1000_TDWBAH(_n)  ((_n) < 4 ? (0x0383C + ((_n) * 0x100)) \
-                                    : (0x0E03C + ((_n) * 0x40)))
-
 #define E1000_RXPBS    0x02404  /* Rx Packet Buffer Size - RW */
 #define E1000_TXPBS    0x03404  /* Tx Packet Buffer Size - RW */
 
@@ -493,7 +449,6 @@ enum e1000_state_t {
 
 #define E1000_HTCBDPC     0x04124  /* Host TX Circuit Breaker Dropped Count */
 #define E1000_RLPML    0x05004  /* RX Long Packet Max Length */
-#define E1000_RA       0x05400  /* Receive Address - RW Array */
 #define E1000_RA2      0x054E0  /* 2nd half of Rx address array - RW Array */
 
 /* VT Registers */
@@ -592,160 +547,84 @@ enum e1000_state_t {
 
 /* new */
 
-#define E1000_RDBAL0_ALT    0x2800
-#define E1000_RDBAH0_ALT    0x2804
-#define E1000_RDLEN0_ALT    0x2808
-#define E1000_SRRCTL0_ALT   0x280C
-#define E1000_RDH0_ALT      0x2810
-#define E1000_RDT0_ALT      0x2818
-#define E1000_RXDCTL0_ALT   0x2828
-#define E1000_RXCTL0_ALT    0x2814
-#define E1000_RQDPC0_ALT    0x2830
-#define E1000_RDBAL1_ALT    0x2900
-#define E1000_RDBAL2_ALT    0x2A00
-#define E1000_RDBAL3_ALT    0x2B00
-#define E1000_RDBAH1_ALT    0x2904
-#define E1000_RDBAH2_ALT    0x2A04
-#define E1000_RDBAH3_ALT    0x2B04
-#define E1000_RDLEN1_ALT    0x2908
-#define E1000_RDLEN2_ALT    0x2A08
-#define E1000_RDLEN3_ALT    0x2B08
-#define E1000_SRRCTL1_ALT   0x290C
-#define E1000_SRRCTL2_ALT   0x2A0C
-#define E1000_SRRCTL3_ALT   0x2B0C
-#define E1000_RDH1_ALT      0x2910
-#define E1000_RDH2_ALT      0x2A10
-#define E1000_RDH3_ALT      0x2B10
-#define E1000_RDT1_ALT      0x2918
-#define E1000_RDT2_ALT      0x2A18
-#define E1000_RDT3_ALT      0x2B18
-#define E1000_RXDCTL1_ALT   0x2928
-#define E1000_RXDCTL2_ALT   0x2A28
-#define E1000_RXDCTL3_ALT   0x2B28
-#define E1000_RXCTL1_ALT    0x2914
-#define E1000_RXCTL2_ALT    0x2A14
-#define E1000_RXCTL3_ALT    0x2B14
-#define E1000_RQDPC1_ALT    0x2930
-#define E1000_RQDPC2_ALT    0x2A30
-#define E1000_RQDPC3_ALT    0x2B30
-#define E1000_RA_ALT        0x0040 /* */
-#define E1000_TDBAL0_ALT    0x3800
-#define E1000_TDBAH0_ALT    0x3804
-#define E1000_TDLEN0_ALT    0x3808
-#define E1000_TDH0_ALT      0x3810
-#define E1000_TDT0_ALT      0x3818
-#define E1000_TXDCTL0_ALT   0x3828
-#define E1000_TXCTL0_ALT    0x3814
-#define E1000_TDWBAL0_ALT   0x3838
-#define E1000_TDWBAH0_ALT   0x383C
-#define E1000_TDBAL1_ALT    0x3900
-#define E1000_TDBAL2_ALT    0x3A00
-#define E1000_TDBAL3_ALT    0x3B00
-#define E1000_TDBAH1_ALT    0x3904
-#define E1000_TDBAH2_ALT    0x3A04
-#define E1000_TDBAH3_ALT    0x3B04
-#define E1000_TDLEN1_ALT    0x3908
-#define E1000_TDLEN2_ALT    0x3A08
-#define E1000_TDLEN3_ALT    0x3B08
-#define E1000_TDH1_ALT      0x3910
-#define E1000_TDH2_ALT      0x3A10
-#define E1000_TDH3_ALT      0x3B10
-#define E1000_TDT1_ALT      0x3918
-#define E1000_TDT2_ALT      0x3A18
-#define E1000_TDT3_ALT      0x3B18
-#define E1000_TXDCTL1_ALT   0x3928
-#define E1000_TXDCTL2_ALT   0x3A28
-#define E1000_TXDCTL3_ALT   0x3B28
-#define E1000_TXCTL1_ALT    0x3914
-#define E1000_TXCTL2_ALT    0x3A14
-#define E1000_TXCTL3_ALT    0x3B14
-#define E1000_TDWBAL1_ALT   0x3938
-#define E1000_TDWBAL2_ALT   0x3A38
-#define E1000_TDWBAL3_ALT   0x3B38
-#define E1000_TDWBAH1_ALT   0x393C
-#define E1000_TDWBAH2_ALT   0x3A3C
-#define E1000_TDWBAH3_ALT   0x3B3C
+/* Receive Registers */
 
-#define E1000_CTRL_ALT      0x0004
-#define E1000_ICR_ALT       0x00C0
-#define E1000_ICS_ALT       0x00C8
-#define E1000_IMS_ALT       0x00D0
-#define E1000_IMC_ALT       0x00D8
-#define E1000_IAM_ALT       0x00E0
-#define E1000_FCRTL_ALT     0x0168
-#define E1000_RDBAH0_ALT    0x2804
-#define E1000_RDLEN0_ALT    0x2808
-#define E1000_SRRCTL0_ALT   0x280C
-#define E1000_RDH0_ALT      0x2810
-#define E1000_RDT0_ALT      0x2818
-#define E1000_RXDCTL0_ALT   0x2828
-#define E1000_RXCTL0_ALT    0x2814
-#define E1000_RQDPC0_ALT    0x2830
-#define E1000_RDBAH1_ALT    0x2904
-#define E1000_RDBAH2_ALT    0x2A04
-#define E1000_RDBAH3_ALT    0x2B04
-#define E1000_RDLEN1_ALT    0x2908
-#define E1000_RDLEN2_ALT    0x2A08
-#define E1000_RDLEN3_ALT    0x2B08
-#define E1000_SRRCTL1_ALT   0x290C
-#define E1000_SRRCTL2_ALT   0x2A0C
-#define E1000_SRRCTL3_ALT   0x2B0C
-#define E1000_RDH1_ALT      0x2910
-#define E1000_RDH2_ALT      0x2A10
-#define E1000_RDH3_ALT      0x2B10
-#define E1000_RDT1_ALT      0x2918
-#define E1000_RDT2_ALT      0x2A18
-#define E1000_RDT3_ALT      0x2B18
-#define E1000_RXDCTL1_ALT   0x2928
-#define E1000_RXDCTL2_ALT   0x2A28
-#define E1000_RXDCTL3_ALT   0x2B28
-#define E1000_RXCTL1_ALT    0x2914
-#define E1000_RXCTL2_ALT    0x2A14
-#define E1000_RXCTL3_ALT    0x2B14
-#define E1000_RQDPC1_ALT    0x2930
-#define E1000_RQDPC2_ALT    0x2A30
-#define E1000_RQDPC3_ALT    0x2B30
-#define E1000_MTA_ALT       0x0200
-#define E1000_VFTA_ALT      0x0600
+/* RX Descriptor Base Low; RW */
+#define E1000_RDBAL(_n)      (0x0C000 + (0x40  * (_n)))
+#define E1000_RDBAL_ALT(_n)  (0x02800 + (0x100 * (_n)))
 
-#define E1000_TDBAL0_ALT    0x3800
-#define E1000_TDBAH0_ALT    0x3804
-#define E1000_TDLEN0_ALT    0x3808
-#define E1000_TDH0_ALT      0x3810
-#define E1000_TDT0_ALT      0x3818
-#define E1000_TXDCTL0_ALT   0x3828
-#define E1000_TXCTL0_ALT    0x3814
-#define E1000_TDWBAL0_ALT   0x3838
-#define E1000_TDWBAH0_ALT   0x383C
-#define E1000_TDBAL1_ALT    0x3900
-#define E1000_TDBAL2_ALT    0x3A00
-#define E1000_TDBAL3_ALT    0x3B00
-#define E1000_TDBAH1_ALT    0x3904
-#define E1000_TDBAH2_ALT    0x3A04
-#define E1000_TDBAH3_ALT    0x3B04
-#define E1000_TDLEN1_ALT    0x3908
-#define E1000_TDLEN2_ALT    0x3A08
-#define E1000_TDLEN3_ALT    0x3B08
-#define E1000_TDH1_ALT      0x3910
-#define E1000_TDH2_ALT      0x3A10
-#define E1000_TDH3_ALT      0x3B10
-#define E1000_TDT1_ALT      0x3918
-#define E1000_TDT2_ALT      0x3A18
-#define E1000_TDT3_ALT      0x3B18
-#define E1000_TXDCTL1_ALT   0x3928
-#define E1000_TXDCTL2_ALT   0x3A28
-#define E1000_TXDCTL3_ALT   0x3B28
-#define E1000_TXCTL1_ALT    0x3914
-#define E1000_TXCTL2_ALT    0x3A14
-#define E1000_TXCTL3_ALT    0x3B14
-#define E1000_TDWBAL1_ALT   0x3938
-#define E1000_TDWBAL2_ALT   0x3A38
-#define E1000_TDWBAL3_ALT   0x3B38
-#define E1000_TDWBAH1_ALT   0x393C
-#define E1000_TDWBAH2_ALT   0x3A3C
-#define E1000_TDWBAH3_ALT   0x3B3C
+/* RX Descriptor Base High; RW */
+#define E1000_RDBAH(_n)      (0x0C004 + (0x40  * (_n)))
+#define E1000_RDBAH_ALT(_n)  (0x02804 + (0x100 * (_n)))
 
-#define E1000_XDBAL_MASK  (~(BIT(5) - 1)) /* TDBAL and RDBAL Registers Mask */
+/* RX Descriptor Ring Length; RW */
+#define E1000_RDLEN(_n)      (0x0C008 + (0x40  * (_n)))
+#define E1000_RDLEN_ALT(_n)  (0x02808 + (0x100 * (_n)))
+
+/* Split and Replication Receive Control; RW */
+#define E1000_SRRCTL(_n)     (0x0C00C + (0x40  * (_n)))
+#define E1000_SRRCTL_ALT(_n) (0x0280C + (0x100 * (_n)))
+
+/* RX Descriptor Head; RW */
+#define E1000_RDH(_n)        (0x0C010 + (0x40  * (_n)))
+#define E1000_RDH_ALT(_n)    (0x02810 + (0x100 * (_n)))
+
+/* RX DCA Control; RW */
+#define E1000_RXCTL(_n)      (0x0C014 + (0x40  * (_n)))
+#define E1000_RXCTL_ALT(_n)  (0x02814 + (0x100 * (_n)))
+
+/* RX Descriptor Tail; RW */
+#define E1000_RDT(_n)        (0x0C018 + (0x40  * (_n)))
+#define E1000_RDT_ALT(_n)    (0x02818 + (0x100 * (_n)))
+
+/* RX Descriptor Control; RW */
+#define E1000_RXDCTL(_n)     (0x0C028 + (0x40  * (_n)))
+#define E1000_RXDCTL_ALT(_n) (0x02828 + (0x100 * (_n)))
+
+/* RX Queue Drop Packet Count; RC */
+#define E1000_RQDPC_ALT(_n)  (0x02830 + (0x100 * (_n)))
+
+/* Transmit Registers */
+
+/* TX Descriptor Base Low; RW */
+#define E1000_TDBAL(_n)      (0x0E000 + (0x40  * (_n)))
+#define E1000_TDBAL_ALT(_n)  (0x03800 + (0x100 * (_n)))
+
+/* TX Descriptor Base High; RW */
+#define E1000_TDBAH(_n)      (0x0E004 + (0x40  * (_n)))
+#define E1000_TDBAH_ALT(_n)  (0x03804 + (0x100 * (_n)))
+
+/* TX Descriptor Ring Length; RW */
+#define E1000_TDLEN(_n)      (0x0E008 + (0x40  * (_n)))
+#define E1000_TDLEN_ALT(_n)  (0x03808 + (0x100 * (_n)))
+
+/* TX Descriptor Head; RW */
+#define E1000_TDH(_n)        (0x0E010 + (0x40  * (_n)))
+#define E1000_TDH_ALT(_n)    (0x03810 + (0x100 * (_n)))
+
+/* TX DCA Control; RW */
+#define E1000_TXCTL(_n)      (0x0E014 + (0x40  * (_n)))
+#define E1000_TXCTL_ALT(_n)  (0x03814 + (0x100 * (_n)))
+
+/* TX Descriptor Tail; RW */
+#define E1000_TDT(_n)        (0x0E018 + (0x40  * (_n)))
+#define E1000_TDT_ALT(_n)    (0x03818 + (0x100 * (_n)))
+
+/* TX Descriptor Control; RW */
+#define E1000_TXDCTL(_n)     (0x0E028 + (0x40  * (_n)))
+#define E1000_TXDCTL_ALT(_n) (0x03828 + (0x100 * (_n)))
+
+/* TX Descriptor Completion Write–Back Address Low; RW */
+#define E1000_TDWBAL(_n)     (0x0E038 + (0x40  * (_n)))
+#define E1000_TDWBAL_ALT(_n) (0x03838 + (0x100 * (_n)))
+
+/* TX Descriptor Completion Write–Back Address High; RW */
+#define E1000_TDWBAH(_n)     (0x0E03C + (0x40  * (_n)))
+#define E1000_TDWBAH_ALT(_n) (0x0383C + (0x100 * (_n)))
+
+#define E1000_MTA_ALT        0x0200
+
+#define E1000_XDBAL_MASK (~(BIT(5) - 1)) /* TDBAL and RDBAL Registers Mask */
 
 #define E1000_ICR_MACSEC   0x00000020 /* MACSec */
 #define E1000_ICR_RX0      0x00000040 /* Receiver Overrun */

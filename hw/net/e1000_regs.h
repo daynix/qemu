@@ -33,6 +33,7 @@
 #define HW_E1000_REGS_H
 
 #include "e1000x_regs.h"
+
 #define E1000_EIAC     0x000DC  /* Ext. Interrupt Auto Clear - RW */
 #define E1000_IVAR     0x000E4  /* Interrupt Vector Allocation Register - RW */
 #define E1000_EITR     0x000E8  /* Extended Interrupt Throttling Rate - RW */
@@ -86,8 +87,6 @@
 #define E1000_TDT1     0x03918  /* TX Desc Tail (1) - RW */
 #define E1000_TXDCTL1  0x03928  /* TX Descriptor Control (1) - RW */
 #define E1000_ICRXOC   0x04124  /* Interrupt Cause Receiver Overrun Count */
-#define E1000_RA       0x05400  /* Receive Address - RW Array */
-#define E1000_RA_A     0x00040  /* Alias to RA */
 
 #define E1000_RSS_QUEUE(reta, hash) ((E1000_RETA_VAL(reta, hash) & BIT(7)) >> 7)
 
