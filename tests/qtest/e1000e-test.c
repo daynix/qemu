@@ -37,19 +37,19 @@
 
 static void e1000e_send_verify(QE1000E *d, int *test_sockets, QGuestAllocator *alloc)
 {
-    static const char data[] = "TEST";
+    static const char test[] = "TEST";
     struct e1000_tx_desc descr;
     char buffer[64];
     int ret;
     uint32_t recv_len;
 
     /* Prepare test data buffer */
-    uint64_t guest_data = guest_alloc(alloc, sizeof(buffer));
-    memwrite(guest_data, data, sizeof(data));
+    uint64_t data = guest_alloc(alloc, sizeof(buffer));
+    memwrite(data, test, sizeof(test));
 
     /* Prepare TX descriptor */
     memset(&descr, 0, sizeof(descr));
-    descr.buffer_addr = cpu_to_le64(guest_data);
+    descr.buffer_addr = cpu_to_le64(data);
     descr.lower.data = cpu_to_le32(E1000_TXD_CMD_RS   |
                                    E1000_TXD_CMD_EOP  |
                                    E1000_TXD_CMD_DEXT |
@@ -71,10 +71,10 @@ static void e1000e_send_verify(QE1000E *d, int *test_sockets, QGuestAllocator *a
     g_assert_cmpint(ret, == , sizeof(recv_len));
     ret = recv(test_sockets[0], buffer, sizeof(buffer), 0);
     g_assert_cmpint(ret, ==, sizeof(buffer));
-    g_assert_cmpstr(buffer, == , data);
+    g_assert_cmpstr(buffer, == , test);
 
     /* Free test data buffer */
-    guest_free(alloc, guest_data);
+    guest_free(alloc, data);
 }
 
 static void e1000e_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator *alloc)
@@ -93,7 +93,6 @@ static void e1000e_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator
         },
     };
 
-    static const int data_len = 64;
     char buffer[64];
     int ret;
 
@@ -102,7 +101,7 @@ static void e1000e_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator
     g_assert_cmpint(ret, == , sizeof(test) + sizeof(len));
 
     /* Prepare test data buffer */
-    uint64_t data = guest_alloc(alloc, data_len);
+    uint64_t data = guest_alloc(alloc, sizeof(buffer));
 
     /* Prepare RX descriptor */
     memset(&descr, 0, sizeof(descr));
@@ -120,7 +119,7 @@ static void e1000e_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator
 
     /* Check data sent to the backend */
     memread(data, buffer, sizeof(buffer));
-    g_assert_cmpstr(buffer, == , "TEST");
+    g_assert_cmpstr(buffer, == , test);
 
     /* Free test data buffer */
     guest_free(alloc, data);
