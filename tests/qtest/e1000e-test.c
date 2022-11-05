@@ -37,24 +37,24 @@
 
 static void e1000e_send_verify(QE1000E *d, int *test_sockets, QGuestAllocator *alloc)
 {
+    static const char data[] = "TEST";
     struct e1000_tx_desc descr;
-    static const int data_len = 64;
     char buffer[64];
     int ret;
     uint32_t recv_len;
 
     /* Prepare test data buffer */
-    uint64_t data = guest_alloc(alloc, data_len);
-    memwrite(data, "TEST", 5);
+    uint64_t guest_data = guest_alloc(alloc, sizeof(buffer));
+    memwrite(guest_data, data, sizeof(data));
 
     /* Prepare TX descriptor */
     memset(&descr, 0, sizeof(descr));
-    descr.buffer_addr = cpu_to_le64(data);
+    descr.buffer_addr = cpu_to_le64(guest_data);
     descr.lower.data = cpu_to_le32(E1000_TXD_CMD_RS   |
                                    E1000_TXD_CMD_EOP  |
                                    E1000_TXD_CMD_DEXT |
                                    E1000_TXD_DTYP_D   |
-                                   data_len);
+                                   sizeof(buffer));
 
     /* Put descriptor to the ring */
     e1000e_tx_ring_push(d, &descr);
@@ -69,12 +69,12 @@ static void e1000e_send_verify(QE1000E *d, int *test_sockets, QGuestAllocator *a
     /* Check data sent to the backend */
     ret = recv(test_sockets[0], &recv_len, sizeof(recv_len), 0);
     g_assert_cmpint(ret, == , sizeof(recv_len));
-    ret = recv(test_sockets[0], buffer, 64, 0);
-    g_assert_cmpint(ret, >=, 5);
-    g_assert_cmpstr(buffer, == , "TEST");
+    ret = recv(test_sockets[0], buffer, sizeof(buffer), 0);
+    g_assert_cmpint(ret, ==, sizeof(buffer));
+    g_assert_cmpstr(buffer, == , data);
 
     /* Free test data buffer */
-    guest_free(alloc, data);
+    guest_free(alloc, guest_data);
 }
 
 static void e1000e_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator *alloc)
