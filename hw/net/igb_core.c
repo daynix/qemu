@@ -638,7 +638,7 @@ static void igb_process_tx_desc(E1000ECore *core, struct e1000e_tx *tx,
 
 //#define IVAR_GET_ENTRY(i) ((core->mac[IVAR0 + (n)/4] >> (8 * ((n)%4))) & 0xFF)
 
-#define IVAR_VALID_ENTRY(x) !!((x) & 0x80)
+#define IVAR_VALID_ENTRY(x) !!((x) & E1000_IVAR_VALID)
 
 static uint32_t igb_tx_wb_interrupt_cause(E1000ECore *core, int queue_idx)
 {

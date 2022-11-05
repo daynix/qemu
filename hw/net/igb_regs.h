@@ -357,6 +357,7 @@ enum e1000_state_t {
 
 /* from igb/e1000_defines.h */
 
+#define E1000_IVAR_VALID     0x80
 #define E1000_GPIE_NSICR     0x00000001
 #define E1000_GPIE_MSIX_MODE 0x00000010
 #define E1000_GPIE_EIAME     0x40000000

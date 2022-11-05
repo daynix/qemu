@@ -366,30 +366,6 @@
 /* [TR]DBAL and [TR]DLEN masks */
 #define E1000_XDLEN_MASK            ((BIT(20) - 1) & (~(BIT(7) - 1)))
 
-/* IVAR register parsing helpers */
-#define E1000_IVAR_INT_ALLOC_VALID  (0x8)
-
-#define E1000_IVAR_RXQ0_SHIFT       (0)
-#define E1000_IVAR_RXQ1_SHIFT       (4)
-#define E1000_IVAR_TXQ0_SHIFT       (8)
-#define E1000_IVAR_TXQ1_SHIFT       (12)
-#define E1000_IVAR_OTHER_SHIFT      (16)
-
-#define E1000_IVAR_ENTRY_MASK       (0xF)
-#define E1000_IVAR_ENTRY_VALID_MASK E1000_IVAR_INT_ALLOC_VALID
-#define E1000_IVAR_ENTRY_VEC_MASK   (0x7)
-
-#define E1000_IVAR_RXQ0(x)          ((x) >> E1000_IVAR_RXQ0_SHIFT)
-#define E1000_IVAR_RXQ1(x)          ((x) >> E1000_IVAR_RXQ1_SHIFT)
-#define E1000_IVAR_TXQ0(x)          ((x) >> E1000_IVAR_TXQ0_SHIFT)
-#define E1000_IVAR_TXQ1(x)          ((x) >> E1000_IVAR_TXQ1_SHIFT)
-#define E1000_IVAR_OTHER(x)         ((x) >> E1000_IVAR_OTHER_SHIFT)
-
-#define E1000_IVAR_ENTRY_VALID(x)   ((x) & E1000_IVAR_ENTRY_VALID_MASK)
-#define E1000_IVAR_ENTRY_VEC(x)     ((x) & E1000_IVAR_ENTRY_VEC_MASK)
-
-#define E1000_IVAR_TX_INT_EVERY_WB  BIT(31)
-
 /* RFCTL register bits */
 #define E1000_RFCTL_ISCSI_DIS           0x00000001
 #define E1000_RFCTL_NFSW_DIS            0x00000040
