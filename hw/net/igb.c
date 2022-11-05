@@ -406,6 +406,8 @@ static void pci_igb_uninit(PCIDevice *dev)
 
     trace_igb_cb_pci_uninit();
 
+    igb_core_pci_uninit(&s->core);
+
     pcie_sriov_pf_exit(dev);
     pcie_cap_exit(dev);
     qemu_del_nic(s->nic);
