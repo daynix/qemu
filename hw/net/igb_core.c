@@ -938,8 +938,8 @@ e1000e_rx_l4_cso_enabled(E1000ECore *core)
 
 static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehdr)
 {
-    static const int mta_shift[] = { 4, 3, 2, 0 };
-    uint32_t f, ra[2], *rp, rctl = core->mac[RCTL];
+    static const int ta_shift[] = { 4, 3, 2, 0 };
+    uint32_t f, ra[2], *macp, rctl = core->mac[RCTL];
     uint16_t queues = 0;
     int i;
 
@@ -966,31 +966,31 @@ static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehd
         return queues;
     }
 
-    for (rp = core->mac + RA; rp < core->mac + RA + 32; rp += 2) {
-        if (!(rp[1] & E1000_RAH_AV)) {
+    for (macp = core->mac + RA; macp < core->mac + RA + 32; macp += 2) {
+        if (!(macp[1] & E1000_RAH_AV)) {
             continue;
         }
-        ra[0] = cpu_to_le32(rp[0]);
-        ra[1] = cpu_to_le32(rp[1]);
+        ra[0] = cpu_to_le32(macp[0]);
+        ra[1] = cpu_to_le32(macp[1]);
         if (!memcmp(ehdr->h_dest, (uint8_t *)ra, 6)) {
-            trace_e1000x_rx_flt_ucast_match((int)(rp - core->mac - RA) / 2,
+            trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA) / 2,
                                             MAC_ARG(ehdr->h_dest));
 
-            queues |= (rp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
+            queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
         }
     }
 
-    for (rp = core->mac + RA2; rp < core->mac + RA2 + 16; rp += 2) {
-        if (!(rp[1] & E1000_RAH_AV)) {
+    for (macp = core->mac + RA2; macp < core->mac + RA2 + 16; macp += 2) {
+        if (!(macp[1] & E1000_RAH_AV)) {
             continue;
         }
-        ra[0] = cpu_to_le32(rp[0]);
-        ra[1] = cpu_to_le32(rp[1]);
+        ra[0] = cpu_to_le32(macp[0]);
+        ra[1] = cpu_to_le32(macp[1]);
         if (!memcmp(ehdr->h_dest, (uint8_t *)ra, 6)) {
-            trace_e1000x_rx_flt_ucast_match((int)(rp - core->mac - RA2) / 2,
+            trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA2) / 2,
                                             MAC_ARG(ehdr->h_dest));
 
-            queues |= (rp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
+            queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
         }
     }
 
@@ -998,27 +998,27 @@ static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehd
         return queues;
     }
 
-    if (is_multicast_ether_addr(ehdr->h_dest)) {
-        f = mta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
-        f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
-        if (core->mac[MTA + (f >> 5)] & (1 << (f & 0x1f))) {
-            for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
-                if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
-                    queues |= BIT(i);
-                }
+    macp = core->mac + (is_multicast_ether_addr(ehdr->h_dest) ? MTA : UTA);
+
+    f = ta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
+    f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
+    if (macp[f >> 5] & (1 << (f & 0x1f))) {
+        for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+            if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
+                queues |= BIT(i);
             }
         }
-
-        if (queues) {
-            e1000x_inc_reg_if_not_full(core->mac, MPRC);
-            return queues;
-        }
-
-        trace_e1000x_rx_flt_inexact_mismatch(MAC_ARG(ehdr->h_dest),
-                                             (rctl >> E1000_RCTL_MO_SHIFT) & 3,
-                                             f >> 5,
-                                             core->mac[MTA + (f >> 5)]);
     }
+
+    if (queues) {
+        e1000x_inc_reg_if_not_full(core->mac, MPRC);
+        return queues;
+    }
+
+    trace_e1000x_rx_flt_inexact_mismatch(MAC_ARG(ehdr->h_dest),
+                                         (rctl >> E1000_RCTL_MO_SHIFT) & 3,
+                                         f >> 5,
+                                         macp[f >> 5]);
 
     return queues;
 }
