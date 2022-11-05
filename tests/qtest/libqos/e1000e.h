@@ -24,7 +24,6 @@
 
 #define E1000E_RX0_MSG_ID           (0)
 #define E1000E_TX0_MSG_ID           (1)
-#define E1000E_OTHER_MSG_ID         (2)
 
 typedef struct QE1000E QE1000E;
 typedef struct QE1000E_PCI QE1000E_PCI;
