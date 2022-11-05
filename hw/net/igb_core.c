@@ -631,14 +631,7 @@ static void igb_process_tx_desc(E1000ECore *core, struct e1000e_tx *tx,
     }
 }
 
-#define _IVAR_QUEUE_ENTRY(q, tx) ((q) < 8 ? (q)*4 + tx : ((q)-8)*4 + 2 + tx)
-
-#define IVAR_RX_QUEUE_ENTRY(q)  _IVAR_QUEUE_ENTRY(q, 0)
-#define IVAR_TX_QUEUE_ENTRY(q)  _IVAR_QUEUE_ENTRY(q, 1)
-
 //#define IVAR_GET_ENTRY(i) ((core->mac[IVAR0 + (n)/4] >> (8 * ((n)%4))) & 0xFF)
-
-#define IVAR_VALID_ENTRY(x) !!((x) & E1000_IVAR_VALID)
 
 static uint32_t igb_tx_wb_interrupt_cause(E1000ECore *core, int queue_idx)
 {
@@ -648,10 +641,10 @@ static uint32_t igb_tx_wb_interrupt_cause(E1000ECore *core, int queue_idx)
         return BIT(queue_idx);
     }
 
-    n = IVAR_TX_QUEUE_ENTRY(queue_idx);
+    n = igb_ivar_entry_tx(queue_idx);
     ent = (core->mac[IVAR0 + n / 4] >> (8 * (n % 4))) & 0xff;
 
-    return IVAR_VALID_ENTRY(ent) ? BIT(ent & 0x1f) : 0;
+    return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
 static uint32_t igb_rx_wb_interrupt_cause(E1000ECore *core, int queue_idx,
@@ -663,10 +656,10 @@ static uint32_t igb_rx_wb_interrupt_cause(E1000ECore *core, int queue_idx,
         return BIT(queue_idx);
     }
 
-    n = IVAR_RX_QUEUE_ENTRY(queue_idx);
+    n = igb_ivar_entry_rx(queue_idx);
     ent = (core->mac[IVAR0 + n / 4] >> (8 * (n % 4))) & 0xff;
 
-    return IVAR_VALID_ENTRY(ent) ? BIT(ent & 0x1f) : 0;
+    return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
 #if 0
@@ -2097,14 +2090,14 @@ static void igb_update_interrupt_state(E1000ECore *core)
             causes = 0;
             if (icr & E1000_ICR_DRSTA) {
                 int_alloc = core->mac[IVAR_MISC] & 0xff;
-                if (int_alloc & BIT(7)) {
+                if (int_alloc & E1000_IVAR_VALID) {
                     causes |= BIT(int_alloc & 0x1f);
                 }
             }
             /* Check if other bits (excluding the TCP Timer) are enabled. */
             if (icr & ~E1000_ICR_DRSTA) {
                 int_alloc = (core->mac[IVAR_MISC] >> 8) & 0xff;
-                if (int_alloc & BIT(7)) {
+                if (int_alloc & E1000_IVAR_VALID) {
                     causes |= BIT(int_alloc & 0x1f);
                 }
             }
@@ -2195,7 +2188,7 @@ static void mailbox_interrupt_to_vf(E1000ECore *core, uint16_t vfn)
 {
     uint32_t ent = core->mac[VTIVAR_MISC + vfn] & 0xFF;
 
-    if (IVAR_VALID_ENTRY(ent)) {
+    if ((ent & E1000_IVAR_VALID)) {
         core->mac[EICR] |= (ent & 0x3) << (22 - vfn*3);
         igb_update_interrupt_state(core);
     }
@@ -2397,16 +2390,16 @@ static void igb_set_vtivar(E1000ECore *core, int index, uint32_t val)
 
     /* Get assigned vector associated with queue Rx#0. */
     ent = val & 0xFF;
-    if (IVAR_VALID_ENTRY(ent)) {
-        n = IVAR_RX_QUEUE_ENTRY(qn);
+    if ((ent & E1000_IVAR_VALID)) {
+        n = igb_ivar_entry_rx(qn);
         ent = 0x80 | (24 - vfn*3 - (2-(ent & 0x7)));
         core->mac[IVAR0 + n/4] |= ent << 8*(n%4);
     }
 
     /* Get assigned vector associated with queue Tx#0 */
     ent = (val >> 8) & 0xFF;
-    if (IVAR_VALID_ENTRY(ent)) {
-        n = IVAR_TX_QUEUE_ENTRY(qn);
+    if ((ent & E1000_IVAR_VALID)) {
+        n = igb_ivar_entry_tx(qn);
         ent = 0x80 | (24 - vfn*3 - (2-(ent & 0x7)));
         core->mac[IVAR0 + n/4] |= ent << 8*(n%4);
     }

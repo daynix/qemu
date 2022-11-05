@@ -707,4 +707,14 @@ enum e1000_state_t {
 
 #define E1000_STATUS_NUM_VFS_SHIFT 14
 
+static inline uint8_t igb_ivar_entry_rx(uint8_t i)
+{
+    return i < 8 ? i * 4 : (i - 8) * 4 + 2;
+}
+
+static inline uint8_t igb_ivar_entry_tx(uint8_t i)
+{
+    return i < 8 ? i * 4 + 1 : (i - 8) * 4 + 3;
+}
+
 #endif
