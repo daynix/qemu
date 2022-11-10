@@ -385,6 +385,8 @@ enum e1000_state_t {
 #define E1000_EICR_TX_QUEUE3    0x00000800 /* Tx Queue 3 Interrupt */
 #define E1000_EICR_OTHER        0x80000000 /* Interrupt Cause Active */
 
+#define IGP03E1000_E_PHY_ID 0x02A80390
+
 /* from igb/e1000_mbox.h */
 
 #define E1000_P2VMAILBOX_STS  0x00000001 /* Initiate message send to VF */
