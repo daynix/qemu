@@ -37,8 +37,6 @@
 #define TYPE_IGBVF "igbvf"
 #define IGBVF(obj) OBJECT_CHECK(IgbVfState, (obj), TYPE_IGBVF)
 
-#define PCI_DEVICE_ID_INTEL_82576_VF    0x10CA
-
 #define IGBVF_MSIX_VECTORS  (3)
 
 #define IGBVF_MMIO_BAR_IDX  (0)
@@ -52,7 +50,6 @@ typedef struct IgbVfState {
 
     MemoryRegion mmio;
     MemoryRegion msix;
-
 } IgbVfState;
 
 static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
@@ -61,100 +58,97 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
     {
         case E1000_CTRL:
         case E1000_CTRL_DUP:
-            return 0x10000 + vfn * 0x100;
-        case E1000_STATUS:
-            return 0x0008;
-        case 0x1048: /* E1000_VTFRTIMER */
-            return 0x1048;
+            return E1000_PVTCTRL(vfn);
         case E1000_EICS:
-            return 0x10020 + vfn * 0x100;
+            return E1000_PVTEICS(vfn);
         case E1000_EIMS:
-            return 0x10024 + vfn * 0x100;
+            return E1000_PVTEIMS(vfn);
         case E1000_EIMC:
-            return 0x10028 + vfn * 0x100;
+            return E1000_PVTEIMC(vfn);
         case E1000_EIAC:
-            return 0x1002C + vfn * 0x100;
+            return E1000_PVTEIAC(vfn);
         case E1000_EIAM:
-            return 0x10030 + vfn * 0x100;
+            return E1000_PVTEIAM(vfn);
         case E1000_EICR:
-            return 0x10080 + vfn * 0x100;
-        case 0x1680:
-        case 0x1684:
-        case 0x1688: /* E1000_EITR 0-2 */
-            return 0x16E0 - (0x1688 - addr) - vfn * 0xC;
+            return E1000_PVTEICR(vfn);
+        case E1000_EITR(0):
+        case E1000_EITR(1):
+        case E1000_EITR(2):
+            return E1000_EITR(22) + (addr - E1000_EITR(0)) - vfn * 0xC;
         case E1000_IVAR0:
-            return 0x11700 + vfn * 4;
+            return E1000_VTIVAR + vfn * 4;
         case E1000_IVAR_MISC:
-            return 0x11720 + vfn * 4;
+            return E1000_VTIVAR_MISC + vfn * 4;
         case 0x0F04: /* E1000_PBACL */
-            return 0x5B68;
+            return E1000_PBACLR;
         case 0x0F0C: /* E1000_PSRTYPE */
-            return 0x5480 + vfn * 4;
+            return E1000_PSRTYPE(vfn);
         case E1000_V2PMAILBOX(0):
-            return 0x0C40 + vfn * 4;
-        case 0x0800 ... 0x083F: /* VMBMEM */
+            return E1000_V2PMAILBOX(vfn);
+        case E1000_VMBMEM(0) ... E1000_VMBMEM(0) + 0x3F:
             return addr + vfn * 0x40;
         case E1000_RDBAL_ALT(0):
-            return 0xC000 + vfn * 0x40;
+            return E1000_RDBAL(vfn);
         case E1000_RDBAH_ALT(0):
-            return 0xC004 + vfn * 0x40;
+            return E1000_RDBAH(vfn);
         case E1000_RDLEN_ALT(0):
-            return 0xC008 + vfn * 0x40;
+            return E1000_RDLEN(vfn);
         case E1000_SRRCTL_ALT(0):
-            return 0xC00C + vfn * 0x40;
+            return E1000_SRRCTL(vfn);
         case E1000_RDH_ALT(0):
-            return 0xC010 + vfn * 0x40;
+            return E1000_RDH(vfn);
         case E1000_RXCTL_ALT(0):
-            return 0xC014 + vfn * 0x40;
+            return E1000_RXCTL(vfn);
         case E1000_RDT_ALT(0):
-            return 0xC018 + vfn * 0x40;
+            return E1000_RDT(vfn);
         case E1000_RXDCTL_ALT(0):
-            return 0xC028 + vfn * 0x40;
+            return E1000_RXDCTL(vfn);
         case E1000_RQDPC_ALT(0):
-            return 0xC030 + vfn * 0x40;
+            return E1000_RQDPC(vfn);
         case E1000_TDBAL_ALT(0):
-            return 0xE000 + vfn * 0x40;
+            return E1000_TDBAL(vfn);
         case E1000_TDBAH_ALT(0):
-            return 0xE004 + vfn * 0x40;
+            return E1000_TDBAH(vfn);
         case E1000_TDLEN_ALT(0):
-            return 0xE008 + vfn * 0x40;
+            return E1000_TDLEN(vfn);
         case E1000_TDH_ALT(0):
-            return 0xE010 + vfn * 0x40;
+            return E1000_TDH(vfn);
         case E1000_TXCTL_ALT(0):
-            return 0xE014 + vfn * 0x40;
+            return E1000_TXCTL(vfn);
         case E1000_TDT_ALT(0):
-            return 0xE018 + vfn * 0x40;
+            return E1000_TDT(vfn);
         case E1000_TXDCTL_ALT(0):
-            return 0xE028 + vfn * 0x40;
+            return E1000_TXDCTL(vfn);
         case E1000_TDWBAL_ALT(0):
-            return 0xE038 + vfn * 0x40;
+            return E1000_TDWBAL(vfn);
         case E1000_TDWBAH_ALT(0):
-            return 0xE03C + vfn * 0x40;
+            return E1000_TDWBAH(vfn);
         case E1000_VFGPRC:
-            return 0x10010 + vfn * 0x100;
+            return E1000_PVFGPRC(vfn);
         case E1000_VFGPTC:
-            return 0x10014 + vfn * 0x100;
+            return E1000_PVFGPTC(vfn);
         case E1000_VFGORC:
-            return 0x10018 + vfn * 0x100;
+            return E1000_PVFGORC(vfn);
         case E1000_VFGOTC:
-            return 0x10034 + vfn * 0x100;
+            return E1000_PVFGOTC(vfn);
         case E1000_VFMPRC:
-            return 0x1003C + vfn * 0x100;
+            return E1000_PVFMPRC(vfn);
         case E1000_VFGPRLBC:
-            return 0x10040 + vfn * 0x100;
+            return E1000_PVFGPRLBC(vfn);
         case E1000_VFGPTLBC:
-            return 0x10044 + vfn * 0x100;
+            return E1000_PVFGPTLBC(vfn);
         case E1000_VFGORLBC:
-            return 0x10048 + vfn * 0x100;
+            return E1000_PVFGORLBC(vfn);
         case E1000_VFGOTLBC:
-            return 0x10050 + vfn * 0x100;
+            return E1000_PVFGOTLBC(vfn);
+        case E1000_STATUS:
+        case E1000_FRTIMER:
         case 0x34E8: /* E1000_PBTWAC */
-            return 0x34E8;
         case 0x24E8: /* E1000_PBRWAC */
-            return 0x24E8;
+            return addr;
     }
 
-    g_assert_not_reached();
+    trace_igbvf_wrn_io_addr_unknown(addr);
 
     return addr;
 }
@@ -254,7 +248,7 @@ static void igbvf_class_init(ObjectClass *class, void *data)
     c->realize = igbvf_pci_realize;
     c->exit = igbvf_pci_uninit;
     c->vendor_id = PCI_VENDOR_ID_INTEL;
-    c->device_id = PCI_DEVICE_ID_INTEL_82576_VF;
+    c->device_id = E1000_DEV_ID_82576_VF;
     c->revision = 1;
     c->romfile = NULL;
     c->class_id = PCI_CLASS_NETWORK_ETHERNET;

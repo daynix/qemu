@@ -274,7 +274,7 @@ e1000e_msix_use_vector_fail(uint32_t vec, int32_t res) "Failed to use MSI-X vect
 e1000e_mac_set_permanent(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4, uint8_t b5) "Set permanent MAC: %02x:%02x:%02x:%02x:%02x:%02x"
 e1000e_cfg_support_virtio(bool support) "Virtio header supported: %d"
 
-# hw/net/igb.c
+# igb.c
 igb_cb_pci_realize(void) "IGB PCI realize entry"
 igb_cb_pci_uninit(void) "IGB PCI unit entry"
 igb_cb_qdev_reset(void) "IGB qdev reset entry"
@@ -300,7 +300,7 @@ igb_msix_use_vector_fail(uint32_t vec, int32_t res) "Failed to use MSI-X vector 
 igb_cfg_support_virtio(bool support) "Virtio header supported: %d"
 igb_mac_set_permanent(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4, uint8_t b5) "Set permanent MAC: %02x:%02x:%02x:%02x:%02x:%02x"
 
-# hw/net/igb_core.c
+# igb_core.c
 igb_irq_icr_read(uint32_t icr) "Current ICR: 0x%x"
 igb_irq_icr_clear_gpie_nsicr(void) "Clearing ICR on read due to GPIE.NSICR enabled"
 igb_irq_icr_clear_zero_ims(void) "Clearing ICR on read due to zero IMS"
@@ -316,6 +316,9 @@ igb_irq_write_eicr(uint32_t val, bool msix) "Update EICR: 0x%x MSI-X: %d"
 igb_irq_eitr_set(uint32_t eitr_num, uint32_t val) "EITR[%u] = 0x%x"
 igb_set_pfmailbox(uint32_t vf_num, uint32_t val) "PFMailbox[%d]: 0x%x"
 igb_set_vfmailbox(uint32_t vf_num, uint32_t val) "VFMailbox[%d]: 0x%x"
+
+# igbvf.c
+igbvf_wrn_io_addr_unknown(uint64_t addr) "IO unknown register 0x%"PRIx64
 
 # spapr_llan.c
 spapr_vlan_get_rx_bd_from_pool_found(int pool, int32_t count, uint32_t rx_bufs) "pool=%d count=%"PRId32" rxbufs=%"PRIu32

@@ -430,27 +430,29 @@ enum e1000_state_t {
 
 /* from igb/e1000_regs.h */
 
-#define E1000_EIAC      0x0152C  /* Ext. Interrupt Auto Clear - RW */
-#define E1000_IVAR0     0x01700  /* Interrupt Vector Allocation Register - RW */
-#define E1000_IVAR_MISC 0x01740  /* Interrupt Vector Allocation Register (last) - RW */
+#define E1000_EICR      0x01580  /* Ext. Interrupt Cause Read - R/clr */
 #define E1000_EITR(_n)  (0x01680 + (0x4 * (_n)))
-#define E1000_GPIE      0x01514  /* General Purpose Interrupt Enable; RW */
 #define E1000_EICS      0x01520  /* Ext. Interrupt Cause Set - W0 */
 #define E1000_EIMS      0x01524  /* Ext. Interrupt Mask Set/Read - RW */
 #define E1000_EIMC      0x01528  /* Ext. Interrupt Mask Clear - WO */
+#define E1000_EIAC      0x0152C  /* Ext. Interrupt Auto Clear - RW */
 #define E1000_EIAM      0x01530  /* Ext. Interrupt Ack Auto Clear Mask - RW */
-#define E1000_EICR      0x01580  /* Ext. Interrupt Cause Read - R/clr */
+#define E1000_GPIE      0x01514  /* General Purpose Interrupt Enable; RW */
+#define E1000_IVAR0     0x01700  /* Interrupt Vector Allocation Register - RW */
+#define E1000_IVAR_MISC 0x01740  /* Interrupt Vector Allocation Register (last) - RW */
+#define E1000_FRTIMER   0x01048  /* Free Running Timer - RW */
 
 #define E1000_RQDPC(_n) (0x0C030 + ((_n) * 0x40))
 
-#define E1000_RXPBS    0x02404  /* Rx Packet Buffer Size - RW */
-#define E1000_TXPBS    0x03404  /* Tx Packet Buffer Size - RW */
+#define E1000_RXPBS 0x02404  /* Rx Packet Buffer Size - RW */
+#define E1000_TXPBS 0x03404  /* Tx Packet Buffer Size - RW */
 
-#define E1000_DTXCTL   0x03590  /* DMA TX Control - RW */
+#define E1000_DTXCTL 0x03590  /* DMA TX Control - RW */
 
 #define E1000_HTCBDPC     0x04124  /* Host TX Circuit Breaker Dropped Count */
-#define E1000_RLPML    0x05004  /* RX Long Packet Max Length */
-#define E1000_RA2      0x054E0  /* 2nd half of Rx address array - RW Array */
+#define E1000_RLPML       0x05004  /* RX Long Packet Max Length */
+#define E1000_RA2         0x054E0  /* 2nd half of Rx address array - RW Array */
+#define E1000_PSRTYPE(_i) (0x05480 + ((_i) * 4))
 
 /* VT Registers */
 #define E1000_MBVFICR   0x00C80 /* Mailbox VF Cause - RWC */
@@ -545,6 +547,10 @@ enum e1000_state_t {
 /* These act per VF so an array friendly macro is used */
 #define E1000_V2PMAILBOX(_n) (0x00C40 + (4 * (_n)))
 #define E1000_VMBMEM(_n)     (0x00800 + (64 * (_n)))
+
+/* from igbvf/vf.h */
+
+#define E1000_DEV_ID_82576_VF 0x10CA
 
 /* new */
 
