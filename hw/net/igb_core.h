@@ -39,7 +39,7 @@
 #define E1000E_PHY_PAGE_SIZE    (0x20)
 #define E1000E_PHY_PAGES        (0x07)
 #define E1000E_MAC_SIZE         (0x8000)
-#define E1000E_EEPROM_SIZE      (64)
+#define E1000E_EEPROM_SIZE      (1024)
 #define E1000E_MSIX_VEC_NUM     (25)
 #define E1000E_NUM_QUEUES       (16)
 

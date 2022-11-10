@@ -275,13 +275,13 @@ static void igb_init_net_peer(IgbState *s, PCIDevice *dev, uint8_t *macaddr)
  *
  * TBD: Need to walk through this, names in comments are ok up to 0x4F
  */
-static const uint16_t igb_eeprom_template[80] = {
+static const uint16_t igb_eeprom_template[] = {
   /*        Address        |    Compat.    | ImRev |Compat.|OEM sp.*/
     0x0000, 0x0000, 0x0000, 0x0d14, 0xffff, 0x2010, 0xffff, 0xffff,
   /*      PBA      |ICtrl1 | SSID  | SVID  | DevID |-------|ICtrl2 */
     0x1040, 0xffff, 0x046b, 0x484c, 0x108e, 0x10c9, 0x0000, 0xf14b,
   /* SwPin0| DevID | EESZ  |-------|ICtrl3 |PCI-tc | MSIX  | APtr  */
-    0xe30c, 0x10c9, 0x6000, 0x0000, 0x2880, 0x0014, 0x4a40, 0x0060,
+    0xe30c, 0x10c9, 0x5C00, 0x0000, 0x2880, 0x0014, 0x4a40, 0x0060,
   /* PCIe Init. Conf 1,2,3 |PCICtrl| LD1,3 |DDevID |DevRev | LD0,2 */
     0x6cf6, 0xd7b0, 0x0a7e, 0x8403, 0x4784, 0x10a6, 0x0001, 0x4602,
   /* SwPin1| FunC  |LAN-PWR|ManHwC |ICtrl3 | IOVct |VDevID |-------*/
