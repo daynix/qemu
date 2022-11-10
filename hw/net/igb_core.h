@@ -69,7 +69,6 @@ struct E1000Core {
     uint16_t phy[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE];
     uint16_t eeprom[E1000E_EEPROM_SIZE];
 
-    uint32_t rxbuf_sizes[E1000_PSRCTL_BUFFS_PER_DESC];
     uint32_t rx_desc_buf_size;
     uint32_t rxbuf_min_shift;
     uint8_t rx_desc_len;

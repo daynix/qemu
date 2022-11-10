@@ -304,8 +304,6 @@ static inline bool
 e1000e_rx_use_ps_descriptor(E1000ECore *core)
 {
     return false;
-    return !e1000e_rx_use_legacy_descriptor(core) &&
-           (core->mac[RCTL] & E1000_RCTL_DTYP_PS);
 }
 
 static inline bool
@@ -1031,35 +1029,12 @@ e1000e_read_ext_rx_descr(E1000ECore *core, uint8_t *desc, hwaddr *buff_addr)
 }
 
 static inline void
-e1000e_read_ps_rx_descr(E1000ECore *core, uint8_t *desc,
-                        hwaddr (*buff_addr)[MAX_PS_BUFFERS])
-{
-    int i;
-    union e1000_rx_desc_packet_split *d =
-        (union e1000_rx_desc_packet_split *) desc;
-
-    for (i = 0; i < MAX_PS_BUFFERS; i++) {
-        (*buff_addr)[i] = le64_to_cpu(d->read.buffer_addr[i]);
-    }
-
-    trace_e1000e_rx_desc_ps_read((*buff_addr)[0], (*buff_addr)[1],
-                                 (*buff_addr)[2], (*buff_addr)[3]);
-}
-
-static inline void
-e1000e_read_rx_descr(E1000ECore *core, uint8_t *desc,
-                     hwaddr (*buff_addr)[MAX_PS_BUFFERS])
+igb_read_rx_descr(E1000ECore *core, uint8_t *desc, hwaddr *buff_addr)
 {
     if (e1000e_rx_use_legacy_descriptor(core)) {
-        e1000e_read_lgcy_rx_descr(core, desc, &(*buff_addr)[0]);
-        (*buff_addr)[1] = (*buff_addr)[2] = (*buff_addr)[3] = 0;
+        e1000e_read_lgcy_rx_descr(core, desc, buff_addr);
     } else {
-        if (core->mac[RCTL] & E1000_RCTL_DTYP_PS) {
-            e1000e_read_ps_rx_descr(core, desc, buff_addr);
-        } else {
-            e1000e_read_ext_rx_descr(core, desc, &(*buff_addr)[0]);
-            (*buff_addr)[1] = (*buff_addr)[2] = (*buff_addr)[3] = 0;
-        }
+        e1000e_read_ext_rx_descr(core, desc, buff_addr);
     }
 }
 
@@ -1371,112 +1346,34 @@ e1000e_write_ext_rx_descr(E1000ECore *core, uint8_t *desc,
 }
 
 static inline void
-e1000e_write_ps_rx_descr(E1000ECore *core, uint8_t *desc,
-                         struct NetRxPkt *pkt,
-                         const E1000E_RSSInfo *rss_info,
-                         size_t ps_hdr_len,
-                         uint16_t(*written)[MAX_PS_BUFFERS])
-{
-    int i;
-    union e1000_rx_desc_packet_split *d =
-        (union e1000_rx_desc_packet_split *) desc;
-
-    memset(&d->wb, 0, sizeof(d->wb));
-
-    d->wb.middle.length0 = cpu_to_le16((*written)[0]);
-
-    for (i = 0; i < PS_PAGE_BUFFERS; i++) {
-        d->wb.upper.length[i] = cpu_to_le16((*written)[i + 1]);
-    }
-
-    e1000e_build_rx_metadata(core, pkt, pkt != NULL,
-                             rss_info,
-                             &d->wb.lower.hi_dword.rss,
-                             &d->wb.lower.mrq,
-                             &d->wb.middle.status_error,
-                             &d->wb.lower.hi_dword.csum_ip.ip_id,
-                             &d->wb.middle.vlan);
-
-    d->wb.upper.header_status =
-        cpu_to_le16(ps_hdr_len | (ps_hdr_len ? E1000_RXDPS_HDRSTAT_HDRSP : 0));
-
-    trace_e1000e_rx_desc_ps_write((*written)[0], (*written)[1],
-                                  (*written)[2], (*written)[3]);
-}
-
-static inline void
-e1000e_write_rx_descr(E1000ECore *core, uint8_t *desc,
-struct NetRxPkt *pkt, const E1000E_RSSInfo *rss_info,
-    size_t ps_hdr_len, uint16_t(*written)[MAX_PS_BUFFERS])
+igb_write_rx_descr(E1000ECore *core, uint8_t *desc, struct NetRxPkt *pkt,
+                   const E1000E_RSSInfo *rss_info, uint16_t length)
 {
     if (e1000e_rx_use_legacy_descriptor(core)) {
-        assert(ps_hdr_len == 0);
-        e1000e_write_lgcy_rx_descr(core, desc, pkt, rss_info, (*written)[0]);
+        e1000e_write_lgcy_rx_descr(core, desc, pkt, rss_info, length);
     } else {
-        if (core->mac[RCTL] & E1000_RCTL_DTYP_PS) {
-            e1000e_write_ps_rx_descr(core, desc, pkt, rss_info,
-                                      ps_hdr_len, written);
-        } else {
-            assert(ps_hdr_len == 0);
-            e1000e_write_ext_rx_descr(core, desc, pkt, rss_info,
-                                       (*written)[0]);
-        }
+        e1000e_write_ext_rx_descr(core, desc, pkt, rss_info, length);
     }
 }
 
-typedef struct e1000e_ba_state_st {
-    uint16_t written[MAX_PS_BUFFERS];
-    uint8_t cur_idx;
-} e1000e_ba_state;
-
 static inline void
-e1000e_write_hdr_to_rx_buffers(E1000ECore *core,
-                               hwaddr (*ba)[MAX_PS_BUFFERS],
-                               e1000e_ba_state *bastate,
-                               const char *data,
-                               dma_addr_t data_len)
+igb_write_hdr_to_rx_buffers(E1000ECore *core, hwaddr ba, uint16_t *written,
+                            const char *data, dma_addr_t data_len)
 {
-    assert(data_len <= core->rxbuf_sizes[0] - bastate->written[0]);
+    assert(data_len <= core->rx_desc_buf_size - *written);
 
-    pci_dma_write(core->owner, (*ba)[0] + bastate->written[0], data, data_len);
-    bastate->written[0] += data_len;
-
-    bastate->cur_idx = 1;
+    pci_dma_write(core->owner, ba + *written, data, data_len);
+    *written += data_len;
 }
 
 static void
-e1000e_write_to_rx_buffers(E1000ECore *core,
-                           hwaddr (*ba)[MAX_PS_BUFFERS],
-                           e1000e_ba_state *bastate,
-                           const char *data,
-                           dma_addr_t data_len)
+igb_write_to_rx_buffers(E1000ECore *core, hwaddr ba, uint16_t *written,
+                        const char *data, dma_addr_t data_len)
 {
-    while (data_len > 0) {
-        uint32_t cur_buf_len = core->rxbuf_sizes[bastate->cur_idx];
-        uint32_t cur_buf_bytes_left = cur_buf_len -
-                                      bastate->written[bastate->cur_idx];
-        uint32_t bytes_to_write = MIN(data_len, cur_buf_bytes_left);
-
-        trace_e1000e_rx_desc_buff_write(bastate->cur_idx,
-                                        (*ba)[bastate->cur_idx],
-                                        bastate->written[bastate->cur_idx],
-                                        data,
-                                        bytes_to_write);
-
-        pci_dma_write(core->owner,
-            (*ba)[bastate->cur_idx] + bastate->written[bastate->cur_idx],
-            data, bytes_to_write);
-
-        bastate->written[bastate->cur_idx] += bytes_to_write;
-        data += bytes_to_write;
-        data_len -= bytes_to_write;
-
-        if (bastate->written[bastate->cur_idx] == cur_buf_len) {
-            bastate->cur_idx++;
-        }
-
-        assert(bastate->cur_idx < MAX_PS_BUFFERS);
-    }
+    assert(data_len <= core->rx_desc_buf_size - *written);
+    trace_igb_rx_desc_buff_write(ba, *written, data, data_len);
+    pci_dma_write(core->owner, ba + *written, data, data_len);
+    *written += data_len;
 }
 
 static void
@@ -1507,48 +1404,10 @@ e1000e_rx_descr_threshold_hit(E1000ECore *core, const E1000E_RingInfo *rxi)
            e1000e_ring_len(core, rxi) >> core->rxbuf_min_shift;
 }
 
-static bool
-e1000e_do_ps(E1000ECore *core, struct NetRxPkt *pkt, size_t *hdr_len)
-{
-    bool isip4, isip6, isudp, istcp;
-    bool fragment;
-
-    if (!e1000e_rx_use_ps_descriptor(core)) {
-        return false;
-    }
-
-    net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
-
-    if (isip4) {
-        fragment = net_rx_pkt_get_ip4_info(pkt)->fragment;
-    } else if (isip6) {
-        fragment = net_rx_pkt_get_ip6_info(pkt)->fragment;
-    } else {
-        return false;
-    }
-
-    if (fragment && (core->mac[RFCTL] & E1000_RFCTL_IPFRSP_DIS)) {
-        return false;
-    }
-
-    if (!fragment && (isudp || istcp)) {
-        *hdr_len = net_rx_pkt_get_l5_hdr_offset(pkt);
-    } else {
-        *hdr_len = net_rx_pkt_get_l4_hdr_offset(pkt);
-    }
-
-    if ((*hdr_len > core->rxbuf_sizes[0]) ||
-        (*hdr_len > net_rx_pkt_get_total_len(pkt))) {
-        return false;
-    }
-
-    return true;
-}
-
 static void
-e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
-                             const E1000E_RxRing *rxr,
-                             const E1000E_RSSInfo *rss_info)
+igb_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
+                          const E1000E_RxRing *rxr,
+                          const E1000E_RSSInfo *rss_info)
 {
     PCIDevice *d = core->owner;
     dma_addr_t base;
@@ -1561,15 +1420,12 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
     size_t size = net_rx_pkt_get_total_len(pkt);
     size_t total_size = size + e1000x_fcs_len(core->mac);
     const E1000E_RingInfo *rxi;
-    size_t ps_hdr_len = 0;
-    bool do_ps = e1000e_do_ps(core, pkt, &ps_hdr_len);
-    bool is_first = true;
 
     rxi = rxr->i;
 
     do {
-        hwaddr ba[MAX_PS_BUFFERS];
-        e1000e_ba_state bastate = { { 0 } };
+        hwaddr ba;
+        uint16_t written = 0;
         bool is_last = false;
 
         desc_size = total_size - desc_offset;
@@ -1588,9 +1444,9 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
 
         trace_e1000e_rx_descr(rxi->idx, base, core->rx_desc_len);
 
-        e1000e_read_rx_descr(core, desc, &ba);
+        igb_read_rx_descr(core, desc, &ba);
 
-        if (ba[0]) {
+        if (ba) {
             if (desc_offset < size) {
                 static const uint32_t fcs_pad;
                 size_t iov_copy;
@@ -1599,41 +1455,11 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
                     copy_size = core->rx_desc_buf_size;
                 }
 
-                /* For PS mode copy the packet header first */
-                if (do_ps) {
-                    if (is_first) {
-                        size_t ps_hdr_copied = 0;
-                        do {
-                            iov_copy = MIN(ps_hdr_len - ps_hdr_copied,
-                                           iov->iov_len - iov_ofs);
-
-                            e1000e_write_hdr_to_rx_buffers(core, &ba, &bastate,
-                                                      iov->iov_base, iov_copy);
-
-                            copy_size -= iov_copy;
-                            ps_hdr_copied += iov_copy;
-
-                            iov_ofs += iov_copy;
-                            if (iov_ofs == iov->iov_len) {
-                                iov++;
-                                iov_ofs = 0;
-                            }
-                        } while (ps_hdr_copied < ps_hdr_len);
-
-                        is_first = false;
-                    } else {
-                        /* Leave buffer 0 of each descriptor except first */
-                        /* empty as per spec 7.1.5.1                      */
-                        e1000e_write_hdr_to_rx_buffers(core, &ba, &bastate,
-                                                       NULL, 0);
-                    }
-                }
-
                 /* Copy packet payload */
                 while (copy_size) {
                     iov_copy = MIN(copy_size, iov->iov_len - iov_ofs);
 
-                    e1000e_write_to_rx_buffers(core, &ba, &bastate,
+                    igb_write_to_rx_buffers(core, ba, &written,
                                             iov->iov_base + iov_ofs, iov_copy);
 
                     copy_size -= iov_copy;
@@ -1646,7 +1472,7 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
 
                 if (desc_offset + desc_size >= total_size) {
                     /* Simulate FCS checksum presence in the last descriptor */
-                    e1000e_write_to_rx_buffers(core, &ba, &bastate,
+                    igb_write_to_rx_buffers(core, ba, &written,
                           (const char *) &fcs_pad, e1000x_fcs_len(core->mac));
                 }
             }
@@ -1658,8 +1484,8 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
             is_last = true;
         }
 
-        e1000e_write_rx_descr(core, desc, is_last ? core->rx_pkt : NULL,
-                           rss_info, do_ps ? ps_hdr_len : 0, &bastate.written);
+        igb_write_rx_descr(core, desc, is_last ? core->rx_pkt : NULL,
+                           rss_info, written);
 
         pci_dma_write(d, base, &desc, core->rx_desc_len);
 
@@ -1774,7 +1600,7 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
 
             igb_rx_ring_init(core, &rxr, i);
 
-            e1000e_write_packet_to_guest(core, core->rx_pkt, &rxr, &rss_info);
+            igb_write_packet_to_guest(core, core->rx_pkt, &rxr, &rss_info);
 
             /* Check if receive descriptor minimum threshold hit */
             rdmts_hit = e1000e_rx_descr_threshold_hit(core, rxr.i);
@@ -1925,52 +1751,22 @@ e1000e_set_rfctl(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_calc_per_desc_buf_size(E1000ECore *core)
-{
-    int i;
-    core->rx_desc_buf_size = 0;
-
-    for (i = 0; i < ARRAY_SIZE(core->rxbuf_sizes); i++) {
-        core->rx_desc_buf_size += core->rxbuf_sizes[i];
-    }
-}
-
-static void
-e1000e_parse_rxbufsize(E1000ECore *core)
+igb_parse_rxbufsize(E1000ECore *core)
 {
     uint32_t rctl = core->mac[RCTL];
 
-    memset(core->rxbuf_sizes, 0, sizeof(core->rxbuf_sizes));
-
-    if (rctl & E1000_RCTL_DTYP_MASK) {
-        uint32_t bsize;
-
-        bsize = core->mac[PSRCTL] & E1000_PSRCTL_BSIZE0_MASK;
-        core->rxbuf_sizes[0] = (bsize >> E1000_PSRCTL_BSIZE0_SHIFT) * 128;
-
-        bsize = core->mac[PSRCTL] & E1000_PSRCTL_BSIZE1_MASK;
-        core->rxbuf_sizes[1] = (bsize >> E1000_PSRCTL_BSIZE1_SHIFT) * 1024;
-
-        bsize = core->mac[PSRCTL] & E1000_PSRCTL_BSIZE2_MASK;
-        core->rxbuf_sizes[2] = (bsize >> E1000_PSRCTL_BSIZE2_SHIFT) * 1024;
-
-        bsize = core->mac[PSRCTL] & E1000_PSRCTL_BSIZE3_MASK;
-        core->rxbuf_sizes[3] = (bsize >> E1000_PSRCTL_BSIZE3_SHIFT) * 1024;
-    } else if (rctl & E1000_RCTL_FLXBUF_MASK) {
+    if (rctl & E1000_RCTL_FLXBUF_MASK) {
         int flxbuf = rctl & E1000_RCTL_FLXBUF_MASK;
-        core->rxbuf_sizes[0] = (flxbuf >> E1000_RCTL_FLXBUF_SHIFT) * 1024;
+        core->rx_desc_buf_size = (flxbuf >> E1000_RCTL_FLXBUF_SHIFT) * 1024;
     } else {
-        core->rxbuf_sizes[0] = e1000x_rxbufsize(rctl);
+        core->rx_desc_buf_size = e1000x_rxbufsize(rctl);
     }
 
-    trace_e1000e_rx_desc_buff_sizes(core->rxbuf_sizes[0], core->rxbuf_sizes[1],
-                                    core->rxbuf_sizes[2], core->rxbuf_sizes[3]);
-
-    e1000e_calc_per_desc_buf_size(core);
+    trace_igb_rx_desc_buff_size(core->rx_desc_buf_size);
 }
 
 static void
-e1000e_calc_rxdesclen(E1000ECore *core)
+igb_calc_rxdesclen(E1000ECore *core)
 {
     core->rx_desc_len = sizeof(union e1000_adv_rx_desc);
     return;
@@ -1978,24 +1774,25 @@ e1000e_calc_rxdesclen(E1000ECore *core)
     if (e1000e_rx_use_legacy_descriptor(core)) {
         core->rx_desc_len = sizeof(struct e1000_rx_desc);
     } else {
-        if (core->mac[RCTL] & E1000_RCTL_DTYP_PS) {
-            core->rx_desc_len = sizeof(union e1000_rx_desc_packet_split);
-        } else {
-            core->rx_desc_len = sizeof(union e1000_rx_desc_extended);
-        }
+        core->rx_desc_len = sizeof(union e1000_rx_desc_extended);
     }
     trace_e1000e_rx_desc_len(core->rx_desc_len);
 }
 
 static void
-e1000e_set_rx_control(E1000ECore *core, int index, uint32_t val)
+igb_set_rx_control(E1000ECore *core, int index, uint32_t val)
 {
     core->mac[RCTL] = val;
     trace_e1000e_rx_set_rctl(core->mac[RCTL]);
 
+    if (val & E1000_RCTL_DTYP_MASK) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "igb: RCTL.DTYP must be zero for compatibility");
+    }
+
     if (val & E1000_RCTL_EN) {
-        e1000e_parse_rxbufsize(core);
-        e1000e_calc_rxdesclen(core);
+        igb_parse_rxbufsize(core);
+        igb_calc_rxdesclen(core);
         core->rxbuf_min_shift = ((val / E1000_RCTL_RDMTS_QUAT) & 3) + 1 +
                                 E1000_RING_DESC_LEN_SHIFT;
 
@@ -2945,27 +2742,6 @@ static void igb_set_eitr(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_psrctl(E1000ECore *core, int index, uint32_t val)
-{
-    if (core->mac[RCTL] & E1000_RCTL_DTYP_MASK) {
-
-        if ((val & E1000_PSRCTL_BSIZE0_MASK) == 0) {
-            qemu_log_mask(LOG_GUEST_ERROR,
-                          "e1000e: PSRCTL.BSIZE0 cannot be zero");
-            return;
-        }
-
-        if ((val & E1000_PSRCTL_BSIZE1_MASK) == 0) {
-            qemu_log_mask(LOG_GUEST_ERROR,
-                          "e1000e: PSRCTL.BSIZE1 cannot be zero");
-            return;
-        }
-    }
-
-    core->mac[PSRCTL] = val;
-}
-
-static void
 e1000e_update_rx_offloads(E1000ECore *core)
 {
     int cso_state = e1000e_rx_l4_cso_enabled(core);
@@ -2989,7 +2765,7 @@ e1000e_set_gcr(E1000ECore *core, int index, uint32_t val)
 
 #define e1000e_getreg(x)    [x] = e1000e_mac_readreg
 typedef uint32_t (*readops)(E1000ECore *, int);
-static const readops e1000e_macreg_readops[] = {
+static const readops igb_macreg_readops[] = {
     e1000e_getreg(PBA),
     e1000e_getreg(WUFC),
     e1000e_getreg(MANC),
@@ -3082,7 +2858,6 @@ static const readops e1000e_macreg_readops[] = {
     e1000e_getreg(MGTPRC),
     e1000e_getreg(EERD),
     e1000e_getreg(EIAC),
-    e1000e_getreg(PSRCTL),
     e1000e_getreg(MANC2H),
     e1000e_getreg(RXCSUM),
     e1000e_getreg(GSCL_3),
@@ -3537,11 +3312,11 @@ static const readops e1000e_macreg_readops[] = {
     [VTIVAR ... VTIVAR + 7] = e1000e_mac_readreg,
     [VTIVAR_MISC ... VTIVAR_MISC + 7] = e1000e_mac_readreg,
 };
-enum { E1000E_NREADOPS = ARRAY_SIZE(e1000e_macreg_readops) };
+enum { IGB_NREADOPS = ARRAY_SIZE(igb_macreg_readops) };
 
 #define e1000e_putreg(x)    [x] = e1000e_mac_writereg
 typedef void (*writeops)(E1000ECore *, int, uint32_t);
-static const writeops e1000e_macreg_writeops[] = {
+static const writeops igb_macreg_writeops[] = {
     e1000e_putreg(PBA),
     e1000e_putreg(SWSM),
     e1000e_putreg(WUFC),
@@ -3785,11 +3560,10 @@ static const writeops e1000e_macreg_writeops[] = {
     [IMS]      = igb_set_ims,
     [ICR]      = igb_set_icr,
     [EECD]     = e1000e_set_eecd,
-    [RCTL]     = e1000e_set_rx_control,
+    [RCTL]     = igb_set_rx_control,
     [CTRL]     = igb_set_ctrl,
     [EERD]     = e1000e_set_eerd,
     [GCR]      = e1000e_set_gcr,
-    [PSRCTL]   = e1000e_set_psrctl,
     [RXCSUM]   = e1000e_set_rxcsum,
     [TDLEN0]   = e1000e_set_dlen,
     [TDLEN1]   = e1000e_set_dlen,
@@ -3976,7 +3750,7 @@ static const writeops e1000e_macreg_writeops[] = {
     [VTIVAR ... VTIVAR + 7] = igb_set_vtivar,
     [VTIVAR_MISC ... VTIVAR_MISC + 7] = e1000e_mac_writereg
 };
-enum { E1000E_NWRITEOPS = ARRAY_SIZE(e1000e_macreg_writeops) };
+enum { IGB_NWRITEOPS = ARRAY_SIZE(igb_macreg_writeops) };
 
 enum { MAC_ACCESS_PARTIAL = 1 };
 
@@ -4089,13 +3863,13 @@ void igb_core_write(E1000ECore *core, hwaddr addr, uint64_t val, unsigned size)
 {
     uint16_t index = e1000e_get_reg_index_with_offset(mac_reg_access, addr);
 
-    if (index < E1000E_NWRITEOPS && e1000e_macreg_writeops[index]) {
+    if (index < IGB_NWRITEOPS && igb_macreg_writeops[index]) {
         if (mac_reg_access[index] & MAC_ACCESS_PARTIAL) {
             trace_e1000e_wrn_regs_write_trivial(index << 2);
         }
         trace_e1000e_core_write(index << 2, size, val);
-        e1000e_macreg_writeops[index](core, index, val);
-    } else if (index < E1000E_NREADOPS && e1000e_macreg_readops[index]) {
+        igb_macreg_writeops[index](core, index, val);
+    } else if (index < IGB_NREADOPS && igb_macreg_readops[index]) {
         trace_e1000e_wrn_regs_write_ro(index << 2, size, val);
     } else {
         trace_e1000e_wrn_regs_write_unknown(index << 2, size, val);
@@ -4107,11 +3881,11 @@ uint64_t igb_core_read(E1000ECore *core, hwaddr addr, unsigned size)
     uint64_t val;
     uint16_t index = e1000e_get_reg_index_with_offset(mac_reg_access, addr);
 
-    if (index < E1000E_NREADOPS && e1000e_macreg_readops[index]) {
+    if (index < IGB_NREADOPS && igb_macreg_readops[index]) {
         if (mac_reg_access[index] & MAC_ACCESS_PARTIAL) {
             trace_e1000e_wrn_regs_read_trivial(index << 2);
         }
-        val = e1000e_macreg_readops[index](core, index);
+        val = igb_macreg_readops[index](core, index);
         trace_e1000e_core_read(index << 2, size, val);
         return val;
     } else {
@@ -4280,9 +4054,6 @@ static const uint32_t e1000e_mac_reg_init[] = {
     [CTRL]          = E1000_CTRL_FD | E1000_CTRL_LRST | E1000_CTRL_SPD_1000 |
                       E1000_CTRL_ADVD3WUC,
     [STATUS]        = E1000_STATUS_PHYRA | E1000_STATUS_GIO_MASTER_ENABLE,
-    [PSRCTL]        = (2 << E1000_PSRCTL_BSIZE0_SHIFT) |
-                      (4 << E1000_PSRCTL_BSIZE1_SHIFT) |
-                      (4 << E1000_PSRCTL_BSIZE2_SHIFT),
     [TARC0]         = 0x3 | E1000_TARC_ENABLE,
     [TARC1]         = 0x3 | E1000_TARC_ENABLE,
     [EECD]          = E1000_EECD_AUTO_RD | E1000_EECD_PRES,
