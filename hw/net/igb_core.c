@@ -55,14 +55,14 @@
                                      second according to spec 10.2.4.2 */
 #define E1000E_MAX_TX_FRAGS (64)
 
-static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehdr);
-static void igb_update_interrupt_state(E1000ECore *core);
+static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr);
+static void igb_update_interrupt_state(IGBCore *core);
 
 static inline void
-e1000e_set_interrupt_cause(E1000ECore *core, uint32_t val);
+e1000e_set_interrupt_cause(IGBCore *core, uint32_t val);
 
 static inline void
-e1000e_raise_legacy_irq(E1000ECore *core)
+e1000e_raise_legacy_irq(IGBCore *core)
 {
     trace_e1000e_irq_legacy_notify(true);
     e1000x_inc_reg_if_not_full(core->mac, IAC);
@@ -70,13 +70,13 @@ e1000e_raise_legacy_irq(E1000ECore *core)
 }
 
 static inline void
-e1000e_lower_legacy_irq(E1000ECore *core)
+e1000e_lower_legacy_irq(IGBCore *core)
 {
     trace_e1000e_irq_legacy_notify(false);
     pci_set_irq(core->owner, 0);
 }
 
-static void igb_msix_notify(E1000ECore *core, unsigned int vector)
+static void igb_msix_notify(IGBCore *core, unsigned int vector)
 {
     PCIDevice *dev = core->owner;
     uint16_t vfn;
@@ -94,7 +94,7 @@ static void igb_msix_notify(E1000ECore *core, unsigned int vector)
 }
 
 static inline void
-e1000e_intrmgr_rearm_timer(E1000IntrDelayTimer *timer)
+e1000e_intrmgr_rearm_timer(IGBIntrDelayTimer *timer)
 {
     int64_t delay_ns = (int64_t) timer->core->mac[timer->delay_reg] *
                                  timer->delay_resolution_ns;
@@ -107,7 +107,7 @@ e1000e_intrmgr_rearm_timer(E1000IntrDelayTimer *timer)
 }
 
 static void
-e1000e_intmgr_timer_resume(E1000IntrDelayTimer *timer)
+e1000e_intmgr_timer_resume(IGBIntrDelayTimer *timer)
 {
     if (timer->running) {
         e1000e_intrmgr_rearm_timer(timer);
@@ -115,7 +115,7 @@ e1000e_intmgr_timer_resume(E1000IntrDelayTimer *timer)
 }
 
 static void
-e1000e_intmgr_timer_pause(E1000IntrDelayTimer *timer)
+e1000e_intmgr_timer_pause(IGBIntrDelayTimer *timer)
 {
     if (timer->running) {
         timer_del(timer->timer);
@@ -123,7 +123,7 @@ e1000e_intmgr_timer_pause(E1000IntrDelayTimer *timer)
 }
 
 static inline void
-e1000e_intrmgr_stop_timer(E1000IntrDelayTimer *timer)
+e1000e_intrmgr_stop_timer(IGBIntrDelayTimer *timer)
 {
     if (timer->running) {
         timer_del(timer->timer);
@@ -132,7 +132,7 @@ e1000e_intrmgr_stop_timer(E1000IntrDelayTimer *timer)
 }
 
 static inline void
-e1000e_intrmgr_fire_delayed_interrupts(E1000ECore *core)
+e1000e_intrmgr_fire_delayed_interrupts(IGBCore *core)
 {
     trace_e1000e_irq_fire_delayed_interrupts();
     e1000e_set_interrupt_cause(core, 0);
@@ -141,7 +141,7 @@ e1000e_intrmgr_fire_delayed_interrupts(E1000ECore *core)
 static void
 e1000e_intrmgr_on_msix_throttling_timer(void *opaque)
 {
-    E1000IntrDelayTimer *timer = opaque;
+    IGBIntrDelayTimer *timer = opaque;
     int idx = timer - &timer->core->eitr[0];
 
     assert(msix_enabled(timer->core->owner));
@@ -158,7 +158,7 @@ e1000e_intrmgr_on_msix_throttling_timer(void *opaque)
 }
 
 static void
-e1000e_intrmgr_initialize_all_timers(E1000ECore *core, bool create)
+e1000e_intrmgr_initialize_all_timers(IGBCore *core, bool create)
 {
     int i;
 
@@ -179,7 +179,7 @@ e1000e_intrmgr_initialize_all_timers(E1000ECore *core, bool create)
 }
 
 static bool
-e1000e_intrmgr_delay_rx_causes(E1000ECore *core, uint32_t *causes)
+e1000e_intrmgr_delay_rx_causes(IGBCore *core, uint32_t *causes)
 {
     uint32_t delayable_causes;
 
@@ -199,7 +199,7 @@ e1000e_intrmgr_delay_rx_causes(E1000ECore *core, uint32_t *causes)
 }
 
 static bool
-e1000e_intrmgr_delay_tx_causes(E1000ECore *core, uint32_t *causes)
+e1000e_intrmgr_delay_tx_causes(IGBCore *core, uint32_t *causes)
 {
     static const uint32_t delayable_causes = E1000_ICR_TXQ0 |
                                              E1000_ICR_TXQ1 |
@@ -223,7 +223,7 @@ e1000e_intrmgr_delay_tx_causes(E1000ECore *core, uint32_t *causes)
 }
 
 static uint32_t
-e1000e_intmgr_collect_delayed_causes(E1000ECore *core)
+e1000e_intmgr_collect_delayed_causes(IGBCore *core)
 {
     uint32_t res;
 
@@ -239,7 +239,7 @@ e1000e_intmgr_collect_delayed_causes(E1000ECore *core)
 }
 
 static void
-e1000e_intrmgr_resume(E1000ECore *core)
+e1000e_intrmgr_resume(IGBCore *core)
 {
     int i;
 
@@ -249,7 +249,7 @@ e1000e_intrmgr_resume(E1000ECore *core)
 }
 
 static void
-e1000e_intrmgr_pause(E1000ECore *core)
+e1000e_intrmgr_pause(IGBCore *core)
 {
     int i;
 
@@ -259,7 +259,7 @@ e1000e_intrmgr_pause(E1000ECore *core)
 }
 
 static void
-e1000e_intrmgr_reset(E1000ECore *core)
+e1000e_intrmgr_reset(IGBCore *core)
 {
     int i;
 
@@ -271,7 +271,7 @@ e1000e_intrmgr_reset(E1000ECore *core)
 }
 
 static void
-e1000e_intrmgr_pci_unint(E1000ECore *core)
+e1000e_intrmgr_pci_unint(IGBCore *core)
 {
     int i;
 
@@ -282,18 +282,18 @@ e1000e_intrmgr_pci_unint(E1000ECore *core)
 }
 
 static void
-e1000e_intrmgr_pci_realize(E1000ECore *core)
+e1000e_intrmgr_pci_realize(IGBCore *core)
 {
     e1000e_intrmgr_initialize_all_timers(core, true);
 }
 
 static inline bool
-e1000e_rx_csum_enabled(E1000ECore *core)
+e1000e_rx_csum_enabled(IGBCore *core)
 {
     return (core->mac[RXCSUM] & E1000_RXCSUM_PCSD) ? false : true;
 }
 
-static bool e1000e_rx_use_legacy_descriptor(E1000ECore *core)
+static bool e1000e_rx_use_legacy_descriptor(IGBCore *core)
 {
     // TODO: If SRRCTL[n],DESCTYPE = 000b, the 82576 uses the legacy Rx
     // descriptor.
@@ -301,13 +301,13 @@ static bool e1000e_rx_use_legacy_descriptor(E1000ECore *core)
 }
 
 static inline bool
-e1000e_rx_use_ps_descriptor(E1000ECore *core)
+e1000e_rx_use_ps_descriptor(IGBCore *core)
 {
     return false;
 }
 
 static inline bool
-e1000e_rss_enabled(E1000ECore *core)
+e1000e_rss_enabled(IGBCore *core)
 {
     return E1000_MRQC_ENABLED(core->mac[MRQC]) &&
            !e1000e_rx_csum_enabled(core) &&
@@ -322,7 +322,7 @@ typedef struct E1000E_RSSInfo_st {
 } E1000E_RSSInfo;
 
 static uint32_t
-e1000e_rss_get_hash_type(E1000ECore *core, struct NetRxPkt *pkt)
+e1000e_rss_get_hash_type(IGBCore *core, struct NetRxPkt *pkt)
 {
     bool isip4, isip6, isudp, istcp;
 
@@ -392,7 +392,7 @@ e1000e_rss_get_hash_type(E1000ECore *core, struct NetRxPkt *pkt)
 }
 
 static uint32_t
-e1000e_rss_calc_hash(E1000ECore *core,
+e1000e_rss_calc_hash(IGBCore *core,
                      struct NetRxPkt *pkt,
                      E1000E_RSSInfo *info)
 {
@@ -425,7 +425,7 @@ e1000e_rss_calc_hash(E1000ECore *core,
 }
 
 static void
-e1000e_rss_parse_packet(E1000ECore *core,
+e1000e_rss_parse_packet(IGBCore *core,
                         struct NetRxPkt *pkt,
                         E1000E_RSSInfo *info)
 {
@@ -457,7 +457,7 @@ e1000e_rss_parse_packet(E1000ECore *core,
 }
 
 static void
-e1000e_setup_tx_offloads(E1000ECore *core, struct e1000e_tx *tx)
+e1000e_setup_tx_offloads(IGBCore *core, struct e1000e_tx *tx)
 {
     if (tx->tse) {
         net_tx_pkt_build_vheader(tx->tx_pkt, true, true, tx->mss);
@@ -476,7 +476,7 @@ e1000e_setup_tx_offloads(E1000ECore *core, struct e1000e_tx *tx)
 }
 
 /* TX Packets Switching (7.10.3.6) */
-static bool igb_tx_pkt_switch(E1000ECore *core, struct e1000e_tx *tx,
+static bool igb_tx_pkt_switch(IGBCore *core, struct e1000e_tx *tx,
     NetClientState *nc)
 {
     struct eth_header *ehdr;
@@ -514,7 +514,7 @@ send_out:
     return net_tx_pkt_send(tx->tx_pkt, nc);
 }
 
-static bool igb_tx_pkt_send(E1000ECore *core, struct e1000e_tx *tx,
+static bool igb_tx_pkt_send(IGBCore *core, struct e1000e_tx *tx,
     int queue_index)
 {
     int target_queue = MIN(core->max_queue_num, queue_index);
@@ -533,7 +533,7 @@ static bool igb_tx_pkt_send(E1000ECore *core, struct e1000e_tx *tx,
 }
 
 static void
-e1000e_on_tx_done_update_stats(E1000ECore *core, struct NetTxPkt *tx_pkt)
+e1000e_on_tx_done_update_stats(IGBCore *core, struct NetTxPkt *tx_pkt)
 {
     static const int PTCregs[6] = { PTC64, PTC127, PTC255, PTC511,
                                     PTC1023, PTC1522 };
@@ -562,7 +562,7 @@ e1000e_on_tx_done_update_stats(E1000ECore *core, struct NetTxPkt *tx_pkt)
     core->mac[GOTCH] = core->mac[TOTH];
 }
 
-static void igb_process_tx_desc(E1000ECore *core, struct e1000e_tx *tx,
+static void igb_process_tx_desc(IGBCore *core, struct e1000e_tx *tx,
     union e1000_adv_tx_desc *tx_desc, int queue_index)
 {
     struct e1000_adv_tx_context_desc *tx_ctx_desc;
@@ -631,7 +631,7 @@ static void igb_process_tx_desc(E1000ECore *core, struct e1000e_tx *tx,
 
 //#define IVAR_GET_ENTRY(i) ((core->mac[IVAR0 + (n)/4] >> (8 * ((n)%4))) & 0xFF)
 
-static uint32_t igb_tx_wb_interrupt_cause(E1000ECore *core, int queue_idx)
+static uint32_t igb_tx_wb_interrupt_cause(IGBCore *core, int queue_idx)
 {
     uint32_t n, ent = 0;
 
@@ -645,7 +645,7 @@ static uint32_t igb_tx_wb_interrupt_cause(E1000ECore *core, int queue_idx)
     return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
-static uint32_t igb_rx_wb_interrupt_cause(E1000ECore *core, int queue_idx,
+static uint32_t igb_rx_wb_interrupt_cause(IGBCore *core, int queue_idx,
                                           bool min_threshold_hit)
 {
     uint32_t n, ent = 0;
@@ -662,7 +662,7 @@ static uint32_t igb_rx_wb_interrupt_cause(E1000ECore *core, int queue_idx,
 
 #if 0
 static inline uint32_t
-e1000e_rx_wb_interrupt_cause(E1000ECore *core, int queue_idx,
+e1000e_rx_wb_interrupt_cause(IGBCore *core, int queue_idx,
                              bool min_threshold_hit)
 {
     if (!msix_enabled(core->owner)) {
@@ -673,7 +673,7 @@ e1000e_rx_wb_interrupt_cause(E1000ECore *core, int queue_idx,
 }
 #endif
 
-static uint32_t igb_txdesc_writeback(E1000ECore *core, dma_addr_t base,
+static uint32_t igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
     union e1000_adv_tx_desc *tx_desc, int queue_idx)
 {
     uint32_t cmd_type_len;
@@ -703,14 +703,14 @@ typedef struct E1000E_RingInfo_st {
 } E1000E_RingInfo;
 
 static inline bool
-e1000e_ring_empty(E1000ECore *core, const E1000E_RingInfo *r)
+e1000e_ring_empty(IGBCore *core, const E1000E_RingInfo *r)
 {
     return core->mac[r->dh] == core->mac[r->dt] ||
                 core->mac[r->dt] >= core->mac[r->dlen] / E1000_RING_DESC_LEN;
 }
 
 static inline uint64_t
-e1000e_ring_base(E1000ECore *core, const E1000E_RingInfo *r)
+e1000e_ring_base(IGBCore *core, const E1000E_RingInfo *r)
 {
     uint64_t bah = core->mac[r->dbah];
     uint64_t bal = core->mac[r->dbal];
@@ -719,13 +719,13 @@ e1000e_ring_base(E1000ECore *core, const E1000E_RingInfo *r)
 }
 
 static inline uint64_t
-e1000e_ring_head_descr(E1000ECore *core, const E1000E_RingInfo *r)
+e1000e_ring_head_descr(IGBCore *core, const E1000E_RingInfo *r)
 {
     return e1000e_ring_base(core, r) + E1000_RING_DESC_LEN * core->mac[r->dh];
 }
 
 static inline void
-e1000e_ring_advance(E1000ECore *core, const E1000E_RingInfo *r, uint32_t count)
+e1000e_ring_advance(IGBCore *core, const E1000E_RingInfo *r, uint32_t count)
 {
     core->mac[r->dh] += count;
 
@@ -735,7 +735,7 @@ e1000e_ring_advance(E1000ECore *core, const E1000E_RingInfo *r, uint32_t count)
 }
 
 static inline uint32_t
-e1000e_ring_free_descr_num(E1000ECore *core, const E1000E_RingInfo *r)
+e1000e_ring_free_descr_num(IGBCore *core, const E1000E_RingInfo *r)
 {
     trace_e1000e_ring_free_space(r->idx, core->mac[r->dlen],
                                  core->mac[r->dh],  core->mac[r->dt]);
@@ -754,13 +754,13 @@ e1000e_ring_free_descr_num(E1000ECore *core, const E1000E_RingInfo *r)
 }
 
 static inline bool
-e1000e_ring_enabled(E1000ECore *core, const E1000E_RingInfo *r)
+e1000e_ring_enabled(IGBCore *core, const E1000E_RingInfo *r)
 {
     return core->mac[r->dlen] > 0;
 }
 
 static inline uint32_t
-e1000e_ring_len(E1000ECore *core, const E1000E_RingInfo *r)
+e1000e_ring_len(IGBCore *core, const E1000E_RingInfo *r)
 {
     return core->mac[r->dlen];
 }
@@ -776,7 +776,7 @@ e1000e_mq_queue_idx(int base_reg_idx, int reg_idx)
     return (reg_idx - base_reg_idx) / 16;
 }
 
-static inline void igb_tx_ring_init(E1000ECore *core,
+static inline void igb_tx_ring_init(IGBCore *core,
     E1000E_TxRing *txr, int idx)
 {
     static const E1000E_RingInfo i[IGB_NUM_QUEUES] = {
@@ -808,7 +808,7 @@ typedef struct E1000E_RxRing_st {
     const E1000E_RingInfo *i;
 } E1000E_RxRing;
 
-static inline void igb_rx_ring_init(E1000ECore *core, E1000E_RxRing *rxr,
+static inline void igb_rx_ring_init(IGBCore *core, E1000E_RxRing *rxr,
                                     int idx)
 {
     static const E1000E_RingInfo i[IGB_NUM_QUEUES] = {
@@ -835,7 +835,7 @@ static inline void igb_rx_ring_init(E1000ECore *core, E1000E_RxRing *rxr,
     rxr->i = &i[idx];
 }
 
-static void igb_start_xmit(E1000ECore *core, const E1000E_TxRing *txr)
+static void igb_start_xmit(IGBCore *core, const E1000E_TxRing *txr)
 {
     dma_addr_t base;
     union e1000_adv_tx_desc desc;
@@ -869,7 +869,7 @@ static void igb_start_xmit(E1000ECore *core, const E1000E_TxRing *txr)
 }
 
 static bool
-e1000e_has_rxbufs(E1000ECore *core, const E1000E_RingInfo *r,
+e1000e_has_rxbufs(IGBCore *core, const E1000E_RingInfo *r,
                   size_t total_size)
 {
     uint32_t bufs = e1000e_ring_free_descr_num(core, r);
@@ -881,7 +881,7 @@ e1000e_has_rxbufs(E1000ECore *core, const E1000E_RingInfo *r,
                          core->rx_desc_buf_size;
 }
 
-void igb_start_recv(E1000ECore *core)
+void igb_start_recv(IGBCore *core)
 {
     int i;
 
@@ -892,7 +892,7 @@ void igb_start_recv(E1000ECore *core)
     }
 }
 
-bool igb_can_receive(E1000ECore *core)
+bool igb_can_receive(IGBCore *core)
 {
     int i;
 
@@ -916,18 +916,18 @@ bool igb_can_receive(E1000ECore *core)
 }
 
 static inline bool
-e1000e_rx_l3_cso_enabled(E1000ECore *core)
+e1000e_rx_l3_cso_enabled(IGBCore *core)
 {
     return !!(core->mac[RXCSUM] & E1000_RXCSUM_IPOFLD);
 }
 
 static inline bool
-e1000e_rx_l4_cso_enabled(E1000ECore *core)
+e1000e_rx_l4_cso_enabled(IGBCore *core)
 {
     return !!(core->mac[RXCSUM] & E1000_RXCSUM_TUOFLD);
 }
 
-static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehdr)
+static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
 {
     static const int ta_shift[] = { 4, 3, 2, 0 };
     uint32_t f, ra[2], *macp, rctl = core->mac[RCTL];
@@ -1015,21 +1015,21 @@ static uint16_t igb_receive_route(E1000ECore *core, const struct eth_header *ehd
 }
 
 static inline void
-e1000e_read_lgcy_rx_descr(E1000ECore *core, uint8_t *desc, hwaddr *buff_addr)
+e1000e_read_lgcy_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
 {
     struct e1000_rx_desc *d = (struct e1000_rx_desc *) desc;
     *buff_addr = le64_to_cpu(d->buffer_addr);
 }
 
 static inline void
-e1000e_read_ext_rx_descr(E1000ECore *core, uint8_t *desc, hwaddr *buff_addr)
+e1000e_read_ext_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
 {
     union e1000_adv_rx_desc *d = (union e1000_adv_rx_desc *) desc;
     *buff_addr = le64_to_cpu(d->read.pkt_addr);
 }
 
 static inline void
-igb_read_rx_descr(E1000ECore *core, uint8_t *desc, hwaddr *buff_addr)
+igb_read_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
 {
     if (e1000e_rx_use_legacy_descriptor(core)) {
         e1000e_read_lgcy_rx_descr(core, desc, buff_addr);
@@ -1039,7 +1039,7 @@ igb_read_rx_descr(E1000ECore *core, uint8_t *desc, hwaddr *buff_addr)
 }
 
 static void
-e1000e_verify_csum_in_sw(E1000ECore *core,
+e1000e_verify_csum_in_sw(IGBCore *core,
                          struct NetRxPkt *pkt,
                          uint32_t *status_flags,
                          bool istcp, bool isudp)
@@ -1081,7 +1081,7 @@ e1000e_verify_csum_in_sw(E1000ECore *core,
 }
 
 static inline bool
-e1000e_is_tcp_ack(E1000ECore *core, struct NetRxPkt *rx_pkt)
+e1000e_is_tcp_ack(IGBCore *core, struct NetRxPkt *rx_pkt)
 {
     if (!net_rx_pkt_is_tcp_ack(rx_pkt)) {
         return false;
@@ -1090,7 +1090,7 @@ e1000e_is_tcp_ack(E1000ECore *core, struct NetRxPkt *rx_pkt)
     return true;
 }
 
-static void igb_build_rx_metadata(E1000ECore *core, struct NetRxPkt *pkt,
+static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
     bool is_eop, const E1000E_RSSInfo *rss_info,
     uint16_t *pkt_info, uint16_t *hdr_info,
     uint16_t *ip_id, uint16_t *csum,
@@ -1193,7 +1193,7 @@ func_exit:
 }
 
 static void
-e1000e_build_rx_metadata(E1000ECore *core,
+e1000e_build_rx_metadata(IGBCore *core,
                          struct NetRxPkt *pkt,
                          bool is_eop,
                          const E1000E_RSSInfo *rss_info,
@@ -1301,7 +1301,7 @@ func_exit:
 }
 
 static inline void
-e1000e_write_lgcy_rx_descr(E1000ECore *core, uint8_t *desc,
+e1000e_write_lgcy_rx_descr(IGBCore *core, uint8_t *desc,
                            struct NetRxPkt *pkt,
                            const E1000E_RSSInfo *rss_info,
                            uint16_t length)
@@ -1326,7 +1326,7 @@ e1000e_write_lgcy_rx_descr(E1000ECore *core, uint8_t *desc,
 }
 
 static inline void
-e1000e_write_ext_rx_descr(E1000ECore *core, uint8_t *desc,
+e1000e_write_ext_rx_descr(IGBCore *core, uint8_t *desc,
                           struct NetRxPkt *pkt,
                           const E1000E_RSSInfo *rss_info,
                           uint16_t length)
@@ -1346,7 +1346,7 @@ e1000e_write_ext_rx_descr(E1000ECore *core, uint8_t *desc,
 }
 
 static inline void
-igb_write_rx_descr(E1000ECore *core, uint8_t *desc, struct NetRxPkt *pkt,
+igb_write_rx_descr(IGBCore *core, uint8_t *desc, struct NetRxPkt *pkt,
                    const E1000E_RSSInfo *rss_info, uint16_t length)
 {
     if (e1000e_rx_use_legacy_descriptor(core)) {
@@ -1357,7 +1357,7 @@ igb_write_rx_descr(E1000ECore *core, uint8_t *desc, struct NetRxPkt *pkt,
 }
 
 static inline void
-igb_write_hdr_to_rx_buffers(E1000ECore *core, hwaddr ba, uint16_t *written,
+igb_write_hdr_to_rx_buffers(IGBCore *core, hwaddr ba, uint16_t *written,
                             const char *data, dma_addr_t data_len)
 {
     assert(data_len <= core->rx_desc_buf_size - *written);
@@ -1367,7 +1367,7 @@ igb_write_hdr_to_rx_buffers(E1000ECore *core, hwaddr ba, uint16_t *written,
 }
 
 static void
-igb_write_to_rx_buffers(E1000ECore *core, hwaddr ba, uint16_t *written,
+igb_write_to_rx_buffers(IGBCore *core, hwaddr ba, uint16_t *written,
                         const char *data, dma_addr_t data_len)
 {
     assert(data_len <= core->rx_desc_buf_size - *written);
@@ -1377,7 +1377,7 @@ igb_write_to_rx_buffers(E1000ECore *core, hwaddr ba, uint16_t *written,
 }
 
 static void
-e1000e_update_rx_stats(E1000ECore *core,
+e1000e_update_rx_stats(IGBCore *core,
                        size_t data_size,
                        size_t data_fcs_size)
 {
@@ -1398,14 +1398,14 @@ e1000e_update_rx_stats(E1000ECore *core,
 }
 
 static inline bool
-e1000e_rx_descr_threshold_hit(E1000ECore *core, const E1000E_RingInfo *rxi)
+e1000e_rx_descr_threshold_hit(IGBCore *core, const E1000E_RingInfo *rxi)
 {
     return e1000e_ring_free_descr_num(core, rxi) ==
            e1000e_ring_len(core, rxi) >> core->rxbuf_min_shift;
 }
 
 static void
-igb_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
+igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
                           const E1000E_RxRing *rxr,
                           const E1000E_RSSInfo *rss_info)
 {
@@ -1497,7 +1497,7 @@ igb_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
     e1000e_update_rx_stats(core, size, total_size);
 }
 
-ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
+ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 {
     static const int maximum_ethernet_hdr_len = (14 + 4);
     /* Min. octets in an ethernet frame sans FCS */
@@ -1625,12 +1625,12 @@ ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
 }
 
 static inline bool
-e1000e_have_autoneg(E1000ECore *core)
+e1000e_have_autoneg(IGBCore *core)
 {
     return core->phy[0][MII_BMCR] & MII_BMCR_AUTOEN;
 }
 
-static void e1000e_update_flowctl_status(E1000ECore *core)
+static void e1000e_update_flowctl_status(IGBCore *core)
 {
     if (e1000e_have_autoneg(core) &&
         core->phy[0][MII_BMSR] & MII_BMSR_AN_COMP) {
@@ -1642,14 +1642,14 @@ static void e1000e_update_flowctl_status(E1000ECore *core)
 }
 
 static inline void
-e1000e_link_down(E1000ECore *core)
+e1000e_link_down(IGBCore *core)
 {
     e1000x_update_regs_on_link_down(core->mac, core->phy[0]);
     e1000e_update_flowctl_status(core);
 }
 
 static inline void
-e1000e_set_phy_ctrl(E1000ECore *core, int index, uint16_t val)
+e1000e_set_phy_ctrl(IGBCore *core, int index, uint16_t val)
 {
     /* bits 0-5 reserved; MII_BMCR_[ANRESTART,RESET] are self clearing */
     core->phy[0][MII_BMCR] = val & ~(0x3f |
@@ -1663,7 +1663,7 @@ e1000e_set_phy_ctrl(E1000ECore *core, int index, uint16_t val)
 }
 
 static void
-e1000e_set_phy_oem_bits(E1000ECore *core, int index, uint16_t val)
+e1000e_set_phy_oem_bits(IGBCore *core, int index, uint16_t val)
 {
     core->phy[0][PHY_OEM_BITS] = val & ~BIT(10);
 
@@ -1673,12 +1673,12 @@ e1000e_set_phy_oem_bits(E1000ECore *core, int index, uint16_t val)
 }
 
 static void
-e1000e_set_phy_page(E1000ECore *core, int index, uint16_t val)
+e1000e_set_phy_page(IGBCore *core, int index, uint16_t val)
 {
     core->phy[0][PHY_PAGE] = val & PHY_PAGE_RW_MASK;
 }
 
-void igb_core_set_link_status(E1000ECore *core)
+void igb_core_set_link_status(IGBCore *core)
 {
     NetClientState *nc = qemu_get_queue(core->owner_nic);
     uint32_t old_status = core->mac[STATUS];
@@ -1703,7 +1703,7 @@ void igb_core_set_link_status(E1000ECore *core)
     }
 }
 
-static void igb_set_ctrl(E1000ECore *core, int index, uint32_t val)
+static void igb_set_ctrl(IGBCore *core, int index, uint32_t val)
 {
     trace_e1000e_core_ctrl_write(index, val);
 
@@ -1731,7 +1731,7 @@ static void igb_set_ctrl(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_rfctl(E1000ECore *core, int index, uint32_t val)
+e1000e_set_rfctl(IGBCore *core, int index, uint32_t val)
 {
     trace_e1000e_rx_set_rfctl(val);
 
@@ -1751,7 +1751,7 @@ e1000e_set_rfctl(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-igb_parse_rxbufsize(E1000ECore *core)
+igb_parse_rxbufsize(IGBCore *core)
 {
     uint32_t rctl = core->mac[RCTL];
 
@@ -1766,7 +1766,7 @@ igb_parse_rxbufsize(E1000ECore *core)
 }
 
 static void
-igb_calc_rxdesclen(E1000ECore *core)
+igb_calc_rxdesclen(IGBCore *core)
 {
     core->rx_desc_len = sizeof(union e1000_adv_rx_desc);
     return;
@@ -1780,7 +1780,7 @@ igb_calc_rxdesclen(E1000ECore *core)
 }
 
 static void
-igb_set_rx_control(E1000ECore *core, int index, uint32_t val)
+igb_set_rx_control(IGBCore *core, int index, uint32_t val)
 {
     core->mac[RCTL] = val;
     trace_e1000e_rx_set_rctl(core->mac[RCTL]);
@@ -1802,7 +1802,7 @@ igb_set_rx_control(E1000ECore *core, int index, uint32_t val)
 
 static
 void(*e1000e_phyreg_writeops[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE])
-(E1000ECore *, int, uint16_t) = {
+(IGBCore *, int, uint16_t) = {
     [0] = {
         [MII_BMCR]     = e1000e_set_phy_ctrl,
         [PHY_PAGE]     = e1000e_set_phy_page,
@@ -1811,7 +1811,7 @@ void(*e1000e_phyreg_writeops[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE])
 };
 
 static inline void
-e1000e_clear_ims_bits(E1000ECore *core, uint32_t bits)
+e1000e_clear_ims_bits(IGBCore *core, uint32_t bits)
 {
     trace_e1000e_irq_clear_ims(bits, core->mac[IMS], core->mac[IMS] & ~bits);
     core->mac[IMS] &= ~bits;
@@ -1819,7 +1819,7 @@ e1000e_clear_ims_bits(E1000ECore *core, uint32_t bits)
 
 static inline bool
 e1000e_postpone_interrupt(bool *interrupt_pending,
-                          E1000IntrDelayTimer *timer)
+                          IGBIntrDelayTimer *timer)
 {
     if (timer->running) {
         trace_e1000e_irq_postponed_by_xitr(timer->delay_reg << 2);
@@ -1836,14 +1836,14 @@ e1000e_postpone_interrupt(bool *interrupt_pending,
 }
 
 static inline bool
-e1000e_eitr_should_postpone(E1000ECore *core, int idx)
+e1000e_eitr_should_postpone(IGBCore *core, int idx)
 {
     return e1000e_postpone_interrupt(&core->eitr_intr_pending[idx],
                                      &core->eitr[idx]);
 }
 
 static inline void
-e1000e_fix_icr_asserted(E1000ECore *core)
+e1000e_fix_icr_asserted(IGBCore *core)
 {
     core->mac[ICR] &= ~E1000_ICR_ASSERTED;
     if (core->mac[ICR]) {
@@ -1853,7 +1853,7 @@ e1000e_fix_icr_asserted(E1000ECore *core)
     trace_e1000e_irq_fix_icr_asserted(core->mac[ICR]);
 }
 
-static void igb_send_msi(E1000ECore *core, bool msix)
+static void igb_send_msi(IGBCore *core, bool msix)
 {
     uint32_t causes = core->mac[EICR] & core->mac[EIMS];
     uint32_t effective_eiac;
@@ -1873,7 +1873,7 @@ static void igb_send_msi(E1000ECore *core, bool msix)
     }
 }
 
-static void igb_update_interrupt_state(E1000ECore *core)
+static void igb_update_interrupt_state(IGBCore *core)
 {
     uint32_t icr;
     uint32_t causes;
@@ -1931,7 +1931,7 @@ static void igb_update_interrupt_state(E1000ECore *core)
 }
 
 static void
-e1000e_set_interrupt_cause(E1000ECore *core, uint32_t val)
+e1000e_set_interrupt_cause(IGBCore *core, uint32_t val)
 {
     trace_e1000e_irq_set_cause_entry(val, core->mac[ICR]);
 
@@ -1945,7 +1945,7 @@ e1000e_set_interrupt_cause(E1000ECore *core, uint32_t val)
     igb_update_interrupt_state(core);
 }
 
-static void igb_set_eics(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eics(IGBCore *core, int index, uint32_t val)
 {
     bool msix = !!(core->mac[GPIE] & E1000_GPIE_MSIX_MODE);
 
@@ -1961,7 +1961,7 @@ static void igb_set_eics(E1000ECore *core, int index, uint32_t val)
     igb_update_interrupt_state(core);
 }
 
-static void igb_set_eims(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eims(IGBCore *core, int index, uint32_t val)
 {
     bool msix = !!(core->mac[GPIE] & E1000_GPIE_MSIX_MODE);
 
@@ -1973,7 +1973,7 @@ static void igb_set_eims(E1000ECore *core, int index, uint32_t val)
     igb_update_interrupt_state(core);
 }
 
-static void igb_vf_reset(E1000ECore *core, uint16_t vfn)
+static void igb_vf_reset(IGBCore *core, uint16_t vfn)
 {
     // TODO: Reset of the queue enable and the interrupt registers of the VF.
 
@@ -1981,7 +1981,7 @@ static void igb_vf_reset(E1000ECore *core, uint16_t vfn)
     core->mac[V2PMAILBOX0 + vfn] = E1000_V2PMAILBOX_RSTD;
 }
 
-static void mailbox_interrupt_to_vf(E1000ECore *core, uint16_t vfn)
+static void mailbox_interrupt_to_vf(IGBCore *core, uint16_t vfn)
 {
     uint32_t ent = core->mac[VTIVAR_MISC + vfn] & 0xFF;
 
@@ -1991,12 +1991,12 @@ static void mailbox_interrupt_to_vf(E1000ECore *core, uint16_t vfn)
     }
 }
 
-static void mailbox_interrupt_to_pf(E1000ECore *core)
+static void mailbox_interrupt_to_pf(IGBCore *core)
 {
     e1000e_set_interrupt_cause(core, E1000_ICR_VMMB);
 }
 
-static void igb_set_pfmailbox(E1000ECore *core, int index, uint32_t val)
+static void igb_set_pfmailbox(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = index - P2VMAILBOX0;
 
@@ -2029,7 +2029,7 @@ static void igb_set_pfmailbox(E1000ECore *core, int index, uint32_t val)
     }
 }
 
-static void igb_set_vfmailbox(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vfmailbox(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = index - V2PMAILBOX0;
 
@@ -2057,17 +2057,17 @@ static void igb_set_vfmailbox(E1000ECore *core, int index, uint32_t val)
     }
 }
 
-static void igb_set_mbvficr(E1000ECore *core, int index, uint32_t val)
+static void igb_set_mbvficr(IGBCore *core, int index, uint32_t val)
 {
     core->mac[MBVFICR] &= ~(val & 0xFF00FF);
 }
 
-static void igb_set_vflre(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vflre(IGBCore *core, int index, uint32_t val)
 {
     core->mac[VFLRE] &= ~(val & 0xFF);
 }
 
-static void igb_set_eimc(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eimc(IGBCore *core, int index, uint32_t val)
 {
     bool msix = !!(core->mac[GPIE] & E1000_GPIE_MSIX_MODE);
 
@@ -2079,7 +2079,7 @@ static void igb_set_eimc(E1000ECore *core, int index, uint32_t val)
     igb_update_interrupt_state(core);
 }
 
-static void igb_set_eiac(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eiac(IGBCore *core, int index, uint32_t val)
 {
     bool msix = !!(core->mac[GPIE] & E1000_GPIE_MSIX_MODE);
 
@@ -2093,7 +2093,7 @@ static void igb_set_eiac(E1000ECore *core, int index, uint32_t val)
     }
 }
 
-static void igb_set_eiam(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eiam(IGBCore *core, int index, uint32_t val)
 {
     bool msix = !!(core->mac[GPIE] & E1000_GPIE_MSIX_MODE);
 
@@ -2105,7 +2105,7 @@ static void igb_set_eiam(E1000ECore *core, int index, uint32_t val)
     trace_igb_irq_write_eiam(val, msix);
 }
 
-static void igb_set_eicr(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eicr(IGBCore *core, int index, uint32_t val)
 {
     bool msix = !!(core->mac[GPIE] & E1000_GPIE_MSIX_MODE);
 
@@ -2118,7 +2118,7 @@ static void igb_set_eicr(E1000ECore *core, int index, uint32_t val)
     igb_update_interrupt_state(core);
 }
 
-static void igb_set_vtctrl(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vtctrl(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn;
 
@@ -2128,7 +2128,7 @@ static void igb_set_vtctrl(E1000ECore *core, int index, uint32_t val)
     }
 }
 
-static void igb_set_vteics(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vteics(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - PVTEICS0) / 0x40;
 
@@ -2136,7 +2136,7 @@ static void igb_set_vteics(E1000ECore *core, int index, uint32_t val)
     igb_set_eics(core, EICS, (val & 0x7) << (22 - vfn*3));
 }
 
-static void igb_set_vteims(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vteims(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - PVTEIMS0) / 0x40;
 
@@ -2144,7 +2144,7 @@ static void igb_set_vteims(E1000ECore *core, int index, uint32_t val)
     igb_set_eims(core, EIMS, (val & 0x7) << (22 - vfn*3));
 }
 
-static void igb_set_vteimc(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vteimc(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - PVTEIMC0) / 0x40;
 
@@ -2152,7 +2152,7 @@ static void igb_set_vteimc(E1000ECore *core, int index, uint32_t val)
     igb_set_eimc(core, EIMC, (val & 0x7) << (22 - vfn*3));
 }
 
-static void igb_set_vteiac(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vteiac(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - PVTEIAC0) / 0x40;
 
@@ -2160,7 +2160,7 @@ static void igb_set_vteiac(E1000ECore *core, int index, uint32_t val)
     igb_set_eiac(core, EIAC, (val & 0x7) << (22 - vfn*3));
 }
 
-static void igb_set_vteiam(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vteiam(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - PVTEIAM0) / 0x40;
 
@@ -2168,7 +2168,7 @@ static void igb_set_vteiam(E1000ECore *core, int index, uint32_t val)
     igb_set_eiam(core, EIAM, (val & 0x7) << (22 - vfn*3));
 }
 
-static void igb_set_vteicr(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vteicr(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - PVTEICR0) / 0x40;
 
@@ -2176,7 +2176,7 @@ static void igb_set_vteicr(E1000ECore *core, int index, uint32_t val)
     igb_set_eicr(core, EICR, (val & 0x7) << (22 - vfn*3));
 }
 
-static void igb_set_vtivar(E1000ECore *core, int index, uint32_t val)
+static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
 {
     uint16_t vfn = (index - VTIVAR);
     uint16_t qn = vfn;
@@ -2208,7 +2208,7 @@ static void igb_set_vtivar(E1000ECore *core, int index, uint32_t val)
 static inline void
 e1000e_autoneg_timer(void *opaque)
 {
-    E1000ECore *core = opaque;
+    IGBCore *core = opaque;
     if (!qemu_get_queue(core->owner_nic)->link_down) {
         e1000x_update_regs_on_autoneg_done(core->mac, core->phy[0]);
         igb_start_recv(core);
@@ -2276,7 +2276,7 @@ static const char e1000e_phy_regcap[E1000E_PHY_PAGES][0x20] = {
 };
 
 static bool
-e1000e_phy_reg_check_cap(E1000ECore *core, uint32_t addr,
+e1000e_phy_reg_check_cap(IGBCore *core, uint32_t addr,
                          char cap, uint8_t *page)
 {
     *page =
@@ -2291,7 +2291,7 @@ e1000e_phy_reg_check_cap(E1000ECore *core, uint32_t addr,
 }
 
 static void
-e1000e_phy_reg_write(E1000ECore *core, uint8_t page,
+e1000e_phy_reg_write(IGBCore *core, uint8_t page,
                      uint32_t addr, uint16_t data)
 {
     assert(page < E1000E_PHY_PAGES);
@@ -2305,7 +2305,7 @@ e1000e_phy_reg_write(E1000ECore *core, uint8_t page,
 }
 
 static void
-e1000e_set_mdic(E1000ECore *core, int index, uint32_t val)
+e1000e_set_mdic(IGBCore *core, int index, uint32_t val)
 {
     uint32_t data = val & E1000_MDIC_DATA_MASK;
     uint32_t addr = ((val & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
@@ -2338,14 +2338,14 @@ e1000e_set_mdic(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_rdt(E1000ECore *core, int index, uint32_t val)
+e1000e_set_rdt(IGBCore *core, int index, uint32_t val)
 {
     core->mac[index] = val & 0xffff;
     trace_e1000e_rx_set_rdt(e1000e_mq_queue_idx(RDT0, index), val);
     igb_start_recv(core);
 }
 
-static void igb_set_status(E1000ECore *core, int index, uint32_t val)
+static void igb_set_status(IGBCore *core, int index, uint32_t val)
 {
     if ((val & E1000_STATUS_PHYRA) == 0) {
         core->mac[index] &= ~E1000_STATUS_PHYRA;
@@ -2353,7 +2353,7 @@ static void igb_set_status(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_ctrlext(E1000ECore *core, int index, uint32_t val)
+e1000e_set_ctrlext(IGBCore *core, int index, uint32_t val)
 {
     trace_e1000e_link_set_ext_params(!!(val & E1000_CTRL_EXT_ASDCHK),
                                      !!(val & E1000_CTRL_EXT_SPD_BYPS));
@@ -2366,7 +2366,7 @@ e1000e_set_ctrlext(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_pbaclr(E1000ECore *core, int index, uint32_t val)
+e1000e_set_pbaclr(IGBCore *core, int index, uint32_t val)
 {
     int i;
 
@@ -2384,35 +2384,35 @@ e1000e_set_pbaclr(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_fcrth(E1000ECore *core, int index, uint32_t val)
+e1000e_set_fcrth(IGBCore *core, int index, uint32_t val)
 {
     core->mac[FCRTH] = val & 0xFFF8;
 }
 
 static void
-e1000e_set_fcrtl(E1000ECore *core, int index, uint32_t val)
+e1000e_set_fcrtl(IGBCore *core, int index, uint32_t val)
 {
     core->mac[FCRTL] = val & 0x8000FFF8;
 }
 
 static inline void
-e1000e_set_16bit(E1000ECore *core, int index, uint32_t val)
+e1000e_set_16bit(IGBCore *core, int index, uint32_t val)
 {
     core->mac[index] = val & 0xffff;
 }
 
 static void
-e1000e_set_dlen(E1000ECore *core, int index, uint32_t val)
+e1000e_set_dlen(IGBCore *core, int index, uint32_t val)
 {
     core->mac[index] = val & E1000_XDLEN_MASK;
 }
 
-static void igb_set_dbal(E1000ECore *core, int index, uint32_t val)
+static void igb_set_dbal(IGBCore *core, int index, uint32_t val)
 {
     core->mac[index] = val & E1000_XDBAL_MASK;
 }
 
-static void igb_set_tdt(E1000ECore *core, int index, uint32_t val)
+static void igb_set_tdt(IGBCore *core, int index, uint32_t val)
 {
     E1000E_TxRing txr;
     int qn = e1000e_mq_queue_idx(TDT0, index);
@@ -2423,13 +2423,13 @@ static void igb_set_tdt(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_ics(E1000ECore *core, int index, uint32_t val)
+e1000e_set_ics(IGBCore *core, int index, uint32_t val)
 {
     trace_e1000e_irq_write_ics(val);
     e1000e_set_interrupt_cause(core, val);
 }
 
-static void write_iam_content_to_ims(E1000ECore *core)
+static void write_iam_content_to_ims(IGBCore *core)
 {
     // TODO: Read and understand 8.8.11 and NSICR in 8.8.15 before removing
     // this return!
@@ -2445,7 +2445,7 @@ static void write_iam_content_to_ims(E1000ECore *core)
     }
 }
 
-static void igb_set_icr(E1000ECore *core, int index, uint32_t val)
+static void igb_set_icr(IGBCore *core, int index, uint32_t val)
 {
     uint32_t icr = core->mac[ICR] & ~val;
 
@@ -2456,14 +2456,14 @@ static void igb_set_icr(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_imc(E1000ECore *core, int index, uint32_t val)
+e1000e_set_imc(IGBCore *core, int index, uint32_t val)
 {
     trace_e1000e_irq_ims_clear_set_imc(val);
     e1000e_clear_ims_bits(core, val);
     igb_update_interrupt_state(core);
 }
 
-static void igb_set_ims(E1000ECore *core, int index, uint32_t val)
+static void igb_set_ims(IGBCore *core, int index, uint32_t val)
 {
     static const uint32_t ims_valid_mask =
         E1000_ICR_TXDW     | E1000_ICR_LSC      | E1000_ICR_RXDMT0   |
@@ -2482,20 +2482,20 @@ static void igb_set_ims(E1000ECore *core, int index, uint32_t val)
 }
 
 static uint32_t
-e1000e_mac_readreg(E1000ECore *core, int index)
+e1000e_mac_readreg(IGBCore *core, int index)
 {
     return core->mac[index];
 }
 
 static uint32_t
-e1000e_mac_ics_read(E1000ECore *core, int index)
+e1000e_mac_ics_read(IGBCore *core, int index)
 {
     trace_e1000e_irq_read_ics(core->mac[ICS]);
     return core->mac[ICS];
 }
 
 static uint32_t
-e1000e_mac_ims_read(E1000ECore *core, int index)
+e1000e_mac_ims_read(IGBCore *core, int index)
 {
     trace_e1000e_irq_read_ims(core->mac[IMS]);
     return core->mac[IMS];
@@ -2503,7 +2503,7 @@ e1000e_mac_ims_read(E1000ECore *core, int index)
 
 #define E1000E_LOW_BITS_READ_FUNC(num)                      \
     static uint32_t                                         \
-    e1000e_mac_low##num##_read(E1000ECore *core, int index) \
+    e1000e_mac_low##num##_read(IGBCore *core, int index) \
     {                                                       \
         return core->mac[index] & (BIT(num) - 1);           \
     }                                                       \
@@ -2518,14 +2518,14 @@ E1000E_LOW_BITS_READ_FUNC(13);
 E1000E_LOW_BITS_READ_FUNC(16);
 
 static uint32_t
-e1000e_mac_swsm_read(E1000ECore *core, int index)
+e1000e_mac_swsm_read(IGBCore *core, int index)
 {
     uint32_t val = core->mac[SWSM];
     core->mac[SWSM] = val | 1;
     return val;
 }
 
-static uint32_t igb_mac_eitr_read(E1000ECore *core, int index)
+static uint32_t igb_mac_eitr_read(IGBCore *core, int index)
 {
     uint32_t val = core->eitr_guest_value[index - EITR0];
 
@@ -2535,7 +2535,7 @@ static uint32_t igb_mac_eitr_read(E1000ECore *core, int index)
     return val;
 }
 
-static uint32_t igb_mac_pfmailbox_read(E1000ECore *core, int index)
+static uint32_t igb_mac_pfmailbox_read(IGBCore *core, int index)
 {
     uint32_t val = core->mac[index];
 
@@ -2545,7 +2545,7 @@ static uint32_t igb_mac_pfmailbox_read(E1000ECore *core, int index)
     return val;
 }
 
-static uint32_t igb_mac_vfmailbox_read(E1000ECore *core, int index)
+static uint32_t igb_mac_vfmailbox_read(IGBCore *core, int index)
 {
     uint32_t val = core->mac[index];
 
@@ -2558,7 +2558,7 @@ static uint32_t igb_mac_vfmailbox_read(E1000ECore *core, int index)
     return val;
 }
 
-static uint32_t igb_mac_icr_read(E1000ECore *core, int index)
+static uint32_t igb_mac_icr_read(IGBCore *core, int index)
 {
     uint32_t ret = core->mac[ICR];
 
@@ -2580,7 +2580,7 @@ static uint32_t igb_mac_icr_read(E1000ECore *core, int index)
 }
 
 static uint32_t
-e1000e_mac_read_clr4(E1000ECore *core, int index)
+e1000e_mac_read_clr4(IGBCore *core, int index)
 {
     uint32_t ret = core->mac[index];
 
@@ -2589,7 +2589,7 @@ e1000e_mac_read_clr4(E1000ECore *core, int index)
 }
 
 static uint32_t
-e1000e_mac_read_clr8(E1000ECore *core, int index)
+e1000e_mac_read_clr8(IGBCore *core, int index)
 {
     uint32_t ret = core->mac[index];
 
@@ -2599,7 +2599,7 @@ e1000e_mac_read_clr8(E1000ECore *core, int index)
 }
 
 static uint32_t
-e1000e_get_ctrl(E1000ECore *core, int index)
+e1000e_get_ctrl(IGBCore *core, int index)
 {
     uint32_t val = core->mac[CTRL];
 
@@ -2614,7 +2614,7 @@ e1000e_get_ctrl(E1000ECore *core, int index)
     return val;
 }
 
-static uint32_t igb_get_status(E1000ECore *core, int index)
+static uint32_t igb_get_status(IGBCore *core, int index)
 {
     uint32_t status = core->mac[STATUS];
 
@@ -2656,7 +2656,7 @@ static uint32_t igb_get_status(E1000ECore *core, int index)
 }
 
 static uint32_t
-e1000e_get_tarc(E1000ECore *core, int index)
+e1000e_get_tarc(IGBCore *core, int index)
 {
     return core->mac[index] & ((BIT(11) - 1) |
                                 BIT(27)      |
@@ -2666,12 +2666,12 @@ e1000e_get_tarc(E1000ECore *core, int index)
 }
 
 static void
-e1000e_mac_writereg(E1000ECore *core, int index, uint32_t val)
+e1000e_mac_writereg(IGBCore *core, int index, uint32_t val)
 {
     core->mac[index] = val;
 }
 
-static void igb_mac_set_macaddr(E1000ECore *core, int index, uint32_t val)
+static void igb_mac_set_macaddr(IGBCore *core, int index, uint32_t val)
 {
     uint32_t macaddr[2];
 
@@ -2687,7 +2687,7 @@ static void igb_mac_set_macaddr(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_eecd(E1000ECore *core, int index, uint32_t val)
+e1000e_set_eecd(IGBCore *core, int index, uint32_t val)
 {
     static const uint32_t ro_bits = E1000_EECD_PRES          |
                                     E1000_EECD_AUTO_RD       |
@@ -2697,7 +2697,7 @@ e1000e_set_eecd(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_eerd(E1000ECore *core, int index, uint32_t val)
+e1000e_set_eerd(IGBCore *core, int index, uint32_t val)
 {
     uint32_t addr = (val >> E1000_EERW_ADDR_SHIFT) & E1000_EERW_ADDR_MASK;
     uint32_t flags = 0;
@@ -2714,7 +2714,7 @@ e1000e_set_eerd(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_set_eewr(E1000ECore *core, int index, uint32_t val)
+e1000e_set_eewr(IGBCore *core, int index, uint32_t val)
 {
     uint32_t addr = (val >> E1000_EERW_ADDR_SHIFT) & E1000_EERW_ADDR_MASK;
     uint32_t data = (val >> E1000_EERW_DATA_SHIFT) & E1000_EERW_DATA_MASK;
@@ -2730,7 +2730,7 @@ e1000e_set_eewr(E1000ECore *core, int index, uint32_t val)
                       (data << E1000_EERW_DATA_SHIFT);
 }
 
-static void igb_set_eitr(E1000ECore *core, int index, uint32_t val)
+static void igb_set_eitr(IGBCore *core, int index, uint32_t val)
 {
     uint32_t interval = val & 0x7FFE;
     uint32_t eitr_num = index - EITR0;
@@ -2742,7 +2742,7 @@ static void igb_set_eitr(E1000ECore *core, int index, uint32_t val)
 }
 
 static void
-e1000e_update_rx_offloads(E1000ECore *core)
+e1000e_update_rx_offloads(IGBCore *core)
 {
     int cso_state = e1000e_rx_l4_cso_enabled(core);
 
@@ -2750,21 +2750,21 @@ e1000e_update_rx_offloads(E1000ECore *core)
 }
 
 static void
-e1000e_set_rxcsum(E1000ECore *core, int index, uint32_t val)
+e1000e_set_rxcsum(IGBCore *core, int index, uint32_t val)
 {
     core->mac[RXCSUM] = val;
     e1000e_update_rx_offloads(core);
 }
 
 static void
-e1000e_set_gcr(E1000ECore *core, int index, uint32_t val)
+e1000e_set_gcr(IGBCore *core, int index, uint32_t val)
 {
     uint32_t ro_bits = core->mac[GCR] & E1000_GCR_RO_BITS;
     core->mac[GCR] = (val & ~E1000_GCR_RO_BITS) | ro_bits;
 }
 
 #define e1000e_getreg(x)    [x] = e1000e_mac_readreg
-typedef uint32_t (*readops)(E1000ECore *, int);
+typedef uint32_t (*readops)(IGBCore *, int);
 static const readops igb_macreg_readops[] = {
     e1000e_getreg(PBA),
     e1000e_getreg(WUFC),
@@ -3315,7 +3315,7 @@ static const readops igb_macreg_readops[] = {
 enum { IGB_NREADOPS = ARRAY_SIZE(igb_macreg_readops) };
 
 #define e1000e_putreg(x)    [x] = e1000e_mac_writereg
-typedef void (*writeops)(E1000ECore *, int, uint32_t);
+typedef void (*writeops)(IGBCore *, int, uint32_t);
 static const writeops igb_macreg_writeops[] = {
     e1000e_putreg(PBA),
     e1000e_putreg(SWSM),
@@ -3859,7 +3859,7 @@ static const uint16_t mac_reg_access[E1000E_MAC_SIZE] = {
     [MAVTV0 ... MAVTV3] = MAC_ACCESS_PARTIAL
 };
 
-void igb_core_write(E1000ECore *core, hwaddr addr, uint64_t val, unsigned size)
+void igb_core_write(IGBCore *core, hwaddr addr, uint64_t val, unsigned size)
 {
     uint16_t index = e1000e_get_reg_index_with_offset(mac_reg_access, addr);
 
@@ -3876,7 +3876,7 @@ void igb_core_write(E1000ECore *core, hwaddr addr, uint64_t val, unsigned size)
     }
 }
 
-uint64_t igb_core_read(E1000ECore *core, hwaddr addr, unsigned size)
+uint64_t igb_core_read(IGBCore *core, hwaddr addr, unsigned size)
 {
     uint64_t val;
     uint16_t index = e1000e_get_reg_index_with_offset(mac_reg_access, addr);
@@ -3895,13 +3895,13 @@ uint64_t igb_core_read(E1000ECore *core, hwaddr addr, unsigned size)
 }
 
 static inline void
-e1000e_autoneg_pause(E1000ECore *core)
+e1000e_autoneg_pause(IGBCore *core)
 {
     timer_del(core->autoneg_timer);
 }
 
 static void
-e1000e_autoneg_resume(E1000ECore *core)
+e1000e_autoneg_resume(IGBCore *core)
 {
     if (e1000e_have_autoneg(core) &&
         !(core->phy[0][MII_BMSR] & MII_BMSR_AN_COMP)) {
@@ -3914,7 +3914,7 @@ e1000e_autoneg_resume(E1000ECore *core)
 static void
 e1000e_vm_state_change(void *opaque, bool running, RunState state)
 {
-    E1000ECore *core = opaque;
+    IGBCore *core = opaque;
 
     if (running) {
         trace_e1000e_vm_state_running();
@@ -3927,7 +3927,7 @@ e1000e_vm_state_change(void *opaque, bool running, RunState state)
     }
 }
 
-void igb_core_pci_realize(E1000ECore     *core,
+void igb_core_pci_realize(IGBCore     *core,
                           const uint16_t *eeprom_templ,
                           uint32_t        eeprom_size,
                           const uint8_t  *macaddr)
@@ -3957,7 +3957,7 @@ void igb_core_pci_realize(E1000ECore     *core,
     e1000e_update_rx_offloads(core);
 }
 
-void igb_core_pci_uninit(E1000ECore *core)
+void igb_core_pci_uninit(IGBCore *core)
 {
     int i;
 
@@ -4104,7 +4104,7 @@ static const uint32_t e1000e_mac_reg_init[] = {
     [TXCTL15]      = BIT(13) | BIT(9),
 };
 
-void igb_core_reset(E1000ECore *core)
+void igb_core_reset(IGBCore *core)
 {
     struct e1000e_tx *tx;
     int i;
@@ -4139,7 +4139,7 @@ void igb_core_reset(E1000ECore *core)
     }
 }
 
-void igb_core_pre_save(E1000ECore *core)
+void igb_core_pre_save(IGBCore *core)
 {
     int i;
     NetClientState *nc = qemu_get_queue(core->owner_nic);
@@ -4161,7 +4161,7 @@ void igb_core_pre_save(E1000ECore *core)
     }
 }
 
-int igb_core_post_load(E1000ECore *core)
+int igb_core_post_load(IGBCore *core)
 {
     NetClientState *nc = qemu_get_queue(core->owner_nic);
 

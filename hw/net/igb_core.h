@@ -49,22 +49,22 @@
 #define IGB_MSIX_VEC_NUM     (25)
 #define IGB_NUM_QUEUES       (16)
 
-typedef struct E1000Core E1000ECore;
+typedef struct IGBCore IGBCore;
 
 enum { PHY_R = BIT(0),
        PHY_W = BIT(1),
        PHY_RW = PHY_R | PHY_W,
        PHY_ANYPAGE = BIT(2) };
 
-typedef struct E1000IntrDelayTimer_st {
+typedef struct IGBIntrDelayTimer {
     QEMUTimer *timer;
     bool running;
     uint32_t delay_reg;
     uint32_t delay_resolution_ns;
-    E1000ECore *core;
-} E1000IntrDelayTimer;
+    IGBCore *core;
+} IGBIntrDelayTimer;
 
-struct E1000Core {
+struct IGBCore {
     uint32_t mac[E1000E_MAC_SIZE];
     uint16_t phy[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE];
     uint16_t eeprom[E1000E_EEPROM_SIZE];
@@ -96,7 +96,7 @@ struct E1000Core {
     /* Interrupt moderation management */
     uint32_t delayed_causes;
 
-    E1000IntrDelayTimer eitr[IGB_MSIX_VEC_NUM];
+    IGBIntrDelayTimer eitr[IGB_MSIX_VEC_NUM];
     bool eitr_intr_pending[IGB_MSIX_VEC_NUM];
 
     VMChangeStateEntry *vmstate;
@@ -112,31 +112,31 @@ struct E1000Core {
     void (*owner_start_recv)(PCIDevice *d);
 };
 
-void igb_core_write(E1000ECore *core, hwaddr addr, uint64_t val, unsigned size);
+void igb_core_write(IGBCore *core, hwaddr addr, uint64_t val, unsigned size);
 
-uint64_t igb_core_read(E1000ECore *core, hwaddr addr, unsigned size);
+uint64_t igb_core_read(IGBCore *core, hwaddr addr, unsigned size);
 
-void igb_core_pci_realize(E1000ECore     *regs,
+void igb_core_pci_realize(IGBCore        *regs,
                           const uint16_t *eeprom_templ,
                           uint32_t        eeprom_size,
                           const uint8_t  *macaddr);
 
-void igb_core_reset(E1000ECore *core);
+void igb_core_reset(IGBCore *core);
 
-void igb_core_pre_save(E1000ECore *core);
+void igb_core_pre_save(IGBCore *core);
 
-int igb_core_post_load(E1000ECore *core);
+int igb_core_post_load(IGBCore *core);
 
-void igb_core_set_link_status(E1000ECore *core);
+void igb_core_set_link_status(IGBCore *core);
 
-void igb_core_pci_uninit(E1000ECore *core);
+void igb_core_pci_uninit(IGBCore *core);
 
-bool igb_can_receive(E1000ECore *core);
+bool igb_can_receive(IGBCore *core);
 
-ssize_t igb_receive(E1000ECore *core, const uint8_t *buf, size_t size);
+ssize_t igb_receive(IGBCore *core, const uint8_t *buf, size_t size);
 
-ssize_t igb_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt);
+ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt);
 
-void igb_start_recv(E1000ECore *core);
+void igb_start_recv(IGBCore *core);
 
 #endif

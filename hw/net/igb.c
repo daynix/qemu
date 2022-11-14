@@ -79,7 +79,7 @@ typedef struct IgbState {
 
     uint32_t ioaddr;
 
-    E1000ECore core;
+    IGBCore core;
 } IgbState;
 
 static void igb_write_config(PCIDevice *dev, uint32_t addr,
@@ -465,19 +465,19 @@ static const VMStateDescription igb_vmstate_intr_timer = {
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (VMStateField[]) {
-        VMSTATE_TIMER_PTR(timer, E1000IntrDelayTimer),
-        VMSTATE_BOOL(running, E1000IntrDelayTimer),
+        VMSTATE_TIMER_PTR(timer, IGBIntrDelayTimer),
+        VMSTATE_BOOL(running, IGBIntrDelayTimer),
         VMSTATE_END_OF_LIST()
     }
 };
 
 #define VMSTATE_E1000E_INTR_DELAY_TIMER(_f, _s)                     \
     VMSTATE_STRUCT(_f, _s, 0,                                       \
-                   igb_vmstate_intr_timer, E1000IntrDelayTimer)
+                   igb_vmstate_intr_timer, IGBIntrDelayTimer)
 
 #define VMSTATE_E1000E_INTR_DELAY_TIMER_ARRAY(_f, _s, _num)         \
     VMSTATE_STRUCT_ARRAY(_f, _s, _num, 0,                           \
-                         igb_vmstate_intr_timer, E1000IntrDelayTimer)
+                         igb_vmstate_intr_timer, IGBIntrDelayTimer)
 
 static const VMStateDescription igb_vmstate = {
     .name = "igb",
