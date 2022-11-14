@@ -457,7 +457,7 @@ e1000e_rss_parse_packet(IGBCore *core,
 }
 
 static void
-e1000e_setup_tx_offloads(IGBCore *core, struct e1000e_tx *tx)
+e1000e_setup_tx_offloads(IGBCore *core, struct IGBTx *tx)
 {
     if (tx->tse) {
         net_tx_pkt_build_vheader(tx->tx_pkt, true, true, tx->mss);
@@ -476,7 +476,7 @@ e1000e_setup_tx_offloads(IGBCore *core, struct e1000e_tx *tx)
 }
 
 /* TX Packets Switching (7.10.3.6) */
-static bool igb_tx_pkt_switch(IGBCore *core, struct e1000e_tx *tx,
+static bool igb_tx_pkt_switch(IGBCore *core, struct IGBTx *tx,
     NetClientState *nc)
 {
     struct eth_header *ehdr;
@@ -514,7 +514,7 @@ send_out:
     return net_tx_pkt_send(tx->tx_pkt, nc);
 }
 
-static bool igb_tx_pkt_send(IGBCore *core, struct e1000e_tx *tx,
+static bool igb_tx_pkt_send(IGBCore *core, struct IGBTx *tx,
     int queue_index)
 {
     int target_queue = MIN(core->max_queue_num, queue_index);
@@ -562,7 +562,7 @@ e1000e_on_tx_done_update_stats(IGBCore *core, struct NetTxPkt *tx_pkt)
     core->mac[GOTCH] = core->mac[TOTH];
 }
 
-static void igb_process_tx_desc(IGBCore *core, struct e1000e_tx *tx,
+static void igb_process_tx_desc(IGBCore *core, struct IGBTx *tx,
     union e1000_adv_tx_desc *tx_desc, int queue_index)
 {
     struct e1000_adv_tx_context_desc *tx_ctx_desc;
@@ -767,7 +767,7 @@ e1000e_ring_len(IGBCore *core, const E1000E_RingInfo *r)
 
 typedef struct E1000E_TxRing_st {
     const E1000E_RingInfo *i;
-    struct e1000e_tx *tx;
+    struct IGBTx *tx;
 } E1000E_TxRing;
 
 static inline int
@@ -4106,7 +4106,7 @@ static const uint32_t e1000e_mac_reg_init[] = {
 
 void igb_core_reset(IGBCore *core)
 {
-    struct e1000e_tx *tx;
+    struct IGBTx *tx;
     int i;
 
     timer_del(core->autoneg_timer);

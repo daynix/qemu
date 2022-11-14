@@ -75,7 +75,7 @@ struct IGBCore {
 
     QEMUTimer *autoneg_timer;
 
-    struct e1000e_tx {
+    struct IGBTx {
         struct NetTxPkt *tx_pkt;
 
         uint16_t vlan;  /* VLAN Tag */

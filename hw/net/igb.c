@@ -449,13 +449,13 @@ static const VMStateDescription igb_vmstate_tx = {
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (VMStateField[]) {
-        VMSTATE_UINT16(vlan, struct e1000e_tx),
-        VMSTATE_UINT16(mss, struct e1000e_tx),
-        VMSTATE_BOOL(tse, struct e1000e_tx),
-        VMSTATE_BOOL(ixsm, struct e1000e_tx),
-        VMSTATE_BOOL(txsm, struct e1000e_tx),
-        VMSTATE_BOOL(first, struct e1000e_tx),
-        VMSTATE_BOOL(skip_cp, struct e1000e_tx),
+        VMSTATE_UINT16(vlan, struct IGBTx),
+        VMSTATE_UINT16(mss, struct IGBTx),
+        VMSTATE_BOOL(tse, struct IGBTx),
+        VMSTATE_BOOL(ixsm, struct IGBTx),
+        VMSTATE_BOOL(txsm, struct IGBTx),
+        VMSTATE_BOOL(first, struct IGBTx),
+        VMSTATE_BOOL(skip_cp, struct IGBTx),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -512,7 +512,7 @@ static const VMStateDescription igb_vmstate = {
         VMSTATE_UINT16(core.vet, IgbState),
 
         VMSTATE_STRUCT_ARRAY(core.tx, IgbState, IGB_NUM_QUEUES, 0,
-                             igb_vmstate_tx, struct e1000e_tx),
+                             igb_vmstate_tx, struct IGBTx),
         VMSTATE_END_OF_LIST()
     }
 };
