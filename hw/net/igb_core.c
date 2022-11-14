@@ -265,7 +265,7 @@ e1000e_intrmgr_reset(IGBCore *core)
 
     core->delayed_causes = 0;
 
-    for (i = 0; i < E1000E_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
         e1000e_intrmgr_stop_timer(&core->eitr[i]);
     }
 }
@@ -2376,7 +2376,7 @@ e1000e_set_pbaclr(IGBCore *core, int index, uint32_t val)
         return;
     }
 
-    for (i = 0; i < E1000E_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
         if (core->mac[PBACLR] & BIT(i)) {
             msix_clr_pending(core->owner, i);
         }

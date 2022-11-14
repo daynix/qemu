@@ -40,7 +40,7 @@
 #define E1000E_PHY_PAGES        (0x07)
 #define E1000E_MAC_SIZE         (0x8000)
 #define IGB_EEPROM_SIZE         (1024)
-#define E1000E_MSIX_VEC_NUM     (25)
+#define IGB_MSIX_VEC_NUM        (25)
 #define E1000E_NUM_QUEUES       (16)
 
 /* TBD: handle igb sizes, vectors = 25, queues = 16!
