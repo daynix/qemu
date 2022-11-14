@@ -41,7 +41,7 @@
 #define E1000E_MAC_SIZE         (0x8000)
 #define IGB_EEPROM_SIZE         (1024)
 #define IGB_MSIX_VEC_NUM        (25)
-#define E1000E_NUM_QUEUES       (16)
+#define IGB_NUM_QUEUES          (16)
 
 /* TBD: handle igb sizes, vectors = 25, queues = 16!
  * Just set some conservative values here to work with for now
@@ -87,7 +87,7 @@ struct IGBCore {
         bool first;
         bool skip_cp;
 
-    } tx[E1000E_NUM_QUEUES];
+    } tx[IGB_NUM_QUEUES];
 
     struct NetRxPkt *rx_pkt;
 

@@ -1572,7 +1572,7 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 
     retval = orig_size;
 
-    for (i = 0; i < E1000E_NUM_QUEUES; i++) {
+    for (i = 0; i < IGB_NUM_QUEUES; i++) {
         if (!(queues & BIT(i))) {
             continue;
         }
@@ -1588,7 +1588,7 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     }
 
     if (retval) {
-        for (i = 0; i < E1000E_NUM_QUEUES; i++) {
+        for (i = 0; i < IGB_NUM_QUEUES; i++) {
             if (!(queues & BIT(i))) {
                 continue;
             }
@@ -3942,7 +3942,7 @@ void igb_core_pci_realize(IGBCore     *core,
     core->vmstate =
         qemu_add_vm_change_state_handler(e1000e_vm_state_change, core);
 
-    for (i = 0; i < E1000E_NUM_QUEUES; i++) {
+    for (i = 0; i < IGB_NUM_QUEUES; i++) {
         net_tx_pkt_init(&core->tx[i].tx_pkt, core->owner,
                         E1000E_MAX_TX_FRAGS, false);
     }
@@ -3968,7 +3968,7 @@ void igb_core_pci_uninit(IGBCore *core)
 
     qemu_del_vm_change_state_handler(core->vmstate);
 
-    for (i = 0; i < E1000E_NUM_QUEUES; i++) {
+    for (i = 0; i < IGB_NUM_QUEUES; i++) {
         net_tx_pkt_reset(core->tx[i].tx_pkt);
         net_tx_pkt_uninit(core->tx[i].tx_pkt);
     }
