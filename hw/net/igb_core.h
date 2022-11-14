@@ -39,7 +39,7 @@
 #define E1000E_PHY_PAGE_SIZE    (0x20)
 #define E1000E_PHY_PAGES        (0x07)
 #define E1000E_MAC_SIZE         (0x8000)
-#define E1000E_EEPROM_SIZE      (1024)
+#define IGB_EEPROM_SIZE         (1024)
 #define E1000E_MSIX_VEC_NUM     (25)
 #define E1000E_NUM_QUEUES       (16)
 
@@ -67,7 +67,7 @@ typedef struct IGBIntrDelayTimer {
 struct IGBCore {
     uint32_t mac[E1000E_MAC_SIZE];
     uint16_t phy[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE];
-    uint16_t eeprom[E1000E_EEPROM_SIZE];
+    uint16_t eeprom[IGB_EEPROM_SIZE];
 
     uint32_t rx_desc_buf_size;
     uint32_t rxbuf_min_shift;
