@@ -1538,7 +1538,7 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
         trace_e1000e_rx_rss_dispatched_to_queue(rxr.i->idx);
 
         if (!igb_has_rxbufs(core, rxr.i, total_size)) {
-            //n |= E1000_ICS_RXO;
+            n |= E1000_ICS_RXO;
             retval = 0;
         }
     }
