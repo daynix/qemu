@@ -445,7 +445,7 @@ static bool igb_tx_pkt_send(IGBCore *core, struct IGBTx *tx,
 
     net_tx_pkt_dump(tx->tx_pkt);
 
-    if ((core->phy[0][MII_BMCR] & MII_BMCR_LOOPBACK) ||
+    if ((core->phy[MII_BMCR] & MII_BMCR_LOOPBACK) ||
         ((core->mac[RCTL] & E1000_RCTL_LBM_MAC) == E1000_RCTL_LBM_MAC)) {
         return net_tx_pkt_send_loopback(tx->tx_pkt, queue);
     } else {
@@ -1509,13 +1509,12 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 static inline bool
 igb_have_autoneg(IGBCore *core)
 {
-    return core->phy[0][MII_BMCR] & MII_BMCR_AUTOEN;
+    return core->phy[MII_BMCR] & MII_BMCR_AUTOEN;
 }
 
 static void igb_update_flowctl_status(IGBCore *core)
 {
-    if (igb_have_autoneg(core) &&
-        core->phy[0][MII_BMSR] & MII_BMSR_AN_COMP) {
+    if (igb_have_autoneg(core) && core->phy[MII_BMSR] & MII_BMSR_AN_COMP) {
         trace_e1000e_link_autoneg_flowctl(true);
         core->mac[CTRL] |= E1000_CTRL_TFCE | E1000_CTRL_RFCE;
     } else {
@@ -1526,7 +1525,7 @@ static void igb_update_flowctl_status(IGBCore *core)
 static inline void
 igb_link_down(IGBCore *core)
 {
-    e1000x_update_regs_on_link_down(core->mac, core->phy[0]);
+    e1000x_update_regs_on_link_down(core->mac, core->phy);
     igb_update_flowctl_status(core);
 }
 
@@ -1534,29 +1533,11 @@ static inline void
 igb_set_phy_ctrl(IGBCore *core, int index, uint16_t val)
 {
     /* bits 0-5 reserved; MII_BMCR_[ANRESTART,RESET] are self clearing */
-    core->phy[0][MII_BMCR] = val & ~(0x3f |
-                                     MII_BMCR_RESET |
-                                     MII_BMCR_ANRESTART);
+    core->phy[MII_BMCR] = val & ~(0x3f | MII_BMCR_RESET | MII_BMCR_ANRESTART);
 
     if ((val & MII_BMCR_ANRESTART) && igb_have_autoneg(core)) {
-        e1000x_restart_autoneg(core->mac, core->phy[0], core->autoneg_timer);
+        e1000x_restart_autoneg(core->mac, core->phy, core->autoneg_timer);
     }
-}
-
-static void
-igb_set_phy_oem_bits(IGBCore *core, int index, uint16_t val)
-{
-    core->phy[0][PHY_OEM_BITS] = val & ~BIT(10);
-
-    if (val & BIT(10)) {
-        e1000x_restart_autoneg(core->mac, core->phy[0], core->autoneg_timer);
-    }
-}
-
-static void
-igb_set_phy_page(IGBCore *core, int index, uint16_t val)
-{
-    core->phy[0][PHY_PAGE] = val & PHY_PAGE_RW_MASK;
 }
 
 void igb_core_set_link_status(IGBCore *core)
@@ -1567,14 +1548,14 @@ void igb_core_set_link_status(IGBCore *core)
     trace_e1000e_link_status_changed(nc->link_down ? false : true);
 
     if (nc->link_down) {
-        e1000x_update_regs_on_link_down(core->mac, core->phy[0]);
+        e1000x_update_regs_on_link_down(core->mac, core->phy);
     } else {
         if (igb_have_autoneg(core) &&
-            !(core->phy[0][MII_BMSR] & MII_BMSR_AN_COMP)) {
-            e1000x_restart_autoneg(core->mac, core->phy[0],
+            !(core->phy[MII_BMSR] & MII_BMSR_AN_COMP)) {
+            e1000x_restart_autoneg(core->mac, core->phy,
                                    core->autoneg_timer);
         } else {
-            e1000x_update_regs_on_link_up(core->mac, core->phy[0]);
+            e1000x_update_regs_on_link_up(core->mac, core->phy);
             igb_start_recv(core);
         }
     }
@@ -1680,16 +1661,6 @@ igb_set_rx_control(IGBCore *core, int index, uint32_t val)
         igb_start_recv(core);
     }
 }
-
-static
-void(*igb_phyreg_writeops[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE])
-(IGBCore *, int, uint16_t) = {
-    [0] = {
-        [MII_BMCR]     = igb_set_phy_ctrl,
-        [PHY_PAGE]     = igb_set_phy_page,
-        [PHY_OEM_BITS] = igb_set_phy_oem_bits
-    }
-};
 
 static inline void
 igb_clear_ims_bits(IGBCore *core, uint32_t bits)
@@ -2086,7 +2057,7 @@ igb_autoneg_timer(void *opaque)
 {
     IGBCore *core = opaque;
     if (!qemu_get_queue(core->owner_nic)->link_down) {
-        e1000x_update_regs_on_autoneg_done(core->mac, core->phy[0]);
+        e1000x_update_regs_on_autoneg_done(core->mac, core->phy);
         igb_start_recv(core);
 
         igb_update_flowctl_status(core);
@@ -2102,79 +2073,32 @@ igb_get_reg_index_with_offset(const uint16_t *mac_reg_access, hwaddr addr)
     return index + (mac_reg_access[index] & 0xfffe);
 }
 
-static const char igb_phy_regcap[E1000E_PHY_PAGES][0x20] = {
-    [0] = {
-        [MII_BMCR]                   = PHY_ANYPAGE | PHY_RW,
-        [MII_BMSR]                   = PHY_ANYPAGE | PHY_R,
-        [MII_PHYID1]                 = PHY_ANYPAGE | PHY_R,
-        [MII_PHYID2]                 = PHY_ANYPAGE | PHY_R,
-        [MII_ANAR]                   = PHY_ANYPAGE | PHY_RW,
-        [MII_ANLPAR]                 = PHY_ANYPAGE | PHY_R,
-        [MII_ANER]                   = PHY_ANYPAGE | PHY_R,
-        [MII_ANNP]                   = PHY_ANYPAGE | PHY_RW,
-        [MII_ANLPRNP]                = PHY_ANYPAGE | PHY_R,
-        [MII_CTRL1000]               = PHY_ANYPAGE | PHY_RW,
-        [MII_STAT1000]               = PHY_ANYPAGE | PHY_R,
-        [MII_EXTSTAT]                = PHY_ANYPAGE | PHY_R,
-        [PHY_PAGE]                   = PHY_ANYPAGE | PHY_RW,
+static const char igb_phy_regcap[0x20] = {
+    [MII_BMCR]                   = PHY_RW,
+    [MII_BMSR]                   = PHY_R,
+    [MII_PHYID1]                 = PHY_R,
+    [MII_PHYID2]                 = PHY_R,
+    [MII_ANAR]                   = PHY_RW,
+    [MII_ANLPAR]                 = PHY_R,
+    [MII_ANER]                   = PHY_R,
+    [MII_ANNP]                   = PHY_RW,
+    [MII_ANLPRNP]                = PHY_R,
+    [MII_CTRL1000]               = PHY_RW,
+    [MII_STAT1000]               = PHY_R,
+    [MII_EXTSTAT]                = PHY_R,
 
-        [PHY_COPPER_CTRL1]           = PHY_RW,
-        [PHY_COPPER_STAT1]           = PHY_R,
-        [PHY_COPPER_CTRL3]           = PHY_RW,
-        [PHY_RX_ERR_CNTR]            = PHY_R,
-        [PHY_OEM_BITS]               = PHY_RW,
-        [PHY_BIAS_1]                 = PHY_RW,
-        [PHY_BIAS_2]                 = PHY_RW,
-        [IGP01E1000_PHY_PAGE_SELECT] = PHY_RW,
-        [PHY_COPPER_INT_ENABLE]      = PHY_RW,
-        [PHY_COPPER_STAT2]           = PHY_R,
-        [PHY_COPPER_CTRL2]           = PHY_RW
-    },
-    [2] = {
-        [PHY_MAC_CTRL1]              = PHY_RW,
-        [PHY_MAC_INT_ENABLE]         = PHY_RW,
-        [PHY_MAC_STAT]               = PHY_R,
-        [PHY_MAC_CTRL2]              = PHY_RW
-    },
-    [3] = {
-        [PHY_LED_03_FUNC_CTRL1]      = PHY_RW,
-        [PHY_LED_03_POL_CTRL]        = PHY_RW,
-        [PHY_LED_TIMER_CTRL]         = PHY_RW,
-        [PHY_LED_45_CTRL]            = PHY_RW
-    },
-    [5] = {
-        [PHY_1000T_SKEW]             = PHY_R,
-        [PHY_1000T_SWAP]             = PHY_R
-    },
-    [6] = {
-        [PHY_CRC_COUNTERS]           = PHY_R
-    }
+    [IGP01E1000_PHY_PAGE_SELECT] = PHY_RW,
 };
 
-static bool
-igb_phy_reg_check_cap(IGBCore *core, uint32_t addr, char cap, uint8_t *page)
-{
-    *page =
-        (igb_phy_regcap[0][addr] & PHY_ANYPAGE) ? 0
-                                                    : core->phy[0][PHY_PAGE];
-
-    if (*page >= E1000E_PHY_PAGES) {
-        return false;
-    }
-
-    return igb_phy_regcap[*page][addr] & cap;
-}
-
 static void
-igb_phy_reg_write(IGBCore *core, uint8_t page, uint32_t addr, uint16_t data)
+igb_phy_reg_write(IGBCore *core, uint32_t addr, uint16_t data)
 {
-    assert(page < E1000E_PHY_PAGES);
     assert(addr < E1000E_PHY_PAGE_SIZE);
 
-    if (igb_phyreg_writeops[page][addr]) {
-        igb_phyreg_writeops[page][addr](core, addr, data);
+    if (addr == MII_BMCR) {
+        igb_set_phy_ctrl(core, addr, data);
     } else {
-        core->phy[page][addr] = data;
+        core->phy[addr] = data;
     }
 }
 
@@ -2183,25 +2107,24 @@ igb_set_mdic(IGBCore *core, int index, uint32_t val)
 {
     uint32_t data = val & E1000_MDIC_DATA_MASK;
     uint32_t addr = ((val & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
-    uint8_t page;
 
     if ((val & E1000_MDIC_PHY_MASK) >> E1000_MDIC_PHY_SHIFT != 1) { /* phy # */
         val = core->mac[MDIC] | E1000_MDIC_ERROR;
     } else if (val & E1000_MDIC_OP_READ) {
-        if (!igb_phy_reg_check_cap(core, addr, PHY_R, &page)) {
-            trace_e1000e_core_mdic_read_unhandled(page, addr);
+        if (!(igb_phy_regcap[addr] & PHY_R)) {
+            trace_igb_core_mdic_read_unhandled(addr);
             val |= E1000_MDIC_ERROR;
         } else {
-            val = (val ^ data) | core->phy[page][addr];
-            trace_e1000e_core_mdic_read(page, addr, val);
+            val = (val ^ data) | core->phy[addr];
+            trace_igb_core_mdic_read(addr, val);
         }
     } else if (val & E1000_MDIC_OP_WRITE) {
-        if (!igb_phy_reg_check_cap(core, addr, PHY_W, &page)) {
-            trace_e1000e_core_mdic_write_unhandled(page, addr);
+        if (!(igb_phy_regcap[addr] & PHY_W)) {
+            trace_igb_core_mdic_write_unhandled(addr);
             val |= E1000_MDIC_ERROR;
         } else {
-            trace_e1000e_core_mdic_write(page, addr, data);
-            igb_phy_reg_write(core, page, addr, data);
+            trace_igb_core_mdic_write(addr, data);
+            igb_phy_reg_write(core, addr, data);
         }
     }
     core->mac[MDIC] = val | E1000_MDIC_READY;
@@ -3778,7 +3701,7 @@ static void
 igb_autoneg_resume(IGBCore *core)
 {
     if (igb_have_autoneg(core) &&
-        !(core->phy[0][MII_BMSR] & MII_BMSR_AN_COMP)) {
+        !(core->phy[MII_BMSR] & MII_BMSR_AN_COMP)) {
         qemu_get_queue(core->owner_nic)->link_down = false;
         timer_mod(core->autoneg_timer,
                   qemu_clock_get_ms(QEMU_CLOCK_VIRTUAL) + 500);
@@ -3850,50 +3773,37 @@ void igb_core_pci_uninit(IGBCore *core)
 }
 
 static const uint16_t
-igb_phy_reg_init[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE] = {
-    [0] = {
-        [MII_BMCR] = MII_BMCR_SPEED1000 |
-                     MII_BMCR_FD        |
-                     MII_BMCR_AUTOEN,
+igb_phy_reg_init[E1000E_PHY_PAGE_SIZE] = {
+    [MII_BMCR] = MII_BMCR_SPEED1000 |
+                 MII_BMCR_FD        |
+                 MII_BMCR_AUTOEN,
 
-        [MII_BMSR] = MII_BMSR_EXTCAP    |
-                     MII_BMSR_LINK_ST   |
-                     MII_BMSR_AUTONEG   |
-                     MII_BMSR_MFPS      |
-                     MII_BMSR_EXTSTAT   |
-                     MII_BMSR_10T_HD    |
-                     MII_BMSR_10T_FD    |
-                     MII_BMSR_100TX_HD  |
-                     MII_BMSR_100TX_FD,
+    [MII_BMSR] = MII_BMSR_EXTCAP    |
+                 MII_BMSR_LINK_ST   |
+                 MII_BMSR_AUTONEG   |
+                 MII_BMSR_MFPS      |
+                 MII_BMSR_EXTSTAT   |
+                 MII_BMSR_10T_HD    |
+                 MII_BMSR_10T_FD    |
+                 MII_BMSR_100TX_HD  |
+                 MII_BMSR_100TX_FD,
 
-        [MII_PHYID1]            = IGP03E1000_E_PHY_ID >> 16,
-        [MII_PHYID2]            = (IGP03E1000_E_PHY_ID & 0xffff) | 1,
-        [MII_ANAR]              = MII_ANAR_CSMACD | MII_ANAR_10 |
-                                  MII_ANAR_10FD | MII_ANAR_TX |
-                                  MII_ANAR_TXFD | MII_ANAR_PAUSE |
-                                  MII_ANAR_PAUSE_ASYM,
-        [MII_ANLPAR]            = MII_ANLPAR_10 | MII_ANLPAR_10FD |
-                                  MII_ANLPAR_TX | MII_ANLPAR_TXFD |
-                                  MII_ANLPAR_T4 | MII_ANLPAR_PAUSE,
-        [MII_ANER]              = MII_ANER_NP,
-        [MII_ANNP]              = 0x1 | MII_ANNP_MP,
-        [MII_CTRL1000]          = MII_CTRL1000_HALF | MII_CTRL1000_FULL |
-                                  MII_CTRL1000_PORT | MII_CTRL1000_MASTER,
-        [MII_STAT1000]          = MII_STAT1000_HALF | MII_STAT1000_FULL |
-                                  MII_STAT1000_ROK | MII_STAT1000_LOK,
-        [MII_EXTSTAT]           = MII_EXTSTAT_1000T_HD | MII_EXTSTAT_1000T_FD,
-
-        [PHY_COPPER_CTRL1]      = BIT(5) | BIT(6) | BIT(8) | BIT(9) |
-                                  BIT(12) | BIT(13),
-        [PHY_COPPER_STAT1]      = BIT(3) | BIT(10) | BIT(11) | BIT(13) | BIT(15)
-    },
-    [2] = {
-        [PHY_MAC_CTRL1]         = BIT(3) | BIT(7),
-        [PHY_MAC_CTRL2]         = BIT(1) | BIT(2) | BIT(6) | BIT(12)
-    },
-    [3] = {
-        [PHY_LED_TIMER_CTRL]    = BIT(0) | BIT(2) | BIT(14)
-    }
+    [MII_PHYID1]            = IGP03E1000_E_PHY_ID >> 16,
+    [MII_PHYID2]            = (IGP03E1000_E_PHY_ID & 0xffff) | 1,
+    [MII_ANAR]              = MII_ANAR_CSMACD | MII_ANAR_10 |
+                              MII_ANAR_10FD | MII_ANAR_TX |
+                              MII_ANAR_TXFD | MII_ANAR_PAUSE |
+                              MII_ANAR_PAUSE_ASYM,
+    [MII_ANLPAR]            = MII_ANLPAR_10 | MII_ANLPAR_10FD |
+                              MII_ANLPAR_TX | MII_ANLPAR_TXFD |
+                              MII_ANLPAR_T4 | MII_ANLPAR_PAUSE,
+    [MII_ANER]              = MII_ANER_NP,
+    [MII_ANNP]              = 0x1 | MII_ANNP_MP,
+    [MII_CTRL1000]          = MII_CTRL1000_HALF | MII_CTRL1000_FULL |
+                              MII_CTRL1000_PORT | MII_CTRL1000_MASTER,
+    [MII_STAT1000]          = MII_STAT1000_HALF | MII_STAT1000_FULL |
+                              MII_STAT1000_ROK | MII_STAT1000_LOK,
+    [MII_EXTSTAT]           = MII_EXTSTAT_1000T_HD | MII_EXTSTAT_1000T_FD,
 };
 
 static const uint32_t igb_mac_reg_init[] = {
@@ -4023,7 +3933,7 @@ void igb_core_pre_save(IGBCore *core)
     * at MII_BMSR_AN_COMP to infer link status on load.
     */
     if (nc->link_down && igb_have_autoneg(core)) {
-        core->phy[0][MII_BMSR] |= MII_BMSR_AN_COMP;
+        core->phy[MII_BMSR] |= MII_BMSR_AN_COMP;
         igb_update_flowctl_status(core);
     }
 

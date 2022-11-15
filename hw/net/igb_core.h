@@ -37,7 +37,6 @@
 #define HW_NET_IGB_CORE_H
 
 #define E1000E_PHY_PAGE_SIZE    (0x20)
-#define E1000E_PHY_PAGES        (0x07)
 #define E1000E_MAC_SIZE         (0x8000)
 #define IGB_EEPROM_SIZE         (1024)
 #define IGB_MSIX_VEC_NUM        (25)
@@ -51,10 +50,11 @@
 
 typedef struct IGBCore IGBCore;
 
-enum { PHY_R = BIT(0),
-       PHY_W = BIT(1),
-       PHY_RW = PHY_R | PHY_W,
-       PHY_ANYPAGE = BIT(2) };
+enum {
+    PHY_R = BIT(0),
+    PHY_W = BIT(1),
+    PHY_RW = PHY_R | PHY_W,
+};
 
 typedef struct IGBIntrDelayTimer {
     QEMUTimer *timer;
@@ -66,7 +66,7 @@ typedef struct IGBIntrDelayTimer {
 
 struct IGBCore {
     uint32_t mac[E1000E_MAC_SIZE];
-    uint16_t phy[E1000E_PHY_PAGES][E1000E_PHY_PAGE_SIZE];
+    uint16_t phy[E1000E_PHY_PAGE_SIZE];
     uint16_t eeprom[IGB_EEPROM_SIZE];
 
     uint32_t rx_desc_buf_size;
