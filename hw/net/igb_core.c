@@ -648,18 +648,6 @@ static uint32_t igb_rx_wb_interrupt_cause(IGBCore *core, int queue_idx,
     return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
-#if 0
-static inline uint32_t
-igb_rx_wb_interrupt_cause(IGBCore *core, int queue_idx, bool min_threshold_hit)
-{
-    if (!msix_enabled(core->owner)) {
-        return E1000_ICS_RXT0 | (min_threshold_hit ? E1000_ICS_RXDMT0 : 0);
-    }
-
-    return (queue_idx == 0) ? E1000_ICR_RXQ0 : E1000_ICR_RXQ1;
-}
-#endif
-
 static uint32_t igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
     union e1000_adv_tx_desc *tx_desc, int queue_idx)
 {
