@@ -443,6 +443,7 @@ enum e1000_state_t {
 #define E1000_IVAR0     0x01700  /* Interrupt Vector Allocation Register - RW */
 #define E1000_IVAR_MISC 0x01740  /* Interrupt Vector Allocation Register (last) - RW */
 #define E1000_FRTIMER   0x01048  /* Free Running Timer - RW */
+#define E1000_FCRTV     0x02460  /* Flow Control Refresh Timer Value - RW */
 
 #define E1000_RQDPC(_n) (0x0C030 + ((_n) * 0x40))
 

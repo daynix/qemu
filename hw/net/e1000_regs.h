@@ -34,9 +34,33 @@
 
 #include "e1000x_regs.h"
 
+#define E1000_ITR      0x000C4  /* Interrupt Throttling Rate - RW */
 #define E1000_EIAC     0x000DC  /* Ext. Interrupt Auto Clear - RW */
 #define E1000_IVAR     0x000E4  /* Interrupt Vector Allocation Register - RW */
 #define E1000_EITR     0x000E8  /* Extended Interrupt Throttling Rate - RW */
+#define E1000_FCRTV    0x05F40  /* Flow Control Refresh Timer Value - RW */
+#define E1000_TXCW     0x00178  /* TX Configuration Word - RW */
+#define E1000_RXCW     0x00180  /* RX Configuration Word - RO */
+#define E1000_TBT      0x00448  /* TX Burst Timer - RW */
+#define E1000_AIT      0x00458  /* Adaptive Interframe Spacing Throttle - RW */
+#define E1000_EXTCNF_CTRL  0x00F00  /* Extended Configuration Control */
+#define E1000_EXTCNF_SIZE  0x00F08  /* Extended Configuration Size */
+#define E1000_PHY_CTRL     0x00F10  /* PHY Control Register in CSR */
+#define E1000_PBA      0x01000  /* Packet Buffer Allocation - RW */
+#define E1000_PBM      0x10000  /* Packet Buffer Memory - RW */
+#define E1000_PBS      0x01008  /* Packet Buffer Size - RW */
+#define E1000_FLASHT   0x01028  /* FLASH Timer Register */
+#define E1000_EEWR     0x0102C  /* EEPROM Write Register - RW */
+#define E1000_FLSWCTL  0x01030  /* FLASH control register */
+#define E1000_FLSWDATA 0x01034  /* FLASH data register */
+#define E1000_FLSWCNT  0x01038  /* FLASH Access Counter */
+#define E1000_FLOL     0x01050  /* FEEP Auto Load */
+#define E1000_ERT      0x02008  /* Early Rx Threshold - RW */
+#define E1000_FCRTH_A  0x00160  /* Alias to FCRTH */
+#define E1000_PSRCTL   0x02170  /* Packet Split Receive Control - RW */
+#define E1000_TXDMAC   0x03000  /* TX DMA Control - RW */
+#define E1000_KABGTXD  0x03004  /* AFE Band Gap Transmit Ref Data */
+#define E1000_POEMB    0x00F10  /* PHY OEM Bits Register - RW */
 #define E1000_RDTR1    0x02820  /* RX Delay Timer (1) - RW */
 #define E1000_RDBAL1   0x02900  /* RX Descriptor Base Address Low (1) - RW */
 #define E1000_RDBAH1   0x02904  /* RX Descriptor Base Address High (1) - RW */
@@ -80,13 +104,44 @@
 #define E1000_TIDV_A   0x00440  /* Alias to TIDV */
 #define E1000_TXDCTL   0x03828  /* TX Descriptor Control - RW */
 #define E1000_TADV     0x0382C  /* TX Interrupt Absolute Delay Val - RW */
+#define E1000_TSPMT    0x03830  /* TCP Segmentation PAD & Min Threshold - RW */
+#define E1000_TARC0    0x03840  /* TX Arbitration Count (0) */
+#define E1000_TARC1    0x03940  /* TX Arbitration Count (1) */
 #define E1000_TDBAL1   0x03900  /* TX Desc Base Address Low (1) - RW */
 #define E1000_TDBAH1   0x03904  /* TX Desc Base Address High (1) - RW */
 #define E1000_TDLEN1   0x03908  /* TX Desc Length (1) - RW */
 #define E1000_TDH1     0x03910  /* TX Desc Head (1) - RW */
 #define E1000_TDT1     0x03918  /* TX Desc Tail (1) - RW */
 #define E1000_TXDCTL1  0x03928  /* TX Descriptor Control (1) - RW */
+#define E1000_SEQEC    0x04038  /* Sequence Error Count - R/clr */
+#define E1000_CEXTERR  0x0403C  /* Carrier Extension Error Count - R/clr */
+#define E1000_TSCTFC   0x040FC  /* TCP Segmentation Context TX Fail - R/clr */
+#define E1000_ICRXATC  0x04108  /* Interrupt Cause Rx Absolute Timer Expire Count */
+#define E1000_ICTXPTC  0x0410C  /* Interrupt Cause Tx Packet Timer Expire Count */
+#define E1000_ICTXATC  0x04110  /* Interrupt Cause Tx Absolute Timer Expire Count */
+#define E1000_ICTXQEC  0x04118  /* Interrupt Cause Tx Queue Empty Count */
+#define E1000_ICTXQMTC 0x0411C  /* Interrupt Cause Tx Queue Minimum Threshold Count */
 #define E1000_ICRXOC   0x04124  /* Interrupt Cause Receiver Overrun Count */
+#define E1000_MFUTP01  0x05828  /* Management Flex UDP/TCP Ports 0/1 - RW */
+#define E1000_MFUTP23  0x05830  /* Management Flex UDP/TCP Ports 2/3 - RW */
+#define E1000_FFLT     0x05F00  /* Flexible Filter Length Table - RW Array */
+#define E1000_HOST_IF  0x08800  /* Host Interface */
+#define E1000_FFVT     0x09800  /* Flexible Filter Value Table - RW Array */
+
+#define E1000_KUMCTRLSTA 0x00034 /* MAC-PHY interface - RW */
+#define E1000_MDPHYA     0x0003C /* PHY address - RW */
+
+#define E1000_GCR2      0x05B64 /* 3GIO Control Register 2 */
+#define E1000_FFLT_DBG  0x05F04 /* Debug Register */
+#define E1000_HICR      0x08F00 /* Host Inteface Control */
+
+#define E1000_RXMTRL     0x0B634 /* Time sync Rx EtherType and Msg Type - RW */
+#define E1000_RXUDP      0x0B638 /* Time Sync Rx UDP Port - RW */
+#define E1000_RXCFGL     0x0B634 /* RX Ethertype and Message Type - RW*/
+
+#define E1000_CPUVEC    0x02C10 /* CPU Vector Register - RW */
+#define E1000_RSSIM     0x05864 /* RSS Interrupt Mask */
+#define E1000_RSSIR     0x05868 /* RSS Interrupt Request */
 
 #define E1000_RSS_QUEUE(reta, hash) ((E1000_RETA_VAL(reta, hash) & BIT(7)) >> 7)
 

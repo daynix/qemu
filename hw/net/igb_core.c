@@ -2309,10 +2309,7 @@ igb_mac_ims_read(IGBCore *core, int index)
     igb_mac_low##num##_read
 
 IGB_LOW_BITS_READ_FUNC(4);
-IGB_LOW_BITS_READ_FUNC(6);
-IGB_LOW_BITS_READ_FUNC(11);
 IGB_LOW_BITS_READ_FUNC(13);
-IGB_LOW_BITS_READ_FUNC(16);
 
 static uint32_t
 igb_mac_swsm_read(IGBCore *core, int index)
@@ -2452,16 +2449,6 @@ static uint32_t igb_get_status(IGBCore *core, int index)
     return status;
 }
 
-static uint32_t
-igb_get_tarc(IGBCore *core, int index)
-{
-    return core->mac[index] & ((BIT(11) - 1) |
-                                BIT(27)      |
-                                BIT(28)      |
-                                BIT(29)      |
-                                BIT(30));
-}
-
 static void
 igb_mac_writereg(IGBCore *core, int index, uint32_t val)
 {
@@ -2510,23 +2497,6 @@ igb_set_eerd(IGBCore *core, int index, uint32_t val)
                       (data << E1000_EERW_DATA_SHIFT);
 }
 
-static void
-igb_set_eewr(IGBCore *core, int index, uint32_t val)
-{
-    uint32_t addr = (val >> E1000_EERW_ADDR_SHIFT) & E1000_EERW_ADDR_MASK;
-    uint32_t data = (val >> E1000_EERW_DATA_SHIFT) & E1000_EERW_DATA_MASK;
-    uint32_t flags = 0;
-
-    if ((addr < IGB_EEPROM_SIZE) && (val & E1000_EERW_START)) {
-        core->eeprom[addr] = data;
-        flags = E1000_EERW_DONE;
-    }
-
-    core->mac[EERD] = flags                           |
-                      (addr << E1000_EERW_ADDR_SHIFT) |
-                      (data << E1000_EERW_DATA_SHIFT);
-}
-
 static void igb_set_eitr(IGBCore *core, int index, uint32_t val)
 {
     uint32_t interval = val & 0x7FFE;
@@ -2563,7 +2533,6 @@ igb_set_gcr(IGBCore *core, int index, uint32_t val)
 #define igb_getreg(x)    [x] = igb_mac_readreg
 typedef uint32_t (*readops)(IGBCore *, int);
 static const readops igb_macreg_readops[] = {
-    igb_getreg(PBA),
     igb_getreg(WUFC),
     igb_getreg(MANC),
     igb_getreg(TOTL),
@@ -2648,7 +2617,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(SRRCTL14),
     igb_getreg(SRRCTL15),
     igb_getreg(LATECOL),
-    igb_getreg(SEQEC),
     igb_getreg(XONTXC),
     igb_getreg(WUS),
     igb_getreg(GORCL),
@@ -2662,7 +2630,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(FCAH),
     igb_getreg(FCRTH),
     igb_getreg(FLOP),
-    igb_getreg(FLASHT),
     igb_getreg(RXSTMPH),
     igb_getreg(TXSTMPL),
     igb_getreg(TIMADJL),
@@ -2702,14 +2669,11 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(RJC),
     igb_getreg(IAM),
     igb_getreg(GSCL_2),
-    igb_getreg(FLSWDATA),
     igb_getreg(RXSATRH),
     igb_getreg(TIPG),
     igb_getreg(FLMNGCTL),
     igb_getreg(FLMNGCNT),
     igb_getreg(TSYNCTXCTL),
-    igb_getreg(EXTCNF_SIZE),
-    igb_getreg(EXTCNF_CTRL),
     igb_getreg(EEMNGDATA),
     igb_getreg(CTRL_EXT),
     igb_getreg(SYSTIMH),
@@ -2745,19 +2709,13 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(RNBC),
     igb_getreg(MGTPTC),
     igb_getreg(TIMINCA),
-    igb_getreg(RXCFGL),
-    igb_getreg(MFUTP01),
     igb_getreg(FACTPS),
     igb_getreg(GSCL_1),
     igb_getreg(GSCN_0),
-    igb_getreg(GCR2),
     igb_getreg(PBACLR),
     igb_getreg(FCTTV),
-    igb_getreg(EEWR),
-    igb_getreg(FLSWCTL),
     igb_getreg(RXSATRL),
     igb_getreg(SYSTIML),
-    igb_getreg(RXUDP),
     igb_getreg(TORL),
     igb_getreg(TDLEN0),
     igb_getreg(TDLEN1),
@@ -2778,7 +2736,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(MCC),
     igb_getreg(WUC),
     igb_getreg(EECD),
-    igb_getreg(MFUTP23),
     igb_getreg(FCRTV),
     igb_getreg(TXDCTL0),
     igb_getreg(TXDCTL1),
@@ -2954,13 +2911,11 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(TDBAH15),
     igb_getreg(SCC),
     igb_getreg(COLC),
-    igb_getreg(CEXTERR),
     igb_getreg(XOFFRXC),
     igb_getreg(IPAV),
     igb_getreg(GOTCL),
     igb_getreg(MGTPDC),
     igb_getreg(GCR),
-    igb_getreg(POEMB),
     igb_getreg(MFVAL),
     igb_getreg(FUNCTAG),
     igb_getreg(GSCL_4),
@@ -2968,7 +2923,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(MRQC),
     igb_getreg(FCT),
     igb_getreg(FLA),
-    igb_getreg(FLOL),
     igb_getreg(RXDCTL0),
     igb_getreg(RXDCTL1),
     igb_getreg(RXDCTL2),
@@ -2990,11 +2944,9 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(TIMADJH),
     igb_getreg(FCRTL),
     igb_getreg(XONRXC),
-    igb_getreg(TSCTFC),
     igb_getreg(RFCTL),
     igb_getreg(GSCN_1),
     igb_getreg(FCAL),
-    igb_getreg(FLSWCNT),
     igb_getreg(GPIE),
     igb_getreg(TXPBS),
     igb_getreg(RLPML),
@@ -3020,13 +2972,10 @@ static const readops igb_macreg_readops[] = {
     [TDFH]    = IGB_LOW_BITS_READ(13),
     [TDFHS]   = IGB_LOW_BITS_READ(13),
     [STATUS]  = igb_get_status,
-    [TARC0]   = igb_get_tarc,
-    [PBS]     = IGB_LOW_BITS_READ(6),
     [ICS]     = igb_mac_ics_read,
     /* 8.8.10: Reading the IMC register returns the value of the IMS register.
     */
     [IMC]     = igb_mac_ims_read,
-    [AIT]     = IGB_LOW_BITS_READ(16),
     [TORH]    = igb_mac_read_clr8,
     [GORCH]   = igb_mac_read_clr8,
     [PRC127]  = igb_mac_read_clr4,
@@ -3047,7 +2996,6 @@ static const readops igb_macreg_readops[] = {
     [TDFT]    = IGB_LOW_BITS_READ(13),
     [TDFTS]   = IGB_LOW_BITS_READ(13),
     [CTRL]    = igb_get_ctrl,
-    [TARC1]   = igb_get_tarc,
     [SWSM]    = igb_mac_swsm_read,
     [IMS]     = igb_mac_ims_read,
 
@@ -3061,11 +3009,8 @@ static const readops igb_macreg_readops[] = {
     [MTA ... MTA + 127]    = igb_mac_readreg,
     [VFTA ... VFTA + 127]  = igb_mac_readreg,
     [FFMT ... FFMT + 254]  = IGB_LOW_BITS_READ(4),
-    [FFVT ... FFVT + 254]  = igb_mac_readreg,
     [MDEF ... MDEF + 7]    = igb_mac_readreg,
-    [FFLT ... FFLT + 10]   = IGB_LOW_BITS_READ(11),
     [FTFT ... FTFT + 254]  = igb_mac_readreg,
-    [PBM ... PBM + 10239]  = igb_mac_readreg,
     [RETA ... RETA + 31]   = igb_mac_readreg,
     [RSSRK ... RSSRK + 9]  = igb_mac_readreg,
     [MAVTV0 ... MAVTV3]    = igb_mac_readreg,
@@ -3112,7 +3057,6 @@ enum { IGB_NREADOPS = ARRAY_SIZE(igb_macreg_readops) };
 #define igb_putreg(x)    [x] = igb_mac_writereg
 typedef void (*writeops)(IGBCore *, int, uint32_t);
 static const writeops igb_macreg_writeops[] = {
-    igb_putreg(PBA),
     igb_putreg(SWSM),
     igb_putreg(WUFC),
     igb_putreg(RDBAH0),
@@ -3171,7 +3115,6 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(RQDPC0),
     igb_putreg(FCAL),
     igb_putreg(FCRUC),
-    igb_putreg(AIT),
     igb_putreg(TDFH),
     igb_putreg(TDFT),
     igb_putreg(TDFHS),
@@ -3203,17 +3146,9 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(TDBAH15),
     igb_putreg(TIMINCA),
     igb_putreg(IAM),
-    igb_putreg(TARC0),
-    igb_putreg(TARC1),
-    igb_putreg(FLSWDATA),
-    igb_putreg(POEMB),
-    igb_putreg(PBS),
-    igb_putreg(MFUTP01),
-    igb_putreg(MFUTP23),
     igb_putreg(MANC),
     igb_putreg(MANC2H),
     igb_putreg(MFVAL),
-    igb_putreg(EXTCNF_CTRL),
     igb_putreg(FACTPS),
     igb_putreg(FUNCTAG),
     igb_putreg(GSCL_1),
@@ -3224,12 +3159,8 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(GSCN_1),
     igb_putreg(GSCN_2),
     igb_putreg(GSCN_3),
-    igb_putreg(GCR2),
     igb_putreg(MRQC),
     igb_putreg(FLOP),
-    igb_putreg(FLOL),
-    igb_putreg(FLSWCTL),
-    igb_putreg(FLSWCNT),
     igb_putreg(FLA),
     igb_putreg(TXDCTL0),
     igb_putreg(TXDCTL1),
@@ -3274,11 +3205,8 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(SYSTIMH),
     igb_putreg(TIMADJL),
     igb_putreg(TIMADJH),
-    igb_putreg(RXUDP),
-    igb_putreg(RXCFGL),
     igb_putreg(TSYNCRXCTL),
     igb_putreg(TSYNCTXCTL),
-    igb_putreg(EXTCNF_SIZE),
     igb_putreg(EEMNGCTL),
     igb_putreg(GPIE),
     igb_putreg(TXPBS),
@@ -3433,8 +3361,6 @@ static const writeops igb_macreg_writeops[] = {
     [FCRTV]    = igb_set_16bit,
     [FCRTH]    = igb_set_fcrth,
     [FCRTL]    = igb_set_fcrtl,
-    [FLASHT]   = igb_set_16bit,
-    [EEWR]     = igb_set_eewr,
     [CTRL_DUP] = igb_set_ctrl,
     [RFCTL]    = igb_set_rfctl,
 
@@ -3448,10 +3374,7 @@ static const writeops igb_macreg_writeops[] = {
     [MTA ... MTA + 127]      = igb_mac_writereg,
     [VFTA ... VFTA + 127]    = igb_mac_writereg,
     [FFMT ... FFMT + 254]    = igb_mac_writereg,
-    [FFVT ... FFVT + 254]    = igb_mac_writereg,
-    [PBM ... PBM + 10239]    = igb_mac_writereg,
     [MDEF ... MDEF + 7]      = igb_mac_writereg,
-    [FFLT ... FFLT + 10]     = igb_mac_writereg,
     [FTFT ... FTFT + 254]    = igb_mac_writereg,
     [RETA ... RETA + 31]     = igb_mac_writereg,
     [RSSRK ... RSSRK + 9]    = igb_mac_writereg,
@@ -3553,7 +3476,7 @@ enum { MAC_ACCESS_PARTIAL = 1 };
  * because all of the offsets are even. */
 static const uint16_t mac_reg_access[E1000E_MAC_SIZE] = {
     /* Alias index offsets */
-    [FCRTL_A] = 0x07fe, [FCRTH_A] = 0x0802,
+    [FCRTL_A] = 0x07fe,
     [RDFH_A]  = 0xe904, [RDFT_A]  = 0xe904,
     [TDFH_A]  = 0xed00, [TDFT_A]  = 0xed00,
     [RA_A ... RA_A + 31]      = 0x14f0,
@@ -3639,7 +3562,7 @@ static const uint16_t mac_reg_access[E1000E_MAC_SIZE] = {
     [TDFH]  = MAC_ACCESS_PARTIAL,    [TDFT]  = MAC_ACCESS_PARTIAL,
     [TDFHS] = MAC_ACCESS_PARTIAL,    [TDFTS] = MAC_ACCESS_PARTIAL,
     [TDFPC] = MAC_ACCESS_PARTIAL,    [EECD]  = MAC_ACCESS_PARTIAL,
-    [PBM]   = MAC_ACCESS_PARTIAL,    [FLA]   = MAC_ACCESS_PARTIAL,
+    [FLA]   = MAC_ACCESS_PARTIAL,
     [FCAL]  = MAC_ACCESS_PARTIAL,    [FCAH]  = MAC_ACCESS_PARTIAL,
     [FCT]   = MAC_ACCESS_PARTIAL,    [FCTTV] = MAC_ACCESS_PARTIAL,
     [FCRTV] = MAC_ACCESS_PARTIAL,    [FCRTL] = MAC_ACCESS_PARTIAL,
@@ -3798,14 +3721,9 @@ igb_phy_reg_init[E1000E_PHY_PAGE_SIZE] = {
 };
 
 static const uint32_t igb_mac_reg_init[] = {
-    [PBA]           = 0x00140014,
     [LEDCTL]        = BIT(1) | BIT(8) | BIT(9) | BIT(15) | BIT(17) | BIT(18),
-    [EXTCNF_CTRL]   = BIT(3),
     [EEMNGCTL]      = E1000_EEPROM_CFG_DONE | E1000_EEPROM_CFG_DONE_PORT_1 |
                       BIT(31),
-    [FLASHT]        = 0x2,
-    [FLSWCTL]       = BIT(30) | BIT(31),
-    [FLOL]          = BIT(0),
     [RXDCTL0]       = BIT(25) | BIT(16),
     [RXDCTL1]       = BIT(25) | BIT(16),
     [RXDCTL2]       = BIT(25) | BIT(16),
@@ -3823,16 +3741,11 @@ static const uint32_t igb_mac_reg_init[] = {
     [RXDCTL14]      = BIT(25) | BIT(16),
     [RXDCTL15]      = BIT(25) | BIT(16),
     [TIPG]          = 0x8 | (0x4 << 10) | (0x6 << 20),
-    [RXCFGL]        = 0x88F7,
-    [RXUDP]         = 0x319,
     [CTRL]          = E1000_CTRL_FD | E1000_CTRL_LRST | E1000_CTRL_SPD_1000 |
                       E1000_CTRL_ADVD3WUC,
     [STATUS]        = E1000_STATUS_PHYRA | E1000_STATUS_GIO_MASTER_ENABLE,
-    [TARC0]         = 0x3 | E1000_TARC_ENABLE,
-    [TARC1]         = 0x3 | E1000_TARC_ENABLE,
     [EECD]          = E1000_EECD_AUTO_RD | E1000_EECD_PRES,
     [EERD]          = E1000_EERW_DONE,
-    [EEWR]          = E1000_EERW_DONE,
     [GCR]           = E1000_L0S_ADJUST |
                       E1000_L1_ENTRY_LATENCY_MSB |
                       E1000_L1_ENTRY_LATENCY_LSB,
@@ -3840,8 +3753,6 @@ static const uint32_t igb_mac_reg_init[] = {
     [TDFT]          = 0x600,
     [TDFHS]         = 0x600,
     [TDFTS]         = 0x600,
-    [POEMB]         = 0x30D,
-    [PBS]           = 0x028,
     [MANC]          = E1000_MANC_DIS_IP_CHK_ARP,
     [FACTPS]        = E1000_FACTPS_LAN0_ON | 0x20000000,
     [SWSM]          = 0,
