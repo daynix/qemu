@@ -1053,11 +1053,11 @@ igb_verify_csum_in_sw(IGBCore *core, struct NetRxPkt *pkt,
 static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
     bool is_eop, const E1000E_RSSInfo *rss_info,
     uint16_t *pkt_info, uint16_t *hdr_info,
-    uint16_t *ip_id, uint16_t *csum,
+    uint32_t *rss, uint16_t *ip_id, uint16_t *csum,
     uint32_t *status, uint16_t *vlan)
 {
     bool isip4, isip6, istcp, isudp;
-    //uint32_t pkt_type;
+    uint32_t pkt_type;
 
     *status = E1000_RXD_STAT_DD;
 
@@ -1072,7 +1072,7 @@ static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
     net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
     trace_e1000e_rx_metadata_protocols(isip4, isip6, isudp, istcp);
 
-    /*if (rss_info->enabled) {
+    if (rss_info->enabled) {
         *pkt_info = rss_info->type;
     }
 
@@ -1088,9 +1088,8 @@ static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
     }
 
     trace_e1000e_rx_metadata_pkt_type(pkt_type);
-    *pkt_info |= (pkt_type << 4);*/
+    *pkt_info |= (pkt_type << 4);
 
-    *pkt_info = 0;
     *hdr_info = 0;
 
     /* VLAN state */
@@ -1101,22 +1100,21 @@ static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
     }
 
     /* Packet parsing results */
-    /*if ((core->mac[RXCSUM] & E1000_RXCSUM_PCSD) != 0) {
+    if ((core->mac[RXCSUM] & E1000_RXCSUM_PCSD) != 0) {
         if (rss_info->enabled) {
             *rss = cpu_to_le32(rss_info->hash);
-            *mrq = cpu_to_le32(rss_info->type | (rss_info->queue << 8));
-            trace_e1000e_rx_metadata_rss(*rss, *mrq);
+            trace_igb_rx_metadata_rss(*rss);
         }
-    } else*/ if (isip4) {
-            /**status |= E1000_RXD_STAT_IPIDV;*/
-            *ip_id = cpu_to_le16(net_rx_pkt_get_ip_id(pkt));
-            trace_e1000e_rx_metadata_ip_id(*ip_id);
+    } else if (isip4) {
+        *status |= E1000_RXD_STAT_IPIDV;
+        *ip_id = cpu_to_le16(net_rx_pkt_get_ip_id(pkt));
+        trace_e1000e_rx_metadata_ip_id(*ip_id);
     }
 
-    /*if (istcp && net_rx_pkt_is_tcp_ack(pkt)) {
+    if (istcp && net_rx_pkt_is_tcp_ack(pkt)) {
         *status |= E1000_RXD_STAT_ACK;
         trace_e1000e_rx_metadata_ack();
-    }*/
+    }
 
     /* RX CSO information */
     if (isip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_XSUM_DIS)) {
@@ -1124,11 +1122,11 @@ static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
         goto func_exit;
     }
 
-    /*if (!net_rx_pkt_has_virt_hdr(pkt)) {
+    if (!net_rx_pkt_has_virt_hdr(pkt)) {
         trace_e1000e_rx_metadata_no_virthdr();
         igb_verify_csum_in_sw(core, pkt, status, istcp, isudp);
         goto func_exit;
-    }*/
+    }
 
     if (igb_rx_l3_cso_enabled(core)) {
         *status |= isip4 ? E1000_RXD_STAT_IPCS : 0;
@@ -1299,6 +1297,7 @@ igb_write_ext_rx_descr(IGBCore *core, uint8_t *desc,
     igb_build_rx_metadata(core, pkt, pkt != NULL, rss_info,
         &d->wb.lower.lo_dword.pkt_info,
         &d->wb.lower.lo_dword.hdr_info,
+        &d->wb.lower.hi_dword.rss,
         &d->wb.lower.hi_dword.csum_ip.ip_id,
         &d->wb.lower.hi_dword.csum_ip.csum,
         &d->wb.upper.status_error,

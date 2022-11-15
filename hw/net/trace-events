@@ -304,6 +304,8 @@ igb_mac_set_permanent(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4
 igb_rx_desc_buff_size(uint32_t b) "buffer size: %u"
 igb_rx_desc_buff_write(uint64_t addr, uint16_t offset, const void* source, uint32_t len) "addr: 0x%"PRIx64", offset: %u, from: %p, length: %u"
 
+igb_rx_metadata_rss(uint32_t rss) "RSS data: %X"
+
 igb_irq_icr_read(uint32_t icr) "Current ICR: 0x%x"
 igb_irq_icr_clear_gpie_nsicr(void) "Clearing ICR on read due to GPIE.NSICR enabled"
 igb_irq_icr_clear_zero_ims(void) "Clearing ICR on read due to zero IMS"
