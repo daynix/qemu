@@ -51,8 +51,6 @@
 
 #include "trace.h"
 
-#define E1000E_MIN_XITR     (500) /* No more then 7813 interrupts per
-                                     second according to spec 10.2.4.2 */
 #define E1000E_MAX_TX_FRAGS (64)
 
 static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr);
