@@ -1888,8 +1888,6 @@ igb_set_interrupt_cause(IGBCore *core, uint32_t val)
 {
     trace_e1000e_irq_set_cause_entry(val, core->mac[ICR]);
 
-    // TODO: Does the IGB have Interrupts Delay?
-
     val |= igb_intmgr_collect_delayed_causes(core);
     core->mac[ICR] |= val;
 
