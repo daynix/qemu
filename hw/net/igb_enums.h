@@ -29,7 +29,7 @@
 
 #define defreg(x) x = (E1000_##x >> 2)
 #define defreg_indexed(x, i) x##i = (E1000_##x(i) >> 2)
-#define defreg_indexeda(x, i) x##i##_ALT = (E1000_##x##_ALT(i) >> 2)
+#define defreg_indexeda(x, i) x##i##_A = (E1000_##x##_A(i) >> 2)
 
 #define defregd(x) defreg_indexed(x, 0),  defreg_indexed(x, 1),   \
                    defreg_indexed(x, 2),  defreg_indexed(x, 3),   \
@@ -140,7 +140,7 @@ enum {
 
     defreg(IVAR_MISC),  defreg(VTIVAR), defreg(VTIVAR_MISC),
 
-    defreg(MTA_ALT),
+    defreg(MTA_A),
 };
 
 #endif

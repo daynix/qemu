@@ -559,79 +559,79 @@ enum e1000_state_t {
 /* Receive Registers */
 
 /* RX Descriptor Base Low; RW */
-#define E1000_RDBAL(_n)      (0x0C000 + (0x40  * (_n)))
-#define E1000_RDBAL_ALT(_n)  (0x02800 + (0x100 * (_n)))
+#define E1000_RDBAL(_n)    (0x0C000 + (0x40  * (_n)))
+#define E1000_RDBAL_A(_n)  (0x02800 + (0x100 * (_n)))
 
 /* RX Descriptor Base High; RW */
-#define E1000_RDBAH(_n)      (0x0C004 + (0x40  * (_n)))
-#define E1000_RDBAH_ALT(_n)  (0x02804 + (0x100 * (_n)))
+#define E1000_RDBAH(_n)    (0x0C004 + (0x40  * (_n)))
+#define E1000_RDBAH_A(_n)  (0x02804 + (0x100 * (_n)))
 
 /* RX Descriptor Ring Length; RW */
-#define E1000_RDLEN(_n)      (0x0C008 + (0x40  * (_n)))
-#define E1000_RDLEN_ALT(_n)  (0x02808 + (0x100 * (_n)))
+#define E1000_RDLEN(_n)    (0x0C008 + (0x40  * (_n)))
+#define E1000_RDLEN_A(_n)  (0x02808 + (0x100 * (_n)))
 
 /* Split and Replication Receive Control; RW */
-#define E1000_SRRCTL(_n)     (0x0C00C + (0x40  * (_n)))
-#define E1000_SRRCTL_ALT(_n) (0x0280C + (0x100 * (_n)))
+#define E1000_SRRCTL(_n)   (0x0C00C + (0x40  * (_n)))
+#define E1000_SRRCTL_A(_n) (0x0280C + (0x100 * (_n)))
 
 /* RX Descriptor Head; RW */
-#define E1000_RDH(_n)        (0x0C010 + (0x40  * (_n)))
-#define E1000_RDH_ALT(_n)    (0x02810 + (0x100 * (_n)))
+#define E1000_RDH(_n)      (0x0C010 + (0x40  * (_n)))
+#define E1000_RDH_A(_n)    (0x02810 + (0x100 * (_n)))
 
 /* RX DCA Control; RW */
-#define E1000_RXCTL(_n)      (0x0C014 + (0x40  * (_n)))
-#define E1000_RXCTL_ALT(_n)  (0x02814 + (0x100 * (_n)))
+#define E1000_RXCTL(_n)    (0x0C014 + (0x40  * (_n)))
+#define E1000_RXCTL_A(_n)  (0x02814 + (0x100 * (_n)))
 
 /* RX Descriptor Tail; RW */
-#define E1000_RDT(_n)        (0x0C018 + (0x40  * (_n)))
-#define E1000_RDT_ALT(_n)    (0x02818 + (0x100 * (_n)))
+#define E1000_RDT(_n)      (0x0C018 + (0x40  * (_n)))
+#define E1000_RDT_A(_n)    (0x02818 + (0x100 * (_n)))
 
 /* RX Descriptor Control; RW */
-#define E1000_RXDCTL(_n)     (0x0C028 + (0x40  * (_n)))
-#define E1000_RXDCTL_ALT(_n) (0x02828 + (0x100 * (_n)))
+#define E1000_RXDCTL(_n)   (0x0C028 + (0x40  * (_n)))
+#define E1000_RXDCTL_A(_n) (0x02828 + (0x100 * (_n)))
 
 /* RX Queue Drop Packet Count; RC */
-#define E1000_RQDPC_ALT(_n)  (0x02830 + (0x100 * (_n)))
+#define E1000_RQDPC_A(_n)  (0x02830 + (0x100 * (_n)))
 
 /* Transmit Registers */
 
 /* TX Descriptor Base Low; RW */
-#define E1000_TDBAL(_n)      (0x0E000 + (0x40  * (_n)))
-#define E1000_TDBAL_ALT(_n)  (0x03800 + (0x100 * (_n)))
+#define E1000_TDBAL(_n)    (0x0E000 + (0x40  * (_n)))
+#define E1000_TDBAL_A(_n)  (0x03800 + (0x100 * (_n)))
 
 /* TX Descriptor Base High; RW */
-#define E1000_TDBAH(_n)      (0x0E004 + (0x40  * (_n)))
-#define E1000_TDBAH_ALT(_n)  (0x03804 + (0x100 * (_n)))
+#define E1000_TDBAH(_n)    (0x0E004 + (0x40  * (_n)))
+#define E1000_TDBAH_A(_n)  (0x03804 + (0x100 * (_n)))
 
 /* TX Descriptor Ring Length; RW */
-#define E1000_TDLEN(_n)      (0x0E008 + (0x40  * (_n)))
-#define E1000_TDLEN_ALT(_n)  (0x03808 + (0x100 * (_n)))
+#define E1000_TDLEN(_n)    (0x0E008 + (0x40  * (_n)))
+#define E1000_TDLEN_A(_n)  (0x03808 + (0x100 * (_n)))
 
 /* TX Descriptor Head; RW */
-#define E1000_TDH(_n)        (0x0E010 + (0x40  * (_n)))
-#define E1000_TDH_ALT(_n)    (0x03810 + (0x100 * (_n)))
+#define E1000_TDH(_n)      (0x0E010 + (0x40  * (_n)))
+#define E1000_TDH_A(_n)    (0x03810 + (0x100 * (_n)))
 
 /* TX DCA Control; RW */
-#define E1000_TXCTL(_n)      (0x0E014 + (0x40  * (_n)))
-#define E1000_TXCTL_ALT(_n)  (0x03814 + (0x100 * (_n)))
+#define E1000_TXCTL(_n)    (0x0E014 + (0x40  * (_n)))
+#define E1000_TXCTL_A(_n)  (0x03814 + (0x100 * (_n)))
 
 /* TX Descriptor Tail; RW */
-#define E1000_TDT(_n)        (0x0E018 + (0x40  * (_n)))
-#define E1000_TDT_ALT(_n)    (0x03818 + (0x100 * (_n)))
+#define E1000_TDT(_n)      (0x0E018 + (0x40  * (_n)))
+#define E1000_TDT_A(_n)    (0x03818 + (0x100 * (_n)))
 
 /* TX Descriptor Control; RW */
-#define E1000_TXDCTL(_n)     (0x0E028 + (0x40  * (_n)))
-#define E1000_TXDCTL_ALT(_n) (0x03828 + (0x100 * (_n)))
+#define E1000_TXDCTL(_n)   (0x0E028 + (0x40  * (_n)))
+#define E1000_TXDCTL_A(_n) (0x03828 + (0x100 * (_n)))
 
 /* TX Descriptor Completion Write–Back Address Low; RW */
-#define E1000_TDWBAL(_n)     (0x0E038 + (0x40  * (_n)))
-#define E1000_TDWBAL_ALT(_n) (0x03838 + (0x100 * (_n)))
+#define E1000_TDWBAL(_n)   (0x0E038 + (0x40  * (_n)))
+#define E1000_TDWBAL_A(_n) (0x03838 + (0x100 * (_n)))
 
 /* TX Descriptor Completion Write–Back Address High; RW */
-#define E1000_TDWBAH(_n)     (0x0E03C + (0x40  * (_n)))
-#define E1000_TDWBAH_ALT(_n) (0x0383C + (0x100 * (_n)))
+#define E1000_TDWBAH(_n)   (0x0E03C + (0x40  * (_n)))
+#define E1000_TDWBAH_A(_n) (0x0383C + (0x100 * (_n)))
 
-#define E1000_MTA_ALT        0x0200
+#define E1000_MTA_A        0x0200
 
 #define E1000_XDBAL_MASK (~(BIT(5) - 1)) /* TDBAL and RDBAL Registers Mask */
 

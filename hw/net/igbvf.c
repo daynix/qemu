@@ -87,41 +87,41 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
             return E1000_V2PMAILBOX(vfn);
         case E1000_VMBMEM(0) ... E1000_VMBMEM(0) + 0x3F:
             return addr + vfn * 0x40;
-        case E1000_RDBAL_ALT(0):
+        case E1000_RDBAL_A(0):
             return E1000_RDBAL(vfn);
-        case E1000_RDBAH_ALT(0):
+        case E1000_RDBAH_A(0):
             return E1000_RDBAH(vfn);
-        case E1000_RDLEN_ALT(0):
+        case E1000_RDLEN_A(0):
             return E1000_RDLEN(vfn);
-        case E1000_SRRCTL_ALT(0):
+        case E1000_SRRCTL_A(0):
             return E1000_SRRCTL(vfn);
-        case E1000_RDH_ALT(0):
+        case E1000_RDH_A(0):
             return E1000_RDH(vfn);
-        case E1000_RXCTL_ALT(0):
+        case E1000_RXCTL_A(0):
             return E1000_RXCTL(vfn);
-        case E1000_RDT_ALT(0):
+        case E1000_RDT_A(0):
             return E1000_RDT(vfn);
-        case E1000_RXDCTL_ALT(0):
+        case E1000_RXDCTL_A(0):
             return E1000_RXDCTL(vfn);
-        case E1000_RQDPC_ALT(0):
+        case E1000_RQDPC_A(0):
             return E1000_RQDPC(vfn);
-        case E1000_TDBAL_ALT(0):
+        case E1000_TDBAL_A(0):
             return E1000_TDBAL(vfn);
-        case E1000_TDBAH_ALT(0):
+        case E1000_TDBAH_A(0):
             return E1000_TDBAH(vfn);
-        case E1000_TDLEN_ALT(0):
+        case E1000_TDLEN_A(0):
             return E1000_TDLEN(vfn);
-        case E1000_TDH_ALT(0):
+        case E1000_TDH_A(0):
             return E1000_TDH(vfn);
-        case E1000_TXCTL_ALT(0):
+        case E1000_TXCTL_A(0):
             return E1000_TXCTL(vfn);
-        case E1000_TDT_ALT(0):
+        case E1000_TDT_A(0):
             return E1000_TDT(vfn);
-        case E1000_TXDCTL_ALT(0):
+        case E1000_TXDCTL_A(0):
             return E1000_TXDCTL(vfn);
-        case E1000_TDWBAL_ALT(0):
+        case E1000_TDWBAL_A(0):
             return E1000_TDWBAL(vfn);
-        case E1000_TDWBAH_ALT(0):
+        case E1000_TDWBAH_A(0):
             return E1000_TDWBAH(vfn);
         case E1000_VFGPRC:
             return E1000_PVFGPRC(vfn);
