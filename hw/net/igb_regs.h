@@ -343,6 +343,31 @@ enum e1000_state_t {
 
 /* from igb/e1000_82575.h */
 
+/* Additional Receive Descriptor Control definitions */
+#define E1000_RXDCTL_QUEUE_ENABLE  0x02000000 /* Enable specific Rx Queue */
+
+/* Direct Cache Access (DCA) definitions */
+#define E1000_DCA_CTRL_DCA_MODE_DISABLE 0x01 /* DCA Disable */
+#define E1000_DCA_CTRL_DCA_MODE_CB2     0x02 /* DCA Mode CB2 */
+
+#define E1000_DCA_RXCTRL_CPUID_MASK 0x0000001F /* Rx CPUID Mask */
+#define E1000_DCA_RXCTRL_DESC_DCA_EN BIT(5) /* DCA Rx Desc enable */
+#define E1000_DCA_RXCTRL_HEAD_DCA_EN BIT(6) /* DCA Rx Desc header enable */
+#define E1000_DCA_RXCTRL_DATA_DCA_EN BIT(7) /* DCA Rx Desc payload enable */
+#define E1000_DCA_RXCTRL_DESC_RRO_EN BIT(9) /* DCA Rx rd Desc Relax Order */
+
+#define E1000_DCA_TXCTRL_CPUID_MASK 0x0000001F /* Tx CPUID Mask */
+#define E1000_DCA_TXCTRL_DESC_DCA_EN BIT(5) /* DCA Tx Desc enable */
+#define E1000_DCA_TXCTRL_DESC_RRO_EN BIT(9) /* Tx rd Desc Relax Order */
+#define E1000_DCA_TXCTRL_TX_WB_RO_EN BIT(11) /* Tx Desc writeback RO bit */
+#define E1000_DCA_TXCTRL_DATA_RRO_EN BIT(13) /* Tx rd data Relax Order */
+
+/* Additional DCA related definitions, note change in position of CPUID */
+#define E1000_DCA_TXCTRL_CPUID_MASK_82576 0xFF000000 /* Tx CPUID Mask */
+#define E1000_DCA_RXCTRL_CPUID_MASK_82576 0xFF000000 /* Rx CPUID Mask */
+#define E1000_DCA_TXCTRL_CPUID_SHIFT 24 /* Tx CPUID now in the last byte */
+#define E1000_DCA_RXCTRL_CPUID_SHIFT 24 /* Rx CPUID now in the last byte */
+
 /* Per VM Offload register setup */
 #define E1000_VMOLR_RLPML_MASK 0x00003FFF /* Long Packet Maximum Length mask */
 #define E1000_VMOLR_LPE        0x00010000 /* Accept Long packet */
@@ -355,6 +380,32 @@ enum e1000_state_t {
 #define E1000_VMOLR_STRVLAN    0x40000000 /* Vlan stripping enable */
 #define E1000_VMOLR_STRCRC     0x80000000 /* CRC stripping enable */
 
+#define E1000_DVMOLR_HIDEVLAN  0x20000000 /* Hide vlan enable */
+#define E1000_DVMOLR_STRVLAN   0x40000000 /* Vlan stripping enable */
+#define E1000_DVMOLR_STRCRC    0x80000000 /* CRC stripping enable */
+
+#define E1000_VLVF_ARRAY_SIZE     32
+#define E1000_VLVF_VLANID_MASK    0x00000FFF
+#define E1000_VLVF_POOLSEL_SHIFT  12
+#define E1000_VLVF_POOLSEL_MASK   (0xFF << E1000_VLVF_POOLSEL_SHIFT)
+#define E1000_VLVF_LVLAN          0x00100000
+#define E1000_VLVF_VLANID_ENABLE  0x80000000
+
+#define E1000_VMVIR_VLANA_DEFAULT      0x40000000 /* Always use default VLAN */
+#define E1000_VMVIR_VLANA_NEVER        0x80000000 /* Never insert VLAN tag */
+
+#define E1000_IOVCTL 0x05BBC
+#define E1000_IOVCTL_REUSE_VFQ 0x00000001
+
+#define E1000_RPLOLR_STRVLAN   0x40000000
+#define E1000_RPLOLR_STRCRC    0x80000000
+
+#define E1000_DTXCTL_8023LL     0x0004
+#define E1000_DTXCTL_VLAN_ADDED 0x0008
+#define E1000_DTXCTL_OOS_ENABLE 0x0010
+#define E1000_DTXCTL_MDP_EN     0x0020
+#define E1000_DTXCTL_SPOOF_INT  0x0040
+
 /* from igb/e1000_defines.h */
 
 #define E1000_IVAR_VALID     0x80
@@ -362,6 +413,19 @@ enum e1000_state_t {
 #define E1000_GPIE_MSIX_MODE 0x00000010
 #define E1000_GPIE_EIAME     0x40000000
 #define E1000_GPIE_PBA       0x80000000
+
+/* Transmit Control */
+#define E1000_TCTL_EN     0x00000002    /* enable tx */
+#define E1000_TCTL_PSP    0x00000008    /* pad short packets */
+#define E1000_TCTL_CT     0x00000ff0    /* collision threshold */
+#define E1000_TCTL_COLD   0x003ff000    /* collision distance */
+#define E1000_TCTL_RTLC   0x01000000    /* Re-transmit on late collision */
+
+/* Collision related configuration parameters */
+#define E1000_COLLISION_THRESHOLD       15
+#define E1000_CT_SHIFT                  4
+#define E1000_COLLISION_DISTANCE        63
+#define E1000_COLD_SHIFT                12
 
 #define E1000_RAH_POOL_MASK 0x03FC0000
 #define E1000_RAH_POOL_1 0x00040000
@@ -384,6 +448,12 @@ enum e1000_state_t {
 #define E1000_EICR_TX_QUEUE2    0x00000400 /* Tx Queue 2 Interrupt */
 #define E1000_EICR_TX_QUEUE3    0x00000800 /* Tx Queue 3 Interrupt */
 #define E1000_EICR_OTHER        0x80000000 /* Interrupt Cause Active */
+
+/* PCI Express Control */
+#define E1000_GCR_CMPL_TMOUT_MASK       0x0000F000
+#define E1000_GCR_CMPL_TMOUT_10ms       0x00001000
+#define E1000_GCR_CMPL_TMOUT_RESEND     0x00010000
+#define E1000_GCR_CAP_VER2              0x00040000
 
 #define IGP03E1000_E_PHY_ID 0x02A80390
 

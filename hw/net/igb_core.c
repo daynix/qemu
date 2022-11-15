@@ -3721,72 +3721,100 @@ igb_phy_reg_init[E1000E_PHY_PAGE_SIZE] = {
 };
 
 static const uint32_t igb_mac_reg_init[] = {
-    [LEDCTL]        = BIT(1) | BIT(8) | BIT(9) | BIT(15) | BIT(17) | BIT(18),
-    [EEMNGCTL]      = E1000_EEPROM_CFG_DONE | E1000_EEPROM_CFG_DONE_PORT_1 |
-                      BIT(31),
-    [RXDCTL0]       = BIT(25) | BIT(16),
-    [RXDCTL1]       = BIT(25) | BIT(16),
-    [RXDCTL2]       = BIT(25) | BIT(16),
-    [RXDCTL3]       = BIT(25) | BIT(16),
-    [RXDCTL4]       = BIT(25) | BIT(16),
-    [RXDCTL5]       = BIT(25) | BIT(16),
-    [RXDCTL6]       = BIT(25) | BIT(16),
-    [RXDCTL7]       = BIT(25) | BIT(16),
-    [RXDCTL8]       = BIT(25) | BIT(16),
-    [RXDCTL9]       = BIT(25) | BIT(16),
-    [RXDCTL10]      = BIT(25) | BIT(16),
-    [RXDCTL11]      = BIT(25) | BIT(16),
-    [RXDCTL12]      = BIT(25) | BIT(16),
-    [RXDCTL13]      = BIT(25) | BIT(16),
-    [RXDCTL14]      = BIT(25) | BIT(16),
-    [RXDCTL15]      = BIT(25) | BIT(16),
-    [TIPG]          = 0x8 | (0x4 << 10) | (0x6 << 20),
+    [LEDCTL]        = 2 | (3 << 8) | BIT(15) | (6 << 16) | (7 << 24),
+    [EEMNGCTL]      = BIT(31),
+    [RXDCTL0]       = E1000_RXDCTL_QUEUE_ENABLE | (1 << 16),
+    [RXDCTL1]       = 1 << 16,
+    [RXDCTL2]       = 1 << 16,
+    [RXDCTL3]       = 1 << 16,
+    [RXDCTL4]       = 1 << 16,
+    [RXDCTL5]       = 1 << 16,
+    [RXDCTL6]       = 1 << 16,
+    [RXDCTL7]       = 1 << 16,
+    [RXDCTL8]       = 1 << 16,
+    [RXDCTL9]       = 1 << 16,
+    [RXDCTL10]      = 1 << 16,
+    [RXDCTL11]      = 1 << 16,
+    [RXDCTL12]      = 1 << 16,
+    [RXDCTL13]      = 1 << 16,
+    [RXDCTL14]      = 1 << 16,
+    [RXDCTL15]      = 1 << 16,
+    [TIPG]          = 0x08 | (0x04 << 10) | (0x06 << 20),
     [CTRL]          = E1000_CTRL_FD | E1000_CTRL_LRST | E1000_CTRL_SPD_1000 |
                       E1000_CTRL_ADVD3WUC,
-    [STATUS]        = E1000_STATUS_PHYRA | E1000_STATUS_GIO_MASTER_ENABLE,
-    [EECD]          = E1000_EECD_AUTO_RD | E1000_EECD_PRES,
-    [EERD]          = E1000_EERW_DONE,
+    [STATUS]        = E1000_STATUS_PHYRA | E1000_STATUS_GIO_MASTER_ENABLE |
+                      BIT(31),
+    [EECD]          = E1000_EECD_FWE_DIS | E1000_EECD_PRES |
+                      (2 << E1000_EECD_SIZE_EX_SHIFT),
     [GCR]           = E1000_L0S_ADJUST |
+                      E1000_GCR_CMPL_TMOUT_RESEND |
+                      E1000_GCR_CAP_VER2 |
                       E1000_L1_ENTRY_LATENCY_MSB |
                       E1000_L1_ENTRY_LATENCY_LSB,
-    [TDFH]          = 0x600,
-    [TDFT]          = 0x600,
-    [TDFHS]         = 0x600,
-    [TDFTS]         = 0x600,
-    [MANC]          = E1000_MANC_DIS_IP_CHK_ARP,
-    [FACTPS]        = E1000_FACTPS_LAN0_ON | 0x20000000,
-    [SWSM]          = 0,
     [RXCSUM]        = E1000_RXCSUM_IPOFLD | E1000_RXCSUM_TUOFLD,
     [TXPBS]         = 0x28,
     [RXPBS]         = 0x40,
-    [TCTL]          = (0x1 << 3) | (0xF << 4) | (0x40 << 12) | (0x1 << 26) | (0xA << 28),
+    [TCTL]          = E1000_TCTL_PSP | (0xF << E1000_CT_SHIFT) |
+                      (0x40 << E1000_COLD_SHIFT) | (0x1 << 26) | (0xA << 28),
     [TCTL_EXT]      = 0x40 | (0x42 << 10),
-    [DTXCTL]        = (0x1 << 2) | (0x1 << 6),
-    [VET]           = 0x81008100,
+    [DTXCTL]        = E1000_DTXCTL_8023LL | E1000_DTXCTL_SPOOF_INT,
+    [VET]           = ETH_P_VLAN | (ETH_P_VLAN << 16),
 
-    [V2PMAILBOX0 ... V2PMAILBOX0 + 7] = BIT(6),
+    [V2PMAILBOX0 ... V2PMAILBOX0 + 7] = E1000_V2PMAILBOX_RSTI,
     [MBVFIMR]       = 0xFF,
     [VFRE]          = 0xFF,
     [VFTE]          = 0xFF,
-    [VMOLR0 ... VMOLR0 + 7] = 0x80002600,
-    [RPLOLR]        = 0x80000000,
+    [VMOLR0 ... VMOLR0 + 7] = 0x2600 | E1000_VMOLR_STRCRC,
+    [RPLOLR]        = E1000_RPLOLR_STRCRC,
     [RLPML]         = 0x2600,
-    [TXCTL0]       = BIT(13) | BIT(9),
-    [TXCTL1]       = BIT(13) | BIT(9),
-    [TXCTL2]       = BIT(13) | BIT(9),
-    [TXCTL3]       = BIT(13) | BIT(9),
-    [TXCTL4]       = BIT(13) | BIT(9),
-    [TXCTL5]       = BIT(13) | BIT(9),
-    [TXCTL6]       = BIT(13) | BIT(9),
-    [TXCTL7]       = BIT(13) | BIT(9),
-    [TXCTL8]       = BIT(13) | BIT(9),
-    [TXCTL9]       = BIT(13) | BIT(9),
-    [TXCTL10]      = BIT(13) | BIT(9),
-    [TXCTL11]      = BIT(13) | BIT(9),
-    [TXCTL12]      = BIT(13) | BIT(9),
-    [TXCTL13]      = BIT(13) | BIT(9),
-    [TXCTL14]      = BIT(13) | BIT(9),
-    [TXCTL15]      = BIT(13) | BIT(9),
+    [TXCTL0]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL1]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL2]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL3]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL4]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL5]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL6]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL7]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL8]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL9]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL10]      = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL11]      = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL12]      = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL13]      = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL14]      = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
+    [TXCTL15]      = E1000_DCA_TXCTRL_DATA_RRO_EN |
+                     E1000_DCA_TXCTRL_TX_WB_RO_EN |
+                     E1000_DCA_TXCTRL_DESC_RRO_EN,
 };
 
 void igb_core_reset(IGBCore *core)
