@@ -2228,10 +2228,6 @@ igb_set_ics(IGBCore *core, int index, uint32_t val)
 
 static void write_iam_content_to_ims(IGBCore *core)
 {
-    // TODO: Read and understand 8.8.11 and NSICR in 8.8.15 before removing
-    // this return!
-    return;
-
     /* If GPIE.NSICR = 0, then the copy of IAM to IMS will occur only if at
        least one bit is set in the IMS and there is a true interrupt as
        reflected in ICR.INTA. */
