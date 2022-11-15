@@ -93,9 +93,6 @@ struct IGBCore {
 
     int max_queue_num;
 
-    /* Interrupt moderation management */
-    uint32_t delayed_causes;
-
     IGBIntrDelayTimer eitr[IGB_MSIX_VEC_NUM];
     bool eitr_intr_pending[IGB_MSIX_VEC_NUM];
 

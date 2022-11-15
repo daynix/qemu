@@ -499,8 +499,6 @@ static const VMStateDescription igb_vmstate = {
         VMSTATE_UINT32_ARRAY(core.mac, IgbState, E1000E_MAC_SIZE),
         VMSTATE_UINT8_ARRAY(core.permanent_mac, IgbState, ETH_ALEN),
 
-        VMSTATE_UINT32(core.delayed_causes, IgbState),
-
         VMSTATE_E1000E_INTR_DELAY_TIMER_ARRAY(core.eitr, IgbState,
                                               IGB_MSIX_VEC_NUM),
         VMSTATE_BOOL_ARRAY(core.eitr_intr_pending, IgbState,

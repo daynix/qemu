@@ -129,13 +129,6 @@ igb_intrmgr_stop_timer(IGBIntrDelayTimer *timer)
     }
 }
 
-static inline void
-igb_intrmgr_fire_delayed_interrupts(IGBCore *core)
-{
-    trace_e1000e_irq_fire_delayed_interrupts();
-    igb_set_interrupt_cause(core, 0);
-}
-
 static void
 igb_intrmgr_on_msix_throttling_timer(void *opaque)
 {
@@ -176,66 +169,6 @@ igb_intrmgr_initialize_all_timers(IGBCore *core, bool create)
     }
 }
 
-static bool
-igb_intrmgr_delay_rx_causes(IGBCore *core, uint32_t *causes)
-{
-    uint32_t delayable_causes;
-
-    if (msix_enabled(core->owner)) {
-        return false;
-    }
-
-    delayable_causes = E1000_ICR_RXQ0 |
-                       E1000_ICR_RXQ1 |
-                       E1000_ICR_RXT0;
-
-    /* Clean up all causes that may be delayed */
-    core->delayed_causes |= *causes & delayable_causes;
-    *causes &= ~delayable_causes;
-
-    return true;
-}
-
-static bool
-igb_intrmgr_delay_tx_causes(IGBCore *core, uint32_t *causes)
-{
-    static const uint32_t delayable_causes = E1000_ICR_TXQ0 |
-                                             E1000_ICR_TXQ1 |
-                                             E1000_ICR_TXQE |
-                                             E1000_ICR_TXDW;
-
-    if (msix_enabled(core->owner)) {
-        return false;
-    }
-
-    /* Clean up all causes that may be delayed */
-    core->delayed_causes |= *causes & delayable_causes;
-    *causes &= ~delayable_causes;
-
-    /* If there are causes that cannot be delayed */
-    if (*causes != 0) {
-        return false;
-    }
-
-    return true;
-}
-
-static uint32_t
-igb_intmgr_collect_delayed_causes(IGBCore *core)
-{
-    uint32_t res;
-
-    if (msix_enabled(core->owner)) {
-        assert(core->delayed_causes == 0);
-        return 0;
-    }
-
-    res = core->delayed_causes;
-    core->delayed_causes = 0;
-
-    return res;
-}
-
 static void
 igb_intrmgr_resume(IGBCore *core)
 {
@@ -260,8 +193,6 @@ static void
 igb_intrmgr_reset(IGBCore *core)
 {
     int i;
-
-    core->delayed_causes = 0;
 
     for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
         igb_intrmgr_stop_timer(&core->eitr[i]);
@@ -619,7 +550,7 @@ static void igb_process_tx_desc(IGBCore *core, struct IGBTx *tx,
     }
 }
 
-static uint32_t igb_tx_wb_interrupt_cause(IGBCore *core, int queue_idx)
+static uint32_t igb_tx_wb_eic(IGBCore *core, int queue_idx)
 {
     uint32_t n, ent = 0;
 
@@ -633,8 +564,8 @@ static uint32_t igb_tx_wb_interrupt_cause(IGBCore *core, int queue_idx)
     return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
-static uint32_t igb_rx_wb_interrupt_cause(IGBCore *core, int queue_idx,
-                                          bool min_threshold_hit)
+static uint32_t igb_rx_wb_eic(IGBCore *core, int queue_idx,
+                              bool min_threshold_hit)
 {
     uint32_t n, ent = 0;
 
@@ -665,7 +596,7 @@ static uint32_t igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
     pci_dma_write(core->owner, base + offsetof(union e1000_adv_tx_desc, wb),
         &tx_desc->wb, sizeof(tx_desc->wb));
 
-    return igb_tx_wb_interrupt_cause(core, queue_idx);
+    return igb_tx_wb_eic(core, queue_idx);
 }
 
 typedef struct E1000E_RingInfo_st {
@@ -814,7 +745,7 @@ static void igb_start_xmit(IGBCore *core, const IGBTxRing *txr)
     dma_addr_t base;
     union e1000_adv_tx_desc desc;
     const E1000E_RingInfo *txi = txr->i;
-    uint32_t cause = 0;
+    uint32_t eic = 0;
 
     // TODO: check if the queue itself is enabled too.
     if (!(core->mac[TCTL] & E1000_TCTL_EN)) {
@@ -831,14 +762,14 @@ static void igb_start_xmit(IGBCore *core, const IGBTxRing *txr)
                               desc.read.cmd_type_len, desc.wb.status);
 
         igb_process_tx_desc(core, txr->tx, &desc, txi->idx);
-        cause |= igb_txdesc_writeback(core, base, &desc, txi->idx);
+        eic |= igb_txdesc_writeback(core, base, &desc, txi->idx);
 
         igb_ring_advance(core, txi, 1);
     }
 
-    if (!igb_intrmgr_delay_tx_causes(core, &cause)) {
-        core->mac[EICR] |= cause;
-        igb_update_interrupt_state(core);
+    if (eic) {
+        core->mac[EICR] |= eic;
+        igb_set_interrupt_cause(core, E1000_ICR_TXDW);
     }
 }
 
@@ -1460,7 +1391,7 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     static const int min_buf_size = 60;
 
     uint16_t queues = 0;
-    uint32_t n = 0;
+    uint32_t n;
     uint8_t min_buf[min_buf_size];
     struct iovec min_iov;
     struct eth_header *ehdr;
@@ -1538,7 +1469,6 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
         trace_e1000e_rx_rss_dispatched_to_queue(rxr.i->idx);
 
         if (!igb_has_rxbufs(core, rxr.i, total_size)) {
-            n |= E1000_ICS_RXO;
             retval = 0;
         }
     }
@@ -1560,22 +1490,18 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 
             /* Check if receive descriptor minimum threshold hit */
             rdmts_hit = igb_rx_descr_threshold_hit(core, rxr.i);
-            n |= igb_rx_wb_interrupt_cause(core, rxr.i->idx, rdmts_hit);
+            core->mac[EICR] |= igb_rx_wb_eic(core, rxr.i->idx, rdmts_hit);
         }
 
+        n = E1000_ICR_RXT0;
         trace_e1000e_rx_written_to_guest(n);
     } else {
+        n = E1000_ICS_RXO;
         trace_e1000e_rx_not_written_to_guest(n);
     }
 
-    if (!igb_intrmgr_delay_rx_causes(core, &n)) {
-        trace_e1000e_rx_interrupt_set(n);
-//        igb_set_interrupt_cause(core, n);
-        core->mac[EICR] |= n;
-        igb_update_interrupt_state(core);
-    } else {
-        trace_e1000e_rx_interrupt_delayed(n);
-    }
+    trace_e1000e_rx_interrupt_set(n);
+    igb_set_interrupt_cause(core, n);
 
     return retval;
 }
@@ -1888,7 +1814,6 @@ igb_set_interrupt_cause(IGBCore *core, uint32_t val)
 {
     trace_e1000e_irq_set_cause_entry(val, core->mac[ICR]);
 
-    val |= igb_intmgr_collect_delayed_causes(core);
     core->mac[ICR] |= val;
 
     trace_e1000e_irq_set_cause_exit(val, core->mac[ICR]);
