@@ -461,7 +461,7 @@ static const VMStateDescription igb_vmstate_tx = {
 };
 
 static const VMStateDescription igb_vmstate_intr_timer = {
-    .name = "e1000e-intr-timer",
+    .name = "igb-intr-timer",
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (VMStateField[]) {
