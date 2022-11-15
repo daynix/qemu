@@ -3051,7 +3051,7 @@ static const readops igb_macreg_readops[] = {
     [SWSM]    = igb_mac_swsm_read,
     [IMS]     = igb_mac_ims_read,
 
-    /* TBD: These are E1000E specific: */
+    /* E1000E specific: */
     [CRCERRS ... MPC]      = igb_mac_readreg,
     [IP6AT ... IP6AT + 3]  = igb_mac_readreg,
     [IP4AT ... IP4AT + 6]  = igb_mac_readreg,
@@ -3079,9 +3079,7 @@ static const readops igb_macreg_readops[] = {
     [PVTEICR6] = igb_mac_read_clr4,
     [PVTEICR7] = igb_mac_read_clr4,
 
-    /* IGB specific - should go in a disjoint struct
-     * but put here now just to make diffs easier:
-     */
+    /* IGB specific: */
     [FWSM]       = igb_mac_readreg,
     [SW_FW_SYNC] = igb_mac_readreg,
     [HTCBDPC]    = igb_mac_read_clr4,
@@ -3460,9 +3458,7 @@ static const writeops igb_macreg_writeops[] = {
     [MAVTV0 ... MAVTV3]      = igb_mac_writereg,
     [EITR0 ... EITR0 + IGB_MSIX_VEC_NUM - 1] = igb_set_eitr,
 
-    /* IGB specific - should go in a disjoint struct
-     * but put here now just to make changes comprehensible:
-     */
+    /* IGB specific: */
     [FWSM]     = igb_mac_writereg,
     [SW_FW_SYNC] = igb_mac_writereg,
     [EICR] = igb_set_eicr,
@@ -3558,14 +3554,10 @@ enum { MAC_ACCESS_PARTIAL = 1 };
 static const uint16_t mac_reg_access[E1000E_MAC_SIZE] = {
     /* Alias index offsets */
     [FCRTL_A] = 0x07fe, [FCRTH_A] = 0x0802,
-    //[RDH0_A]  = 0x09bc, [RDT0_A]  = 0x09bc, [RDTR_A] = 0x09c6,
     [RDFH_A]  = 0xe904, [RDFT_A]  = 0xe904,
-    //[TDH_A]   = 0x0cf8, [TDT_A]   = 0x0cf8,
     [TDFH_A]  = 0xed00, [TDFT_A]  = 0xed00,
     [RA_A ... RA_A + 31]      = 0x14f0,
     [VFTA_A ... VFTA_A + 127] = 0x1400,
-    //[RDBAH0_A ... RDLEN0_A] = 0x09bc,
-    //[TDBAL_A ... TDLEN_A]   = 0x0cf8,
 
     [RDBAL0_ALT] = 0x2600,
     [RDBAH0_ALT] = 0x2600,
@@ -3603,7 +3595,6 @@ static const uint16_t mac_reg_access[E1000E_MAC_SIZE] = {
     [RQDPC1_ALT] = 0x25D0,
     [RQDPC2_ALT] = 0x25A0,
     [RQDPC3_ALT] = 0x2570,
-    //[MTA_ALT] = 0x1400,
     [TDBAL0_ALT] = 0x2A00,
     [TDBAH0_ALT] = 0x2A00,
     [TDLEN0_ALT] = 0x2A00,
