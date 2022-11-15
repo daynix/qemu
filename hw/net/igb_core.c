@@ -299,12 +299,6 @@ static bool igb_rx_use_legacy_descriptor(IGBCore *core)
 }
 
 static inline bool
-igb_rx_use_ps_descriptor(IGBCore *core)
-{
-    return false;
-}
-
-static inline bool
 igb_rss_enabled(IGBCore *core)
 {
     return E1000_MRQC_ENABLED(core->mac[MRQC]) &&
