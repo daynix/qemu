@@ -3634,7 +3634,7 @@ igb_vm_state_change(void *opaque, bool running, RunState state)
     }
 }
 
-void igb_core_pci_realize(IGBCore     *core,
+void igb_core_pci_realize(IGBCore        *core,
                           const uint16_t *eeprom_templ,
                           uint32_t        eeprom_size,
                           const uint8_t  *macaddr)
