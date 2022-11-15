@@ -619,8 +619,6 @@ static void igb_process_tx_desc(IGBCore *core, struct IGBTx *tx,
     }
 }
 
-//#define IVAR_GET_ENTRY(i) ((core->mac[IVAR0 + (n)/4] >> (8 * ((n)%4))) & 0xFF)
-
 static uint32_t igb_tx_wb_interrupt_cause(IGBCore *core, int queue_idx)
 {
     uint32_t n, ent = 0;
