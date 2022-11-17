@@ -52,7 +52,7 @@ typedef struct IgbVfState {
     MemoryRegion msix;
 } IgbVfState;
 
-static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
+static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn, bool write)
 {
     switch (addr)
     {
@@ -79,9 +79,9 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
             return E1000_VTIVAR + vfn * 4;
         case E1000_IVAR_MISC:
             return E1000_VTIVAR_MISC + vfn * 4;
-        case 0x0F04: /* E1000_PBACL */
+        case 0x0F04: /* PBACL */
             return E1000_PBACLR;
-        case 0x0F0C: /* E1000_PSRTYPE */
+        case 0x0F0C: /* PSRTYPE */
             return E1000_PSRTYPE(vfn);
         case E1000_V2PMAILBOX(0):
             return E1000_V2PMAILBOX(vfn);
@@ -89,40 +89,76 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
             return addr + vfn * 0x40;
         case E1000_RDBAL_A(0):
             return E1000_RDBAL(vfn);
+        case E1000_RDBAL_A(1):
+            return E1000_RDBAL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RDBAH_A(0):
             return E1000_RDBAH(vfn);
+        case E1000_RDBAH_A(1):
+            return E1000_RDBAH(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RDLEN_A(0):
             return E1000_RDLEN(vfn);
+        case E1000_RDLEN_A(1):
+            return E1000_RDLEN(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_SRRCTL_A(0):
             return E1000_SRRCTL(vfn);
+        case E1000_SRRCTL_A(1):
+            return E1000_SRRCTL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RDH_A(0):
             return E1000_RDH(vfn);
+        case E1000_RDH_A(1):
+            return E1000_RDH(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RXCTL_A(0):
             return E1000_RXCTL(vfn);
+        case E1000_RXCTL_A(1):
+            return E1000_RXCTL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RDT_A(0):
             return E1000_RDT(vfn);
+        case E1000_RDT_A(1):
+            return E1000_RDT(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RXDCTL_A(0):
             return E1000_RXDCTL(vfn);
+        case E1000_RXDCTL_A(1):
+            return E1000_RXDCTL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_RQDPC_A(0):
             return E1000_RQDPC(vfn);
+        case E1000_RQDPC_A(1):
+            return E1000_RQDPC(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDBAL_A(0):
             return E1000_TDBAL(vfn);
+        case E1000_TDBAL_A(1):
+            return E1000_TDBAL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDBAH_A(0):
             return E1000_TDBAH(vfn);
+        case E1000_TDBAH_A(1):
+            return E1000_TDBAH(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDLEN_A(0):
             return E1000_TDLEN(vfn);
+        case E1000_TDLEN_A(1):
+            return E1000_TDLEN(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDH_A(0):
             return E1000_TDH(vfn);
+        case E1000_TDH_A(1):
+            return E1000_TDH(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TXCTL_A(0):
             return E1000_TXCTL(vfn);
+        case E1000_TXCTL_A(1):
+            return E1000_TXCTL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDT_A(0):
             return E1000_TDT(vfn);
+        case E1000_TDT_A(1):
+            return E1000_TDT(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TXDCTL_A(0):
             return E1000_TXDCTL(vfn);
+        case E1000_TXDCTL_A(1):
+            return E1000_TXDCTL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDWBAL_A(0):
             return E1000_TDWBAL(vfn);
+        case E1000_TDWBAL_A(1):
+            return E1000_TDWBAL(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_TDWBAH_A(0):
             return E1000_TDWBAH(vfn);
+        case E1000_TDWBAH_A(1):
+            return E1000_TDWBAH(vfn + IGB_MAX_VF_FUNCTIONS);
         case E1000_VFGPRC:
             return E1000_PVFGPRC(vfn);
         case E1000_VFGPTC:
@@ -143,14 +179,18 @@ static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn)
             return E1000_PVFGOTLBC(vfn);
         case E1000_STATUS:
         case E1000_FRTIMER:
-        case 0x34E8: /* E1000_PBTWAC */
-        case 0x24E8: /* E1000_PBRWAC */
+            if (write) {
+                return HWADDR_MAX;
+            }
+            /* fallthrough */
+        case 0x34E8: /* PBTWAC */
+        case 0x24E8: /* PBRWAC */
             return addr;
     }
 
     trace_igbvf_wrn_io_addr_unknown(addr);
 
-    return addr;
+    return HWADDR_MAX;
 }
 
 static void igbvf_write_config(PCIDevice *dev, uint32_t addr, uint32_t val,
@@ -165,8 +205,8 @@ static uint64_t igbvf_mmio_read(void *opaque, hwaddr addr, unsigned size)
     PCIDevice *vf = PCI_DEVICE(opaque);
     PCIDevice *pf = pcie_sriov_get_pf(vf);
 
-    addr = vf_to_pf_addr(addr, pcie_sriov_vf_number(vf));
-    return igb_mmio_read(pf, addr, size);
+    addr = vf_to_pf_addr(addr, pcie_sriov_vf_number(vf), false);
+    return addr == HWADDR_MAX ? 0 : igb_mmio_read(pf, addr, size);
 }
 
 static void igbvf_mmio_write(void *opaque, hwaddr addr, uint64_t val,
@@ -175,8 +215,10 @@ static void igbvf_mmio_write(void *opaque, hwaddr addr, uint64_t val,
     PCIDevice *vf = PCI_DEVICE(opaque);
     PCIDevice *pf = pcie_sriov_get_pf(vf);
 
-    addr = vf_to_pf_addr(addr, pcie_sriov_vf_number(vf));
-    igb_mmio_write(pf, addr, val, size);
+    addr = vf_to_pf_addr(addr, pcie_sriov_vf_number(vf), true);
+    if (addr != HWADDR_MAX) {
+        igb_mmio_write(pf, addr, val, size);
+    }
 }
 
 static const MemoryRegionOps mmio_ops = {
