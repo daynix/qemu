@@ -104,40 +104,37 @@ enum {
     defreg(UTA),
 
     /* Aliases */
-    defreg(RDFH_A),
-    defreg(RDFT_A),
-    defreg(TDFH_A),  defreg(TDFT_A),  defreg(RA_A),
-    defreg(VFTA_A),
-    defreg(FCRTL_A),
+    defreg(RDFH_A),      defreg(RDFT_A),     defreg(TDFH_A),     defreg(TDFT_A),
+    defreg(RA_A),        defreg(VFTA_A),     defreg(FCRTL_A),
 
     /* Additional regs used by IGB */
-    defreg(FWSM),   defreg(SW_FW_SYNC), defreg(HTCBDPC), defreg(GPIE),
-    defreg(EICR),   defreg(EICS),       defreg(EIMS),    defreg(EIAM),
-    defreg(EIMC),   defreg(TXPBS),      defreg(TCTL_EXT),
-    defreg(DTXCTL), defreg(RXPBS),      defreg(RA2),
+    defreg(FWSM),        defreg(SW_FW_SYNC),
 
-    defregd(RDBAL), defregd(RDBAH), defregd(RDLEN), defregd(SRRCTL),
-    defregd(RDH),   defregd(RXCTL), defregd(RDT),   defregd(RXDCTL),
-    defregd(RQDPC),
+    defreg(EICS),        defreg(EIMS),        defreg(EIMC),       defreg(EIAM),
+    defreg(EICR),        defreg(IVAR_MISC),   defreg(GPIE),
 
-    defregd(TDBAL),  defregd(TDBAH), defregd(TDLEN), defregd(TDH),
-    defregd(TXCTL),  defregd(TDT),   defregd(TXDCTL),
-    defregd(TDWBAL), defregd(TDWBAH),
+    defreg(RXPBS),      defregd(RDBAL),       defregd(RDBAH),     defregd(RDLEN),
+    defregd(SRRCTL),    defregd(RDH),         defregd(RDT),
+    defregd(RXDCTL),    defregd(RXCTL),       defregd(RQDPC),     defreg(RA2),
 
-    defregv(P2VMAILBOX),      defregv(V2PMAILBOX), defreg(MBVFICR), defregv(VMBMEM),
-    defreg(MBVFIMR),          defreg(VFLRE),  defreg(VFRE),   defreg(VFTE),
-    defreg(QDE),              defreg(DTXSWC), defreg(WVBR),
-    defreg_indexed(VMVIR, 0), defreg_indexed(VMOLR, 0),
-    defreg(RPLOLR), defreg_indexed(VLVF, 0),
+    defreg(TXPBS),       defreg(TCTL_EXT),    defreg(DTXCTL),     defreg(HTCBDPC),
+    defregd(TDBAL),      defregd(TDBAH),      defregd(TDLEN),     defregd(TDH),
+    defregd(TDT),        defregd(TXDCTL),     defregd(TXCTL),
+    defregd(TDWBAL),     defregd(TDWBAH),
 
-    defregv(PVTCTRL), defregv(PVTEICS), defregv(PVTEIMS), defregv(PVTEIMC),
-    defregv(PVTEIAC), defregv(PVTEIAM), defregv(PVTEICR), defregv(PVFGPRC),
-    defregv(PVFGPTC), defregv(PVFGORC), defregv(PVFGOTC), defregv(PVFMPRC),
-    defregv(PVFGPRLBC),  defregv(PVFGPTLBC), defregv(PVFGORLBC), defregv(PVFGOTLBC),
+    defregv(P2VMAILBOX), defregv(V2PMAILBOX), defreg(MBVFICR),    defreg(MBVFIMR),
+    defreg(VFLRE),       defreg(VFRE),        defreg(VFTE),       defreg(WVBR),
+    defreg(QDE),         defreg(DTXSWC),      defreg_indexed(VLVF, 0),
+    defregv(VMOLR),      defreg(RPLOLR),      defregv(VMBMEM),    defregv(VMVIR),
 
-    defreg(IVAR_MISC),  defreg(VTIVAR), defreg(VTIVAR_MISC),
+    defregv(PVTCTRL),    defregv(PVTEICS),    defregv(PVTEIMS),   defregv(PVTEIMC),
+    defregv(PVTEIAC),    defregv(PVTEIAM),    defregv(PVTEICR),   defregv(PVFGPRC),
+    defregv(PVFGPTC),    defregv(PVFGORC),    defregv(PVFGOTC),   defregv(PVFMPRC),
+    defregv(PVFGPRLBC),  defregv(PVFGPTLBC),  defregv(PVFGORLBC), defregv(PVFGOTLBC),
 
     defreg(MTA_A),
+
+    defreg(VTIVAR), defreg(VTIVAR_MISC),
 };
 
 #endif
