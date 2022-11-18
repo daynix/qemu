@@ -1743,7 +1743,7 @@ static void igb_vf_reset(IGBCore *core, uint16_t vfn)
 
 static void mailbox_interrupt_to_vf(IGBCore *core, uint16_t vfn)
 {
-    uint32_t ent = core->mac[VTIVAR_MISC + vfn] & 0xFF;
+    uint32_t ent = core->mac[VTIVAR_MISC + vfn];
 
     if ((ent & E1000_IVAR_VALID)) {
         core->mac[EICR] |= (ent & 0x3) << (22 - vfn*3);
@@ -1817,14 +1817,9 @@ static void igb_set_vfmailbox(IGBCore *core, int index, uint32_t val)
     }
 }
 
-static void igb_set_mbvficr(IGBCore *core, int index, uint32_t val)
+static void igb_w1c(IGBCore *core, int index, uint32_t val)
 {
-    core->mac[MBVFICR] &= ~(val & 0xFF00FF);
-}
-
-static void igb_set_vflre(IGBCore *core, int index, uint32_t val)
-{
-    core->mac[VFLRE] &= ~(val & 0xFF);
+    core->mac[index] &= ~val;
 }
 
 static void igb_set_eimc(IGBCore *core, int index, uint32_t val)
@@ -1946,15 +1941,14 @@ static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
     core->mac[index] = val;
 
     /* Get assigned vector associated with queue Rx#0. */
-    ent = val & 0xFF;
-    if ((ent & E1000_IVAR_VALID)) {
+    if ((val & E1000_IVAR_VALID)) {
         n = igb_ivar_entry_rx(qn);
-        ent = 0x80 | (24 - vfn*3 - (2-(ent & 0x7)));
+        ent = 0x80 | (24 - vfn*3 - (2-(val & 0x7)));
         core->mac[IVAR0 + n/4] |= ent << 8*(n%4);
     }
 
     /* Get assigned vector associated with queue Tx#0 */
-    ent = (val >> 8) & 0xFF;
+    ent = val >> 8;
     if ((ent & E1000_IVAR_VALID)) {
         n = igb_ivar_entry_tx(qn);
         ent = 0x80 | (24 - vfn*3 - (2-(ent & 0x7)));
@@ -2222,33 +2216,15 @@ igb_mac_swsm_read(IGBCore *core, int index)
 
 static uint32_t igb_mac_eitr_read(IGBCore *core, int index)
 {
-    uint32_t val = core->eitr_guest_value[index - EITR0];
-
-    /* CNT_INGR (bit 31) is always read as zero. */
-    val &= (BIT(31) - 1);
-
-    return val;
-}
-
-static uint32_t igb_mac_pfmailbox_read(IGBCore *core, int index)
-{
-    uint32_t val = core->mac[index];
-
-    /* STS and ACK (bit 0 and 1) are always read as zero. */
-    val &= 0xFC;
-
-    return val;
+    return core->eitr_guest_value[index - EITR0];
 }
 
 static uint32_t igb_mac_vfmailbox_read(IGBCore *core, int index)
 {
     uint32_t val = core->mac[index];
 
-    /* REQ and ACK (bit 0 and 1) are always read as zero. */
-    val &= 0xFC;
-
-    /* PFSTS, PFACK and RSTD (bits 4, 5 and 7) are clear after read bits. */
-    core->mac[index] &= 0x4F;
+    core->mac[index] &= ~(E1000_V2PMAILBOX_PFSTS | E1000_V2PMAILBOX_PFACK |
+                          E1000_V2PMAILBOX_RSTD);
 
     return val;
 }
@@ -2405,7 +2381,7 @@ static void igb_set_eitr(IGBCore *core, int index, uint32_t val)
 
     trace_igb_irq_eitr_set(eitr_num, val);
 
-    core->eitr_guest_value[eitr_num] = val;
+    core->eitr_guest_value[eitr_num] = val & ~E1000_EITR_CNT_IGNR;
     core->mac[index] = interval;
 }
 
@@ -2934,7 +2910,7 @@ static const readops igb_macreg_readops[] = {
     [EIAM]       = igb_mac_readreg,
     [IVAR0 ... IVAR0 + 7] = igb_mac_readreg,
     igb_getreg(IVAR_MISC),
-    [P2VMAILBOX0 ... P2VMAILBOX7] = igb_mac_pfmailbox_read,
+    [P2VMAILBOX0 ... P2VMAILBOX7] = igb_mac_readreg,
     [V2PMAILBOX0 ... V2PMAILBOX7] = igb_mac_vfmailbox_read,
     igb_getreg(MBVFICR),
     [VMBMEM0 ... VMBMEM0 + 127] = igb_mac_readreg,
@@ -3295,10 +3271,10 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(IVAR_MISC),
     [P2VMAILBOX0 ... P2VMAILBOX7] = igb_set_pfmailbox,
     [V2PMAILBOX0 ... V2PMAILBOX7] = igb_set_vfmailbox,
-    [MBVFICR] = igb_set_mbvficr,
+    [MBVFICR] = igb_w1c,
     [VMBMEM0 ... VMBMEM0 + 127] = igb_mac_writereg,
     igb_putreg(MBVFIMR),
-    [VFLRE] = igb_set_vflre,
+    [VFLRE] = igb_w1c,
     igb_putreg(VFRE),
     igb_putreg(VFTE),
     igb_putreg(QDE),
