@@ -325,6 +325,58 @@
 /* TARC* parsing */
 #define E1000_TARC_ENABLE BIT(10)
 
+/* PHY 1000 MII Register/Bit Definitions */
+/* 82574-specific registers */
+#define PHY_COPPER_CTRL1      0x10 /* Copper Specific Control Register 1 */
+#define PHY_COPPER_STAT1      0x11 /* Copper Specific Status Register 1 */
+#define PHY_COPPER_INT_ENABLE 0x12  /* Interrupt Enable Register */
+#define PHY_COPPER_STAT2      0x13 /* Copper Specific Status Register 2 */
+#define PHY_COPPER_CTRL3      0x14 /* Copper Specific Control Register 3 */
+#define PHY_COPPER_CTRL2      0x1A /* Copper Specific Control Register 2 */
+#define PHY_RX_ERR_CNTR       0x15  /* Receive Error Counter */
+#define PHY_PAGE              0x16 /* Page Address (Any page) */
+#define PHY_OEM_BITS          0x19 /* OEM Bits (Page 0) */
+#define PHY_BIAS_1            0x1d /* Bias Setting Register */
+#define PHY_BIAS_2            0x1e /* Bias Setting Register */
+
+/* 82574-specific registers - page 2 */
+#define PHY_MAC_CTRL1         0x10 /* MAC Specific Control Register 1 */
+#define PHY_MAC_INT_ENABLE    0x12 /* MAC Interrupt Enable Register */
+#define PHY_MAC_STAT          0x13 /* MAC Specific Status Register */
+#define PHY_MAC_CTRL2         0x15 /* MAC Specific Control Register 2 */
+
+/* 82574-specific registers - page 3 */
+#define PHY_LED_03_FUNC_CTRL1 0x10 /* LED[3:0] Function Control */
+#define PHY_LED_03_POL_CTRL   0x11 /* LED[3:0] Polarity Control */
+#define PHY_LED_TIMER_CTRL    0x12 /* LED Timer Control */
+#define PHY_LED_45_CTRL       0x13 /* LED[5:4] Function Control and Polarity */
+
+/* 82574-specific registers - page 5 */
+#define PHY_1000T_SKEW        0x14 /* 1000 BASE - T Pair Skew Register */
+#define PHY_1000T_SWAP        0x15 /* 1000 BASE - T Pair Swap and Polarity */
+
+/* 82574-specific registers - page 6 */
+#define PHY_CRC_COUNTERS      0x11 /* CRC Counters */
+
+#define PHY_PAGE_RW_MASK 0x7F /* R/W part of page address register */
+
+#define MAX_PHY_REG_ADDRESS        0x1F  /* 5 bit address bus (0-0x1F) */
+#define MAX_PHY_MULTI_PAGE_REG     0xF   /* Registers equal on all pages */
+
+/* M88E1000 Specific Registers */
+#define M88E1000_PHY_SPEC_CTRL     0x10  /* PHY Specific Control Register */
+#define M88E1000_PHY_SPEC_STATUS   0x11  /* PHY Specific Status Register */
+#define M88E1000_INT_ENABLE        0x12  /* Interrupt Enable Register */
+#define M88E1000_INT_STATUS        0x13  /* Interrupt Status Register */
+#define M88E1000_EXT_PHY_SPEC_CTRL 0x14  /* Extended PHY Specific Control */
+#define M88E1000_RX_ERR_CNTR       0x15  /* Receive Error Counter */
+
+#define M88E1000_PHY_EXT_CTRL      0x1A  /* PHY extend control register */
+#define M88E1000_PHY_PAGE_SELECT   0x1D  /* Reg 29 for page number setting */
+#define M88E1000_PHY_GEN_CONTROL   0x1E  /* Its meaning depends on reg 29 */
+#define M88E1000_PHY_VCO_REG_BIT8  0x100 /* Bits 8 & 11 are adjusted for */
+#define M88E1000_PHY_VCO_REG_BIT11 0x800    /* improved BER performance */
+
 /* SW Semaphore Register */
 #define E1000_SWSM_SMBI         0x00000001 /* Driver Semaphore bit */
 #define E1000_SWSM_SWESMBI      0x00000002 /* FW Semaphore bit */
