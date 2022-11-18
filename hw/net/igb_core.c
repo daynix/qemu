@@ -2210,7 +2210,7 @@ static uint32_t
 igb_mac_swsm_read(IGBCore *core, int index)
 {
     uint32_t val = core->mac[SWSM];
-    core->mac[SWSM] = val | 1;
+    core->mac[SWSM] = val | E1000_SWSM_SMBI;
     return val;
 }
 
