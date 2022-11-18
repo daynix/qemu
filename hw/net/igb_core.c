@@ -2105,11 +2105,16 @@ igb_set_fcrtl(IGBCore *core, int index, uint32_t val)
     core->mac[FCRTL] = val & 0x8000FFF8;
 }
 
-static inline void
-igb_set_16bit(IGBCore *core, int index, uint32_t val)
-{
-    core->mac[index] = val & 0xffff;
-}
+#define IGB_LOW_BITS_SET_FUNC(num)                             \
+    static void                                                \
+    igb_set_##num##bit(IGBCore *core, int index, uint32_t val) \
+    {                                                          \
+        core->mac[index] = val & (BIT(num) - 1);               \
+    }
+ 
+IGB_LOW_BITS_SET_FUNC(4)
+IGB_LOW_BITS_SET_FUNC(13)
+IGB_LOW_BITS_SET_FUNC(16)
 
 static void
 igb_set_dlen(IGBCore *core, int index, uint32_t val)
@@ -2206,19 +2211,6 @@ igb_mac_ims_read(IGBCore *core, int index)
     trace_e1000e_irq_read_ims(core->mac[IMS]);
     return core->mac[IMS];
 }
-
-#define IGB_LOW_BITS_READ_FUNC(num)                   \
-    static uint32_t                                   \
-    igb_mac_low##num##_read(IGBCore *core, int index) \
-    {                                                 \
-        return core->mac[index] & (BIT(num) - 1);     \
-    }                                                 \
-
-#define IGB_LOW_BITS_READ(num)                        \
-    igb_mac_low##num##_read
-
-IGB_LOW_BITS_READ_FUNC(4);
-IGB_LOW_BITS_READ_FUNC(13);
 
 static uint32_t
 igb_mac_swsm_read(IGBCore *core, int index)
@@ -2527,7 +2519,17 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(SRRCTL15),
     igb_getreg(LATECOL),
     igb_getreg(XONTXC),
+    igb_getreg(TDFH),
+    igb_getreg(TDFT),
+    igb_getreg(TDFHS),
+    igb_getreg(TDFTS),
+    igb_getreg(TDFPC),
     igb_getreg(WUS),
+    igb_getreg(RDFH),
+    igb_getreg(RDFT),
+    igb_getreg(RDFHS),
+    igb_getreg(RDFTS),
+    igb_getreg(RDFPC),
     igb_getreg(GORCL),
     igb_getreg(MGTPRC),
     igb_getreg(EERD),
@@ -2875,11 +2877,6 @@ static const readops igb_macreg_readops[] = {
     [MPTC]    = igb_mac_read_clr4,
     [IAC]     = igb_mac_read_clr4,
     [ICR]     = igb_mac_icr_read,
-    [RDFH]    = IGB_LOW_BITS_READ(13),
-    [RDFHS]   = IGB_LOW_BITS_READ(13),
-    [RDFPC]   = IGB_LOW_BITS_READ(13),
-    [TDFH]    = IGB_LOW_BITS_READ(13),
-    [TDFHS]   = IGB_LOW_BITS_READ(13),
     [STATUS]  = igb_get_status,
     [ICS]     = igb_mac_ics_read,
     /* 8.8.10: Reading the IMC register returns the value of the IMS register.
@@ -2899,11 +2896,6 @@ static const readops igb_macreg_readops[] = {
     [MPRC]    = igb_mac_read_clr4,
     [BPTC]    = igb_mac_read_clr4,
     [TSCTC]   = igb_mac_read_clr4,
-    [RDFT]    = IGB_LOW_BITS_READ(13),
-    [RDFTS]   = IGB_LOW_BITS_READ(13),
-    [TDFPC]   = IGB_LOW_BITS_READ(13),
-    [TDFT]    = IGB_LOW_BITS_READ(13),
-    [TDFTS]   = IGB_LOW_BITS_READ(13),
     [CTRL]    = igb_get_ctrl,
     [SWSM]    = igb_mac_swsm_read,
     [IMS]     = igb_mac_ims_read,
@@ -2917,7 +2909,7 @@ static const readops igb_macreg_readops[] = {
     [WUPM ... WUPM + 31]   = igb_mac_readreg,
     [MTA ... MTA + 127]    = igb_mac_readreg,
     [VFTA ... VFTA + 127]  = igb_mac_readreg,
-    [FFMT ... FFMT + 254]  = IGB_LOW_BITS_READ(4),
+    [FFMT ... FFMT + 254]  = igb_mac_readreg,
     [MDEF ... MDEF + 7]    = igb_mac_readreg,
     [FTFT ... FTFT + 254]  = igb_mac_readreg,
     [RETA ... RETA + 31]   = igb_mac_readreg,
@@ -3024,18 +3016,8 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(RQDPC0),
     igb_putreg(FCAL),
     igb_putreg(FCRUC),
-    igb_putreg(TDFH),
-    igb_putreg(TDFT),
-    igb_putreg(TDFHS),
-    igb_putreg(TDFTS),
-    igb_putreg(TDFPC),
     igb_putreg(WUC),
     igb_putreg(WUS),
-    igb_putreg(RDFH),
-    igb_putreg(RDFT),
-    igb_putreg(RDFHS),
-    igb_putreg(RDFTS),
-    igb_putreg(RDFPC),
     igb_putreg(IPAV),
     igb_putreg(TDBAH0),
     igb_putreg(TDBAH1),
@@ -3195,6 +3177,16 @@ static const writeops igb_macreg_writeops[] = {
     [RCTL]     = igb_set_rx_control,
     [CTRL]     = igb_set_ctrl,
     [EERD]     = igb_set_eerd,
+    [TDFH]     = igb_set_13bit,
+    [TDFT]     = igb_set_13bit,
+    [TDFHS]    = igb_set_13bit,
+    [TDFTS]    = igb_set_13bit,
+    [TDFPC]    = igb_set_13bit,
+    [RDFH]     = igb_set_13bit,
+    [RDFT]     = igb_set_13bit,
+    [RDFHS]    = igb_set_13bit,
+    [RDFTS]    = igb_set_13bit,
+    [RDFPC]    = igb_set_13bit,
     [GCR]      = igb_set_gcr,
     [RXCSUM]   = igb_set_rxcsum,
     [TDLEN0]   = igb_set_dlen,
@@ -3282,7 +3274,7 @@ static const writeops igb_macreg_writeops[] = {
     [WUPM ... WUPM + 31]     = igb_mac_writereg,
     [MTA ... MTA + 127]      = igb_mac_writereg,
     [VFTA ... VFTA + 127]    = igb_mac_writereg,
-    [FFMT ... FFMT + 254]    = igb_mac_writereg,
+    [FFMT ... FFMT + 254]    = igb_set_4bit,
     [MDEF ... MDEF + 7]      = igb_mac_writereg,
     [FTFT ... FTFT + 254]    = igb_mac_writereg,
     [RETA ... RETA + 31]     = igb_mac_writereg,
