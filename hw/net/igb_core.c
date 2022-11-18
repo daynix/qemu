@@ -981,115 +981,16 @@ igb_verify_csum_in_sw(IGBCore *core, struct NetRxPkt *pkt,
     }
 }
 
-static void igb_build_rx_metadata(IGBCore *core, struct NetRxPkt *pkt,
-    bool is_eop, const E1000E_RSSInfo *rss_info,
-    uint16_t *pkt_info, uint16_t *hdr_info,
-    uint32_t *rss, uint16_t *ip_id, uint16_t *csum,
-    uint32_t *status, uint16_t *vlan)
-{
-    bool isip4, isip6, istcp, isudp;
-    uint32_t pkt_type;
-
-    *status = E1000_RXD_STAT_DD;
-
-    /* No additional metadata needed for non-EOP descriptors */
-    // TODO: EOP apply only to status so don't skip whole function.
-    if (!is_eop) {
-        goto func_exit;
-    }
-
-    *status |= E1000_RXD_STAT_EOP;
-
-    net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
-    trace_e1000e_rx_metadata_protocols(isip4, isip6, isudp, istcp);
-
-    if (rss_info->enabled) {
-        *pkt_info = rss_info->type;
-    }
-
-    if (isip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_DIS)) {
-        trace_e1000e_rx_metadata_ipv6_filtering_disabled();
-        pkt_type = E1000_RXD_PKT_MAC;
-    } else if (istcp || isudp) {
-        pkt_type = isip4 ? E1000_RXD_PKT_IP4_XDP : E1000_RXD_PKT_IP6_XDP;
-    } else if (isip4 || isip6) {
-        pkt_type = isip4 ? E1000_RXD_PKT_IP4 : E1000_RXD_PKT_IP6;
-    } else {
-        pkt_type = E1000_RXD_PKT_MAC;
-    }
-
-    trace_e1000e_rx_metadata_pkt_type(pkt_type);
-    *pkt_info |= (pkt_type << 4);
-
-    *hdr_info = 0;
-
-    /* VLAN state */
-    if (net_rx_pkt_is_vlan_stripped(pkt)) {
-        *status |= E1000_RXD_STAT_VP;
-        *vlan = cpu_to_le16(net_rx_pkt_get_vlan_tag(pkt));
-        trace_e1000e_rx_metadata_vlan(*vlan);
-    }
-
-    /* Packet parsing results */
-    if ((core->mac[RXCSUM] & E1000_RXCSUM_PCSD) != 0) {
-        if (rss_info->enabled) {
-            *rss = cpu_to_le32(rss_info->hash);
-            trace_igb_rx_metadata_rss(*rss);
-        }
-    } else if (isip4) {
-        *status |= E1000_RXD_STAT_IPIDV;
-        *ip_id = cpu_to_le16(net_rx_pkt_get_ip_id(pkt));
-        trace_e1000e_rx_metadata_ip_id(*ip_id);
-    }
-
-    if (istcp && net_rx_pkt_is_tcp_ack(pkt)) {
-        *status |= E1000_RXD_STAT_ACK;
-        trace_e1000e_rx_metadata_ack();
-    }
-
-    /* RX CSO information */
-    if (isip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_XSUM_DIS)) {
-        trace_e1000e_rx_metadata_ipv6_sum_disabled();
-        goto func_exit;
-    }
-
-    if (!net_rx_pkt_has_virt_hdr(pkt)) {
-        trace_e1000e_rx_metadata_no_virthdr();
-        igb_verify_csum_in_sw(core, pkt, status, istcp, isudp);
-        goto func_exit;
-    }
-
-    if (igb_rx_l3_cso_enabled(core)) {
-        *status |= isip4 ? E1000_RXD_STAT_IPCS : 0;
-    } else {
-        trace_e1000e_rx_metadata_l3_cso_disabled();
-    }
-
-    if (igb_rx_l4_cso_enabled(core)) {
-        if (istcp) {
-            *status |= E1000_RXD_STAT_TCPCS;
-        } else if (isudp) {
-            *status |= E1000_RXD_STAT_TCPCS | E1000_RXD_STAT_UDPCS;
-        }
-    } else {
-        trace_e1000e_rx_metadata_l4_cso_disabled();
-    }
-
-    trace_e1000e_rx_metadata_status_flags(*status);
-
-func_exit:
-    *status = cpu_to_le32(*status);
-}
-
 static void
-igb_build_lgcy_rx_metadata(IGBCore *core,
-                           struct NetRxPkt *pkt,
-                           bool is_eop,
-                           const E1000E_RSSInfo *rss_info,
-                           uint32_t *rss, uint32_t *mrq,
-                           uint32_t *status_flags,
-                           uint16_t *ip_id,
-                           uint16_t *vlan_tag)
+igb_build_rx_metadata(IGBCore *core,
+                      struct NetRxPkt *pkt,
+                      bool is_eop,
+                      const E1000E_RSSInfo *rss_info,
+                      uint16_t *pkt_info, uint16_t *hdr_info,
+                      uint32_t *rss,
+                      uint32_t *status_flags,
+                      uint16_t *ip_id,
+                      uint16_t *vlan_tag)
 {
     struct virtio_net_hdr *vhdr;
     bool isip4, isip6, istcp, isudp;
@@ -1098,6 +999,7 @@ igb_build_lgcy_rx_metadata(IGBCore *core,
     *status_flags = E1000_RXD_STAT_DD;
 
     /* No additional metadata needed for non-EOP descriptors */
+    // TODO: EOP apply only to status so don't skip whole function.
     if (!is_eop) {
         goto func_exit;
     }
@@ -1118,8 +1020,7 @@ igb_build_lgcy_rx_metadata(IGBCore *core,
     if ((core->mac[RXCSUM] & E1000_RXCSUM_PCSD) != 0) {
         if (rss_info->enabled) {
             *rss = cpu_to_le32(rss_info->hash);
-            *mrq = cpu_to_le32(rss_info->type | (rss_info->queue << 8));
-            trace_e1000e_rx_metadata_rss(*rss, *mrq);
+            trace_igb_rx_metadata_rss(*rss);
         }
     } else if (isip4) {
             *status_flags |= E1000_RXD_STAT_IPIDV;
@@ -1143,8 +1044,21 @@ igb_build_lgcy_rx_metadata(IGBCore *core,
         pkt_type = E1000_RXD_PKT_MAC;
     }
 
-    *status_flags |= E1000_RXD_PKT_TYPE(pkt_type);
     trace_e1000e_rx_metadata_pkt_type(pkt_type);
+
+    if (pkt_info) {
+        if (rss_info->enabled) {
+            *pkt_info = rss_info->type;
+        }
+
+        *pkt_info |= (pkt_type << 4);
+    } else {
+        *status_flags |= E1000_RXD_PKT_TYPE(pkt_type);
+    }
+
+    if (hdr_info) {
+        *hdr_info = 0;
+    }
 
     /* RX CSO information */
     if (isip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_XSUM_DIS)) {
@@ -1195,7 +1109,7 @@ igb_write_lgcy_rx_descr(IGBCore *core, uint8_t *desc,
                         const E1000E_RSSInfo *rss_info,
                         uint16_t length)
 {
-    uint32_t status_flags, rss, mrq;
+    uint32_t status_flags, rss;
     uint16_t ip_id;
 
     struct e1000_rx_desc *d = (struct e1000_rx_desc *) desc;
@@ -1204,11 +1118,11 @@ igb_write_lgcy_rx_descr(IGBCore *core, uint8_t *desc,
     d->length = cpu_to_le16(length);
     d->csum = 0;
 
-    igb_build_lgcy_rx_metadata(core, pkt, pkt != NULL,
-                               rss_info,
-                               &rss, &mrq,
-                               &status_flags, &ip_id,
-                               &d->special);
+    igb_build_rx_metadata(core, pkt, pkt != NULL,
+                          rss_info,
+                          NULL, NULL, &rss,
+                          &status_flags, &ip_id,
+                          &d->special);
     d->errors = (uint8_t) (le32_to_cpu(status_flags) >> 24);
     d->status = (uint8_t) le32_to_cpu(status_flags);
     d->special = 0;
@@ -1229,9 +1143,8 @@ igb_write_ext_rx_descr(IGBCore *core, uint8_t *desc,
         &d->wb.lower.lo_dword.pkt_info,
         &d->wb.lower.lo_dword.hdr_info,
         &d->wb.lower.hi_dword.rss,
-        &d->wb.lower.hi_dword.csum_ip.ip_id,
-        &d->wb.lower.hi_dword.csum_ip.csum,
         &d->wb.upper.status_error,
+        &d->wb.lower.hi_dword.csum_ip.ip_id,
         &d->wb.upper.vlan);
 }
 
