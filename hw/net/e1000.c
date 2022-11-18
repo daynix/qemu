@@ -1272,7 +1272,7 @@ enum { MAC_ACCESS_PARTIAL = 1, MAC_ACCESS_FLAG_NEEDED = 2 };
 /* In the array below the meaning of the bits is: [f|f|f|f|f|f|n|p]
  * f - flag bits (up to 6 possible flags)
  * n - flag needed
- * p - partially implenented */
+ * p - partially implemented */
 static const uint8_t mac_reg_access[0x8000] = {
     [RDTR]    = markflag(MIT),    [TADV]    = markflag(MIT),
     [RADV]    = markflag(MIT),    [ITR]     = markflag(MIT),
