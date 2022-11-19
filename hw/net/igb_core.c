@@ -2143,28 +2143,6 @@ igb_set_ics(IGBCore *core, int index, uint32_t val)
     igb_set_interrupt_cause(core, val);
 }
 
-static void write_iam_content_to_ims(IGBCore *core)
-{
-    /* If GPIE.NSICR = 0, then the copy of IAM to IMS will occur only if at
-       least one bit is set in the IMS and there is a true interrupt as
-       reflected in ICR.INTA. */
-    if ((core->mac[GPIE] & E1000_GPIE_NSICR) ||
-        (core->mac[IMS] && (core->mac[ICR] & E1000_ICR_INT_ASSERTED)))
-    {
-        core->mac[IMS] = core->mac[IAM];
-    }
-}
-
-static void igb_set_icr(IGBCore *core, int index, uint32_t val)
-{
-    uint32_t icr = core->mac[ICR] & ~val;
-
-    trace_igb_irq_icr_write(val, core->mac[ICR], icr);
-    core->mac[ICR] = icr;
-    write_iam_content_to_ims(core);
-    igb_update_interrupt_state(core);
-}
-
 static void
 igb_set_imc(IGBCore *core, int index, uint32_t val)
 {
@@ -2189,6 +2167,28 @@ static void igb_set_ims(IGBCore *core, int index, uint32_t val)
     trace_e1000e_irq_set_ims(val, core->mac[IMS], core->mac[IMS] | valid_val);
     core->mac[IMS] |= valid_val;
     igb_update_interrupt_state(core);
+}
+
+static void igb_commit_icr(IGBCore *core)
+{
+    /* If GPIE.NSICR = 0, then the copy of IAM to IMS will occur only if at
+       least one bit is set in the IMS and there is a true interrupt as
+       reflected in ICR.INTA. */
+    if ((core->mac[GPIE] & E1000_GPIE_NSICR) ||
+        (core->mac[IMS] && (core->mac[ICR] & E1000_ICR_INT_ASSERTED))) {
+        igb_set_ims(core, IMS, core->mac[IAM]);
+    } else {
+        igb_update_interrupt_state(core);
+    }
+}
+
+static void igb_set_icr(IGBCore *core, int index, uint32_t val)
+{
+    uint32_t icr = core->mac[ICR] & ~val;
+
+    trace_igb_irq_icr_write(val, core->mac[ICR], icr);
+    core->mac[ICR] = icr;
+    igb_commit_icr(core);
 }
 
 static uint32_t
@@ -2250,8 +2250,7 @@ static uint32_t igb_mac_icr_read(IGBCore *core, int index)
         }
     }
 
-    write_iam_content_to_ims(core);
-    igb_update_interrupt_state(core);
+    igb_commit_icr(core);
     return ret;
 }
 
