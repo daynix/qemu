@@ -98,6 +98,38 @@ union e1000_adv_rx_desc {
     } wb;  /* writeback */
 };
 
+/* from igb/e1000_phy.h */
+
+/* IGP01E1000 Specific Registers */
+#define IGP01E1000_PHY_PORT_CONFIG        0x10 /* Port Config */
+#define IGP01E1000_PHY_PORT_STATUS        0x11 /* Status */
+#define IGP01E1000_PHY_PORT_CTRL          0x12 /* Control */
+#define IGP01E1000_PHY_LINK_HEALTH        0x13 /* PHY Link Health */
+#define IGP02E1000_PHY_POWER_MGMT         0x19 /* Power Management */
+#define IGP01E1000_PHY_PAGE_SELECT        0x1F /* Page Select */
+#define IGP01E1000_PHY_PCS_INIT_REG       0x00B4
+#define IGP01E1000_PHY_POLARITY_MASK      0x0078
+#define IGP01E1000_PSCR_AUTO_MDIX         0x1000
+#define IGP01E1000_PSCR_FORCE_MDI_MDIX    0x2000 /* 0=MDI, 1=MDIX */
+#define IGP01E1000_PSCFR_SMART_SPEED      0x0080
+
+/* Enable flexible speed on link-up */
+#define IGP02E1000_PM_D0_LPLU             0x0002 /* For D0a states */
+#define IGP02E1000_PM_D3_LPLU             0x0004 /* For all other states */
+#define IGP01E1000_PLHR_SS_DOWNGRADE      0x8000
+#define IGP01E1000_PSSR_POLARITY_REVERSED 0x0002
+#define IGP01E1000_PSSR_MDIX              0x0800
+#define IGP01E1000_PSSR_SPEED_MASK        0xC000
+#define IGP01E1000_PSSR_SPEED_1000MBPS    0xC000
+#define IGP02E1000_PHY_CHANNEL_NUM        4
+#define IGP02E1000_PHY_AGC_A              0x11B1
+#define IGP02E1000_PHY_AGC_B              0x12B1
+#define IGP02E1000_PHY_AGC_C              0x14B1
+#define IGP02E1000_PHY_AGC_D              0x18B1
+#define IGP02E1000_AGC_LENGTH_SHIFT       9   /* Course - 15:13, Fine - 12:9 */
+#define IGP02E1000_AGC_LENGTH_MASK        0x7F
+#define IGP02E1000_AGC_RANGE              15
+
 /* from igb/igb.h */
 
 #define E1000_PCS_CFG_IGN_SD	1
@@ -459,6 +491,10 @@ enum e1000_state_t {
 #define E1000_GCR_CMPL_TMOUT_RESEND     0x00010000
 #define E1000_GCR_CAP_VER2              0x00040000
 
+#define PHY_REVISION_MASK      0xFFFFFFF0
+#define MAX_PHY_REG_ADDRESS    0x1F  /* 5 bit address bus (0-0x1F) */
+#define MAX_PHY_MULTI_PAGE_REG 0xF
+
 #define IGP03E1000_E_PHY_ID 0x02A80390
 
 /* from igb/e1000_mbox.h */
@@ -552,16 +588,6 @@ enum e1000_state_t {
 #define E1000_DVMOLR(_n)       (0x0C038 + (64 * (_n)))
 #define E1000_VLVF(_n)         (0x05D00 + (4 * (_n))) /* VLAN VM Filter */
 #define E1000_VMVIR(_n)        (0x03700 + (4 * (_n)))
-
-/* from igb/phy.h */
-
-/* IGP01E1000 Specific Registers */
-#define IGP01E1000_PHY_PORT_CONFIG	0x10	/* Port Config */
-#define IGP01E1000_PHY_PORT_STATUS	0x11	/* Status */
-#define IGP01E1000_PHY_PORT_CTRL	0x12	/* Control */
-#define IGP01E1000_PHY_LINK_HEALTH	0x13	/* PHY Link Health */
-#define IGP02E1000_PHY_POWER_MGMT	0x19	/* Power Management */
-#define IGP01E1000_PHY_PAGE_SELECT	0x1F	/* Page Select */
 
 /* from igbvf/mbox.h */
 
