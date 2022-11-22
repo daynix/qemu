@@ -1181,6 +1181,7 @@ static const readops macreg_readops[] = {
     getreg(GOTCL),    getreg(RDFH),     getreg(RDFT),     getreg(RDFHS),
     getreg(RDFTS),    getreg(RDFPC),    getreg(TDFH),     getreg(TDFT),
     getreg(TDFHS),    getreg(TDFTS),    getreg(TDFPC),    getreg(AIT),
+    getreg(FCAL),     getreg(FCAH),     getreg(FCT),
 
     [TOTH]    = mac_read_clr8,      [TORH]    = mac_read_clr8,
     [GOTCH]   = mac_read_clr8,      [GORCH]   = mac_read_clr8,
@@ -1218,8 +1219,7 @@ static const writeops macreg_writeops[] = {
     putreg(PBA),      putreg(EERD),     putreg(SWSM),     putreg(WUFC),
     putreg(TDBAL),    putreg(TDBAH),    putreg(TXDCTL),   putreg(RDBAH),
     putreg(RDBAL),    putreg(LEDCTL),   putreg(VET),      putreg(FCRUC),
-    putreg(IPAV),     putreg(WUC),
-    putreg(WUS),
+    putreg(IPAV),     putreg(WUC),      putreg(WUS),      putreg(FCAL),
 
     [TDLEN]  = set_dlen,   [RDLEN]  = set_dlen,       [TCTL]  = set_tctl,
     [TDT]    = set_tctl,   [MDIC]   = set_mdic,       [ICS]   = set_ics,
@@ -1231,6 +1231,7 @@ static const writeops macreg_writeops[] = {
     [TDFHS]  = set_13bit,  [TDFTS]  = set_13bit,      [TDFPC] = set_13bit,
     [RDFH]   = set_13bit,  [RDFT]   = set_13bit,      [RDFHS] = set_13bit,
     [RDFTS]  = set_13bit,  [RDFPC]  = set_13bit,      [AIT]   = set_16bit,
+    [FCAH]   = set_16bit,  [FCT]    = set_16bit,
 
     [IP6AT ... IP6AT+3] = &mac_writereg, [IP4AT ... IP4AT+6] = &mac_writereg,
     [FFLT ... FFLT+6]   = &set_11bit,
@@ -1602,6 +1603,9 @@ static const VMStateDescription vmstate_e1000 = {
         VMSTATE_UINT32(mac_reg[TXDCTL], E1000State),
         VMSTATE_UINT32(mac_reg[WUFC], E1000State),
         VMSTATE_UINT32(mac_reg[VET], E1000State),
+        VMSTATE_UINT32(mac_reg[FCAL], E1000State),
+        VMSTATE_UINT32(mac_reg[FCAH], E1000State),
+        VMSTATE_UINT32(mac_reg[FCT], E1000State),
         VMSTATE_UINT32_SUB_ARRAY(mac_reg, E1000State, RA, 32),
         VMSTATE_UINT32_SUB_ARRAY(mac_reg, E1000State, MTA, 128),
         VMSTATE_UINT32_SUB_ARRAY(mac_reg, E1000State, VFTA, 128),
