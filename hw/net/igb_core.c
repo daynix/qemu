@@ -2118,7 +2118,7 @@ IGB_LOW_BITS_SET_FUNC(16)
 static void
 igb_set_dlen(IGBCore *core, int index, uint32_t val)
 {
-    core->mac[index] = val & E1000_XDLEN_MASK;
+    core->mac[index] = val & 0xffff0;
 }
 
 static void igb_set_dbal(IGBCore *core, int index, uint32_t val)

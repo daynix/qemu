@@ -308,9 +308,6 @@
 #define E1000_ICR_ASSERTED BIT(31)
 #define E1000_EIAC_MASK    0x01F00000
 
-/* [TR]DBAL and [TR]DLEN masks */
-#define E1000_XDLEN_MASK            ((BIT(20) - 1) & (~(BIT(7) - 1)))
-
 /* RFCTL register bits */
 #define E1000_RFCTL_ISCSI_DIS           0x00000001
 #define E1000_RFCTL_NFSW_DIS            0x00000040

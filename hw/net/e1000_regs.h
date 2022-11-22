@@ -145,7 +145,9 @@
 
 #define E1000_RSS_QUEUE(reta, hash) ((E1000_RETA_VAL(reta, hash) & BIT(7)) >> 7)
 
+/* [TR]DBAL and [TR]DLEN masks */
 #define E1000_XDBAL_MASK            (~(BIT(4) - 1))
+#define E1000_XDLEN_MASK            ((BIT(20) - 1) & (~(BIT(7) - 1)))
 
 /* IVAR register parsing helpers */
 #define E1000_IVAR_INT_ALLOC_VALID  (0x8)
