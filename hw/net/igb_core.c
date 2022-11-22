@@ -2153,16 +2153,7 @@ igb_set_imc(IGBCore *core, int index, uint32_t val)
 
 static void igb_set_ims(IGBCore *core, int index, uint32_t val)
 {
-    static const uint32_t ims_valid_mask =
-        E1000_ICR_TXDW     | E1000_ICR_LSC      | E1000_ICR_RXDMT0   |
-        E1000_ICR_MACSEC   | E1000_ICR_RX0      | E1000_ICR_RXT0     |
-        E1000_ICR_VMMB     | E1000_ICR_GPI_SDP0 | E1000_ICR_GPI_SDP1 |
-        E1000_ICR_GPI_SDP2 | E1000_ICR_GPI_SDP3 | E1000_ICR_PTRAP    |
-        E1000_ICR_MNG      | E1000_ICR_OMED     | E1000_ICR_FER      |
-        E1000_ICR_NFER     | E1000_ICR_CSRTO    | E1000_ICR_SCE      |
-        E1000_ICR_SW_WD    | E1000_ICR_DOUTSYNC | E1000_ICR_DRSTA;
-
-    uint32_t valid_val = val & ims_valid_mask;
+    uint32_t valid_val = val & 0x77D4FBFD;
 
     trace_e1000e_irq_set_ims(val, core->mac[IMS], core->mac[IMS] | valid_val);
     core->mac[IMS] |= valid_val;
