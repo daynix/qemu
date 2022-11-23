@@ -1,0 +1,25 @@
+from avocado_qemu import LinuxTest
+
+class IGB(LinuxTest):
+    """
+    :avocado: tags=accel:kvm
+    :avocado: tags=arch:x86_64
+    :avocado: tags=distro:fedora
+    :avocado: tags=distro_version:31
+    :avocado: tags=machine:q35
+    """
+
+    def test(self):
+        self.require_accelerator('kvm')
+        print(self.distro._info)
+        kernel_path = self.fetch_asset(self.distro.pxeboot_url + 'vmlinuz')
+        initrd_path = self.fetch_asset(self.distro.pxeboot_url + 'initrd.img')
+        kernel_params = self.distro.default_kernel_params + ' pci=nomsi'
+        self.vm.add_args('-kernel', kernel_path,
+                         '-initrd', initrd_path,
+                         '-append', kernel_params,
+                         '-accel', 'kvm',
+                         '-device', 'igb')
+        self.launch_and_wait()
+        self.ssh_command('dnf -y install ethtool')
+        self.ssh_command('ethtool -t eth1 offline')
