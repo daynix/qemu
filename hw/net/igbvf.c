@@ -237,11 +237,6 @@ static void igbvf_pci_realize(PCIDevice *dev, Error **errp)
     int ret;
     int i;
 
-    if (!pci_is_vf(dev)) {
-        error_setg(errp, "The bus is not a virtual function");
-        return;
-    }
-
     dev->config_write = igbvf_write_config;
 
     memory_region_init_io(&s->mmio, OBJECT(dev), &mmio_ops, s, "igbvf-mmio",
@@ -296,6 +291,7 @@ static void igbvf_class_init(ObjectClass *class, void *data)
     c->class_id = PCI_CLASS_NETWORK_ETHERNET;
 
     dc->desc = "Intel 82576 Virtual Function";
+    dc->user_creatable = false;
 
     set_bit(DEVICE_CATEGORY_NETWORK, dc->categories);
 }
