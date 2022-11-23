@@ -120,15 +120,6 @@ igb_intmgr_timer_pause(IGBIntrDelayTimer *timer)
     }
 }
 
-static inline void
-igb_intrmgr_stop_timer(IGBIntrDelayTimer *timer)
-{
-    if (timer->running) {
-        timer_del(timer->timer);
-        timer->running = false;
-    }
-}
-
 static void
 igb_intrmgr_on_msix_throttling_timer(void *opaque)
 {
@@ -190,7 +181,10 @@ igb_intrmgr_reset(IGBCore *core)
     int i;
 
     for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
-        igb_intrmgr_stop_timer(&core->eitr[i]);
+        if (core->eitr[i].running) {
+            timer_del(core->eitr[i].timer);
+            igb_intrmgr_on_msix_throttling_timer(&core->eitr[i]);
+        }
     }
 }
 
@@ -3691,8 +3685,12 @@ void igb_core_reset(IGBCore *core)
 
     memset(core->phy, 0, sizeof core->phy);
     memcpy(core->phy, igb_phy_reg_init, sizeof igb_phy_reg_init);
-    memset(core->mac, 0, sizeof core->mac);
-    memcpy(core->mac, igb_mac_reg_init, sizeof igb_mac_reg_init);
+    memcpy(core->mac, igb_mac_reg_init, EITR0 * sizeof(*core->mac));
+    memcpy(core->mac + EITR0 + IGB_MSIX_VEC_NUM,
+           igb_mac_reg_init + EITR0 + IGB_MSIX_VEC_NUM,
+           sizeof(igb_mac_reg_init) - (EITR0 + IGB_MSIX_VEC_NUM) * sizeof(*core->mac));
+    memset((char *)core->mac + sizeof(igb_mac_reg_init), 0,
+           sizeof(core->mac) - sizeof(igb_mac_reg_init));
 
     core->rxbuf_min_shift = 1 + E1000_RING_DESC_LEN_SHIFT;
 
