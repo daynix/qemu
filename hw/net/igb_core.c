@@ -1638,6 +1638,7 @@ static void igb_update_interrupt_state(IGBCore *core)
                 if (int_alloc & E1000_IVAR_VALID) {
                     causes |= BIT(int_alloc & 0x1f);
                 }
+                trace_e1000e_irq_add_msi_other(core->mac[EICR]);
             }
             core->mac[EICR] |= causes;
         }
@@ -1650,7 +1651,6 @@ static void igb_update_interrupt_state(IGBCore *core)
 
         if (icr) {
             core->mac[EICR] |= (icr & E1000_ICR_DRSTA) | E1000_EICR_OTHER;
-            trace_e1000e_irq_add_msi_other(core->mac[EICR]);
         } else {
             core->mac[EICR] &= ~E1000_EICR_OTHER;
         }
