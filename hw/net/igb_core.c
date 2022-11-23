@@ -139,11 +139,6 @@ igb_intrmgr_on_msix_throttling_timer(void *opaque)
 
     timer->running = false;
 
-    if (!timer->core->eitr_intr_pending[idx]) {
-        trace_e1000e_irq_throttling_no_pending_vec(idx);
-        return;
-    }
-
     trace_e1000e_irq_msix_notify_postponed_vec(idx);
     igb_msix_notify(timer->core, idx);
 }
@@ -1583,12 +1578,11 @@ igb_clear_ims_bits(IGBCore *core, uint32_t bits)
 }
 
 static inline bool
-igb_postpone_interrupt(bool *interrupt_pending, IGBIntrDelayTimer *timer)
+igb_postpone_interrupt(IGBIntrDelayTimer *timer)
 {
     if (timer->running) {
         trace_e1000e_irq_postponed_by_xitr(timer->delay_reg << 2);
 
-        *interrupt_pending = true;
         return true;
     }
 
@@ -1602,8 +1596,7 @@ igb_postpone_interrupt(bool *interrupt_pending, IGBIntrDelayTimer *timer)
 static inline bool
 igb_eitr_should_postpone(IGBCore *core, int idx)
 {
-    return igb_postpone_interrupt(&core->eitr_intr_pending[idx],
-                                  &core->eitr[idx]);
+    return igb_postpone_interrupt(&core->eitr[idx]);
 }
 
 static inline void

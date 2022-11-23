@@ -495,8 +495,6 @@ static const VMStateDescription igb_vmstate = {
 
         VMSTATE_E1000E_INTR_DELAY_TIMER_ARRAY(core.eitr, IgbState,
                                               IGB_MSIX_VEC_NUM),
-        VMSTATE_BOOL_ARRAY(core.eitr_intr_pending, IgbState,
-                           IGB_MSIX_VEC_NUM),
 
         VMSTATE_UINT32_ARRAY(core.eitr_guest_value, IgbState,
                              IGB_MSIX_VEC_NUM),
