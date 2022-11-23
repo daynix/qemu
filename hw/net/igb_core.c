@@ -3704,9 +3704,9 @@ void igb_core_reset(IGBCore *core)
     igb_intrmgr_reset(core);
 
     memset(core->phy, 0, sizeof core->phy);
-    memmove(core->phy, igb_phy_reg_init, sizeof igb_phy_reg_init);
+    memcpy(core->phy, igb_phy_reg_init, sizeof igb_phy_reg_init);
     memset(core->mac, 0, sizeof core->mac);
-    memmove(core->mac, igb_mac_reg_init, sizeof igb_mac_reg_init);
+    memcpy(core->mac, igb_mac_reg_init, sizeof igb_mac_reg_init);
 
     core->rxbuf_min_shift = 1 + E1000_RING_DESC_LEN_SHIFT;
 
