@@ -549,10 +549,6 @@ static uint32_t igb_tx_wb_eic(IGBCore *core, int queue_idx)
 {
     uint32_t n, ent = 0;
 
-    if (!msix_enabled(core->owner)) {
-        return BIT(queue_idx);
-    }
-
     n = igb_ivar_entry_tx(queue_idx);
     ent = (core->mac[IVAR0 + n / 4] >> (8 * (n % 4))) & 0xff;
 
@@ -563,10 +559,6 @@ static uint32_t igb_rx_wb_eic(IGBCore *core, int queue_idx,
                               bool min_threshold_hit)
 {
     uint32_t n, ent = 0;
-
-    if (!msix_enabled(core->owner)) {
-        return BIT(queue_idx);
-    }
 
     n = igb_ivar_entry_rx(queue_idx);
     ent = (core->mac[IVAR0 + n / 4] >> (8 * (n % 4))) & 0xff;
@@ -1610,7 +1602,7 @@ igb_fix_icr_asserted(IGBCore *core)
     trace_e1000e_irq_fix_icr_asserted(core->mac[ICR]);
 }
 
-static void igb_send_msi(IGBCore *core, bool msix)
+static void igb_send_msix(IGBCore *core)
 {
     uint32_t causes = core->mac[EICR] & core->mac[EIMS];
     uint32_t effective_eiac;
@@ -1634,12 +1626,11 @@ static void igb_update_interrupt_state(IGBCore *core)
     uint32_t icr;
     uint32_t causes;
     uint32_t int_alloc;
-    bool interrupts_pending;
-    bool is_msix = msix_enabled(core->owner);
 
     icr = core->mac[ICR] & core->mac[IMS];
-    if (icr) {
-        if (is_msix) {
+
+    if (msix_enabled(core->owner)) {
+        if (icr) {
             causes = 0;
             if (icr & E1000_ICR_DRSTA) {
                 int_alloc = core->mac[IVAR_MISC] & 0xff;
@@ -1655,33 +1646,34 @@ static void igb_update_interrupt_state(IGBCore *core)
                 }
             }
             core->mac[EICR] |= causes;
-        } else {
-            core->mac[EICR] |= E1000_EICR_OTHER;
+        }
+
+        if ((core->mac[EICR] & core->mac[EIMS])) {
+            igb_send_msix(core);
+        }
+    } else {
+        igb_fix_icr_asserted(core);
+
+        if (icr) {
+            core->mac[EICR] |= (icr & E1000_ICR_DRSTA) | E1000_EICR_OTHER;
             trace_e1000e_irq_add_msi_other(core->mac[EICR]);
-        }
-    } else {
-        if (!is_msix) {
+        } else {
             core->mac[EICR] &= ~E1000_EICR_OTHER;
-            igb_fix_icr_asserted(core);
         }
-    }
 
-    interrupts_pending = !!(core->mac[EIMS] & core->mac[EICR]);
+        trace_e1000e_irq_pending_interrupts(core->mac[ICR] & core->mac[IMS],
+                                            core->mac[ICR], core->mac[IMS]);
 
-    trace_e1000e_irq_pending_interrupts(core->mac[EIMS] & core->mac[EICR],
-                                        core->mac[EICR], core->mac[EIMS]);
-
-    if (is_msix || msi_enabled(core->owner)) {
-        if (interrupts_pending) {
-            igb_send_msi(core, is_msix);
-        }
-    } else {
-        if (interrupts_pending) {
-            if (!igb_eitr_should_postpone(core, 0)) {
-                igb_raise_legacy_irq(core);
+        if (msi_enabled(core->owner)) {
+            if (icr) {
+                msi_notify(core->owner, 0);
             }
         } else {
-            igb_lower_legacy_irq(core);
+            if (icr) {
+                igb_raise_legacy_irq(core);
+            } else {
+                igb_lower_legacy_irq(core);
+            }
         }
     }
 }
@@ -2227,11 +2219,12 @@ static uint32_t igb_mac_icr_read(IGBCore *core, int index)
     if (core->mac[GPIE] & E1000_GPIE_NSICR) {
         trace_igb_irq_icr_clear_gpie_nsicr();
         core->mac[ICR] = 0;
-    } else {
-        if (core->mac[IMS] == 0) {
-            trace_igb_irq_icr_clear_zero_ims();
-            core->mac[ICR] = 0;
-        }
+    } else if (core->mac[IMS] == 0) {
+        trace_e1000e_irq_icr_clear_zero_ims();
+        core->mac[ICR] = 0;
+    } else if (!msix_enabled(core->owner)) {
+        trace_e1000e_irq_icr_clear_nonmsix_icr_read();
+        core->mac[ICR] = 0;
     }
 
     igb_commit_icr(core);
