@@ -3523,7 +3523,6 @@ void igb_core_pci_uninit(IGBCore *core)
 {
     int i;
 
-    timer_del(core->autoneg_timer);
     timer_free(core->autoneg_timer);
 
     igb_intrmgr_pci_unint(core);
