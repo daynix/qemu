@@ -820,10 +820,10 @@ static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
 
     if (e1000x_is_vlan_packet(ehdr->h_dest, core->vet) &&
         e1000x_vlan_rx_filter_enabled(core->mac)) {
-        uint16_t vid = lduw_be_p(ehdr->h_dest + 14);
+        uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci);
         uint32_t vfta = ldl_le_p((uint32_t *)(core->mac + VFTA) +
-                                 ((vid >> 5) & 0x7f));
-        if ((vfta & (1 << (vid & 0x1f))) == 0) {
+                                 ((vid >> E1000_VFTA_ENTRY_SHIFT) & E1000_VFTA_ENTRY_MASK));
+        if ((vfta & (1 << (vid & E1000_VFTA_ENTRY_BIT_SHIFT_MASK))) == 0) {
             trace_e1000e_rx_flt_vlan_mismatch(vid);
             return queues;
         } else {
@@ -847,7 +847,7 @@ static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
         }
         ra[0] = cpu_to_le32(macp[0]);
         ra[1] = cpu_to_le32(macp[1]);
-        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, 6)) {
+        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
             trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA) / 2,
                                             MAC_ARG(ehdr->h_dest));
 
@@ -861,7 +861,7 @@ static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
         }
         ra[0] = cpu_to_le32(macp[0]);
         ra[1] = cpu_to_le32(macp[1]);
-        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, 6)) {
+        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
             trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA2) / 2,
                                             MAC_ARG(ehdr->h_dest));
 
@@ -1280,13 +1280,11 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 
 ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 {
-    static const int maximum_ethernet_hdr_len = (14 + 4);
-    /* Min. octets in an ethernet frame sans FCS */
-    static const int min_buf_size = 60;
+    static const int maximum_ethernet_hdr_len = (ETH_HLEN + 4);
 
     uint16_t queues = 0;
     uint32_t n;
-    uint8_t min_buf[min_buf_size];
+    uint8_t min_buf[ETH_ZLEN];
     struct iovec min_iov;
     struct eth_header *ehdr;
     uint8_t *filter_buf;
@@ -1764,7 +1762,8 @@ static void igb_set_pfmailbox(IGBCore *core, int index, uint32_t val)
 
     if (val & E1000_P2VMAILBOX_RVFU) {
         core->mac[V2PMAILBOX0 + vfn] &= ~E1000_V2PMAILBOX_VFU;
-        core->mac[MBVFICR] &= ~((BIT(vfn) << 16) | BIT(vfn));
+        core->mac[MBVFICR] &= ~((E1000_MBVFICR_VFACK_VF1 << vfn) |
+                                (E1000_MBVFICR_VFREQ_VF1 << vfn));
     }
 }
 
@@ -1775,12 +1774,12 @@ static void igb_set_vfmailbox(IGBCore *core, int index, uint32_t val)
     trace_igb_set_vfmailbox(vfn, val);
 
     if (val & E1000_V2PMAILBOX_REQ) {
-        core->mac[MBVFICR] |= BIT(vfn);
+        core->mac[MBVFICR] |= E1000_MBVFICR_VFREQ_VF1 << vfn;
         mailbox_interrupt_to_pf(core);
     }
 
     if (val & E1000_V2PMAILBOX_ACK) {
-        core->mac[MBVFICR] |= (BIT(vfn) << 16);
+        core->mac[MBVFICR] |= E1000_MBVFICR_VFACK_VF1 << vfn;
         mailbox_interrupt_to_pf(core);
     }
 
@@ -1807,7 +1806,7 @@ static void igb_set_eimc(IGBCore *core, int index, uint32_t val)
 
     /* Interrupts are disabled via a write to EIMC and reflected in EIMS. */
     core->mac[EIMS] &=
-        msix ? ~(val & E1000_EICR_MSIX_MASK) : ~(val & E1000_EICR_LEGACY_MASK);
+        ~(val & (msix ? E1000_EICR_MSIX_MASK : E1000_EICR_LEGACY_MASK));
 
     trace_igb_irq_write_eimc(val, core->mac[EIMS], msix);
     igb_update_interrupt_state(core);
@@ -1834,7 +1833,7 @@ static void igb_set_eiam(IGBCore *core, int index, uint32_t val)
     /* TODO: When using IOV, the bits that correspond to MSI-X vectors that
        are assigned to a VF are read-only. */
     core->mac[EIAM] |=
-        msix ? ~(val & E1000_EICR_MSIX_MASK) : ~(val & E1000_EICR_LEGACY_MASK);
+        ~(val & (msix ? E1000_EICR_MSIX_MASK : E1000_EICR_LEGACY_MASK));
 
     trace_igb_irq_write_eiam(val, msix);
 }
@@ -1846,7 +1845,7 @@ static void igb_set_eicr(IGBCore *core, int index, uint32_t val)
     /* TODO: In IOV mode, only bit zero of this vector is available for the PF
        function. */
     core->mac[EICR] &=
-        msix ? ~(val & E1000_EICR_MSIX_MASK) : ~(val & E1000_EICR_LEGACY_MASK);
+        ~(val & (msix ? E1000_EICR_MSIX_MASK : E1000_EICR_LEGACY_MASK));
 
     trace_igb_irq_write_eicr(val, msix);
     igb_update_interrupt_state(core);
@@ -1867,7 +1866,7 @@ static void igb_set_vteics(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEICS0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eics(core, EICS, (val & 0x7) << (22 - vfn*3));
+    igb_set_eics(core, EICS, (val & 0x7) << (22 - vfn * 3));
 }
 
 static void igb_set_vteims(IGBCore *core, int index, uint32_t val)
@@ -1875,7 +1874,7 @@ static void igb_set_vteims(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIMS0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eims(core, EIMS, (val & 0x7) << (22 - vfn*3));
+    igb_set_eims(core, EIMS, (val & 0x7) << (22 - vfn * 3));
 }
 
 static void igb_set_vteimc(IGBCore *core, int index, uint32_t val)
@@ -1883,7 +1882,7 @@ static void igb_set_vteimc(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIMC0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eimc(core, EIMC, (val & 0x7) << (22 - vfn*3));
+    igb_set_eimc(core, EIMC, (val & 0x7) << (22 - vfn * 3));
 }
 
 static void igb_set_vteiac(IGBCore *core, int index, uint32_t val)
@@ -1891,7 +1890,7 @@ static void igb_set_vteiac(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIAC0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eiac(core, EIAC, (val & 0x7) << (22 - vfn*3));
+    igb_set_eiac(core, EIAC, (val & 0x7) << (22 - vfn * 3));
 }
 
 static void igb_set_vteiam(IGBCore *core, int index, uint32_t val)
@@ -1899,7 +1898,7 @@ static void igb_set_vteiam(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIAM0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eiam(core, EIAM, (val & 0x7) << (22 - vfn*3));
+    igb_set_eiam(core, EIAM, (val & 0x7) << (22 - vfn * 3));
 }
 
 static void igb_set_vteicr(IGBCore *core, int index, uint32_t val)
@@ -1907,7 +1906,7 @@ static void igb_set_vteicr(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEICR0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eicr(core, EICR, (val & 0x7) << (22 - vfn*3));
+    igb_set_eicr(core, EICR, (val & 0x7) << (22 - vfn * 3));
 }
 
 static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
@@ -1922,16 +1921,16 @@ static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
     /* Get assigned vector associated with queue Rx#0. */
     if ((val & E1000_IVAR_VALID)) {
         n = igb_ivar_entry_rx(qn);
-        ent = 0x80 | (24 - vfn*3 - (2-(val & 0x7)));
-        core->mac[IVAR0 + n/4] |= ent << 8*(n%4);
+        ent = E1000_IVAR_VALID | (24 - vfn * 3 - (2 - (val & 0x7)));
+        core->mac[IVAR0 + n / 4] |= ent << 8 * (n % 4);
     }
 
     /* Get assigned vector associated with queue Tx#0 */
     ent = val >> 8;
     if ((ent & E1000_IVAR_VALID)) {
         n = igb_ivar_entry_tx(qn);
-        ent = 0x80 | (24 - vfn*3 - (2-(ent & 0x7)));
-        core->mac[IVAR0 + n/4] |= ent << 8*(n%4);
+        ent = E1000_IVAR_VALID | (24 - vfn * 3 - (2 - (ent & 0x7)));
+        core->mac[IVAR0 + n / 4] |= ent << 8 * (n % 4);
     }
 
     /* Ignoring assigned vectors associated with queues Rx#1 and Tx#1 for
@@ -2858,8 +2857,8 @@ static const readops igb_macreg_readops[] = {
     [RA ... RA + 31]       = igb_mac_readreg,
     [RA2 ... RA2 + 31]     = igb_mac_readreg,
     [WUPM ... WUPM + 31]   = igb_mac_readreg,
-    [MTA ... MTA + 127]    = igb_mac_readreg,
-    [VFTA ... VFTA + 127]  = igb_mac_readreg,
+    [MTA ... MTA + E1000_MC_TBL_SIZE - 1]    = igb_mac_readreg,
+    [VFTA ... VFTA + E1000_VLAN_FILTER_TBL_SIZE - 1]  = igb_mac_readreg,
     [FFMT ... FFMT + 254]  = igb_mac_readreg,
     [MDEF ... MDEF + 7]    = igb_mac_readreg,
     [FTFT ... FTFT + 254]  = igb_mac_readreg,
@@ -2896,7 +2895,7 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(QDE),
     igb_getreg(DTXSWC),
     igb_getreg(RPLOLR),
-    [VLVF0 ... VLVF0 + 31] = igb_mac_readreg,
+    [VLVF0 ... VLVF0 + E1000_VLVF_ARRAY_SIZE - 1] = igb_mac_readreg,
     [VMVIR0 ... VMVIR7] = igb_mac_readreg,
     [VMOLR0 ... VMOLR7] = igb_mac_readreg,
     [WVBR] = igb_mac_read_clr4,
@@ -3223,8 +3222,8 @@ static const writeops igb_macreg_writeops[] = {
     [RA + 2 ... RA + 31]     = igb_mac_writereg,
     [RA2 ... RA2 + 31]       = igb_mac_writereg,
     [WUPM ... WUPM + 31]     = igb_mac_writereg,
-    [MTA ... MTA + 127]      = igb_mac_writereg,
-    [VFTA ... VFTA + 127]    = igb_mac_writereg,
+    [MTA ... MTA + E1000_MC_TBL_SIZE - 1] = igb_mac_writereg,
+    [VFTA ... VFTA + E1000_VLAN_FILTER_TBL_SIZE - 1]    = igb_mac_writereg,
     [FFMT ... FFMT + 254]    = igb_set_4bit,
     [MDEF ... MDEF + 7]      = igb_mac_writereg,
     [FTFT ... FTFT + 254]    = igb_mac_writereg,
@@ -3255,10 +3254,10 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(QDE),
     igb_putreg(DTXSWC),
     igb_putreg(RPLOLR),
-    [VLVF0 ... VLVF0 + 31] = igb_mac_writereg,
+    [VLVF0 ... VLVF0 + E1000_VLVF_ARRAY_SIZE - 1] = igb_mac_writereg,
     [VMVIR0 ... VMVIR7] = igb_mac_writereg,
     [VMOLR0 ... VMOLR7] = igb_mac_writereg,
-    [UTA ... UTA + 127] = igb_mac_writereg,
+    [UTA ... UTA + E1000_MC_TBL_SIZE - 1] = igb_mac_writereg,
     [PVTCTRL0] = igb_set_vtctrl,
     [PVTCTRL1] = igb_set_vtctrl,
     [PVTCTRL2] = igb_set_vtctrl,
@@ -3332,7 +3331,7 @@ static const uint16_t mac_reg_access[E1000E_MAC_SIZE] = {
     [RDFH_A]  = 0xe904, [RDFT_A]  = 0xe904,
     [TDFH_A]  = 0xed00, [TDFT_A]  = 0xed00,
     [RA_A ... RA_A + 31]      = 0x14f0,
-    [VFTA_A ... VFTA_A + 127] = 0x1400,
+    [VFTA_A ... VFTA_A + E1000_VLAN_FILTER_TBL_SIZE - 1] = 0x1400,
 
     [RDBAL0_A] = 0x2600,
     [RDBAH0_A] = 0x2600,
