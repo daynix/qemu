@@ -400,6 +400,12 @@ enum e1000_state_t {
 #define E1000_DCA_TXCTRL_CPUID_SHIFT 24 /* Tx CPUID now in the last byte */
 #define E1000_DCA_RXCTRL_CPUID_SHIFT 24 /* Rx CPUID now in the last byte */
 
+#define E1000_DTXSWC_MAC_SPOOF_MASK   0x000000FF /* Per VF MAC spoof control */
+#define E1000_DTXSWC_VLAN_SPOOF_MASK  0x0000FF00 /* Per VF VLAN spoof control */
+#define E1000_DTXSWC_LLE_MASK         0x00FF0000 /* Per VF Local LB enables */
+#define E1000_DTXSWC_VLAN_SPOOF_SHIFT 8
+#define E1000_DTXSWC_VMDQ_LOOPBACK_EN BIT(31)  /* global VF LB enable */
+
 /* Per VM Offload register setup */
 #define E1000_VMOLR_RLPML_MASK 0x00003FFF /* Long Packet Maximum Length mask */
 #define E1000_VMOLR_LPE        0x00010000 /* Accept Long packet */

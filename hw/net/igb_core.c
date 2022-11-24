@@ -398,7 +398,7 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct IGBTx *tx,
     }
 
     /* TX switching requires DTXSWC.Loopback_en bit enabled. */
-    if (!(core->mac[DTXSWC] & BIT(31))) {
+    if (!(core->mac[DTXSWC] & E1000_DTXSWC_VMDQ_LOOPBACK_EN)) {
         goto send_out;
     }
 
