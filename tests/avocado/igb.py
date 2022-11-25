@@ -11,9 +11,12 @@ class IGB(LinuxTest):
 
     def test(self):
         self.require_accelerator('kvm')
-        print(self.distro._info)
-        kernel_path = self.fetch_asset(self.distro.pxeboot_url + 'vmlinuz')
-        initrd_path = self.fetch_asset(self.distro.pxeboot_url + 'initrd.img')
+        kernel_url = self.distro.pxeboot_url + 'vmlinuz'
+        kernel_hash = '5b6f6876e1b5bda314f93893271da0d5777b1f3c'
+        kernel_path = self.fetch_asset(kernel_url, asset_hash=kernel_hash)
+        initrd_url = self.distro.pxeboot_url + 'initrd.img'
+        initrd_hash = 'dd0340a1b39bd28f88532babd4581c67649ec5b1'
+        initrd_path = self.fetch_asset(initrd_url, asset_hash=initrd_hash)
         kernel_params = self.distro.default_kernel_params + ' pci=nomsi'
         self.vm.add_args('-kernel', kernel_path,
                          '-initrd', initrd_path,
