@@ -55,6 +55,7 @@
 
 static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr);
 static void igb_update_interrupt_state(IGBCore *core);
+static void igb_reset(IGBCore *core, bool warm);
 
 static inline void
 igb_set_interrupt_cause(IGBCore *core, uint32_t val);
@@ -1475,7 +1476,7 @@ static void igb_set_ctrl(IGBCore *core, int index, uint32_t val)
 
     if (val & E1000_CTRL_RST) {
         trace_e1000e_core_ctrl_sw_reset();
-        igb_core_reset(core);
+        igb_reset(core, true);
     }
 
     if (val & E1000_CTRL_PHY_RST) {
@@ -3672,7 +3673,7 @@ static const uint32_t igb_mac_reg_init[] = {
                      E1000_DCA_TXCTRL_DESC_RRO_EN,
 };
 
-void igb_core_reset(IGBCore *core)
+static void igb_reset(IGBCore *core, bool sw)
 {
     struct IGBTx *tx;
     int i;
@@ -3683,12 +3684,16 @@ void igb_core_reset(IGBCore *core)
 
     memset(core->phy, 0, sizeof core->phy);
     memcpy(core->phy, igb_phy_reg_init, sizeof igb_phy_reg_init);
-    memcpy(core->mac, igb_mac_reg_init, EITR0 * sizeof(*core->mac));
-    memcpy(core->mac + EITR0 + IGB_MSIX_VEC_NUM,
-           igb_mac_reg_init + EITR0 + IGB_MSIX_VEC_NUM,
-           sizeof(igb_mac_reg_init) - (EITR0 + IGB_MSIX_VEC_NUM) * sizeof(*core->mac));
-    memset((char *)core->mac + sizeof(igb_mac_reg_init), 0,
-           sizeof(core->mac) - sizeof(igb_mac_reg_init));
+
+    for (i = 0; i < E1000E_MAC_SIZE; i++) {
+        if (sw &&
+            (i == RXPBS || i == TXPBS ||
+             (i >= EITR0 && i < EITR0 + IGB_MSIX_VEC_NUM))) {
+            continue;
+        }
+
+        core->mac[i] = i < ARRAY_SIZE(igb_mac_reg_init) ? igb_mac_reg_init[i] : 0;
+    }
 
     core->rxbuf_min_shift = 1 + E1000_RING_DESC_LEN_SHIFT;
 
@@ -3709,6 +3714,11 @@ void igb_core_reset(IGBCore *core)
         tx->first = true;
         tx->skip_cp = false;
     }
+}
+
+void igb_core_reset(IGBCore *core)
+{
+    igb_reset(core, false);
 }
 
 void igb_core_pre_save(IGBCore *core)
