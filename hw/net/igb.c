@@ -411,10 +411,10 @@ static void pci_igb_uninit(PCIDevice *dev)
     msi_uninit(dev);
 }
 
-static void igb_reset(DeviceState *dev)
+static void igb_reset(Object *obj)
 {
-    PCIDevice *d = PCI_DEVICE(dev);
-    IgbState *s = IGB(dev);
+    PCIDevice *d = PCI_DEVICE(obj);
+    IgbState *s = IGB(obj);
 
     trace_igb_cb_qdev_reset();
     pcie_sriov_pf_disable_vfs(d);
@@ -515,6 +515,7 @@ static Property igb_properties[] = {
 static void igb_class_init(ObjectClass *class, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(class);
+    ResettableClass *rc = RESETTABLE_CLASS(class);
     PCIDeviceClass *c = PCI_DEVICE_CLASS(class);
 
     c->realize = pci_igb_realize;
@@ -525,8 +526,9 @@ static void igb_class_init(ObjectClass *class, void *data)
     c->romfile = NULL;
     c->class_id = PCI_CLASS_NETWORK_ETHERNET;
 
+    rc->phases.hold = igb_reset;
+
     dc->desc = "Intel 82576 Gigabit Ethernet Controller";
-    dc->reset = igb_reset;
     dc->vmsd = &igb_vmstate;
 
     device_class_set_props(dc, igb_properties);
