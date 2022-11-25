@@ -390,8 +390,7 @@ igb_setup_tx_offloads(IGBCore *core, struct IGBTx *tx)
 static bool igb_tx_pkt_switch(IGBCore *core, struct IGBTx *tx,
     NetClientState *nc)
 {
-    struct eth_header *ehdr;
-    bool ret, send_both;
+    bool ret;
 
 	/* TX switching is only used to serve VM to VM traffic. */
 	if (!pcie_sriov_is_iov(core->owner)) {
@@ -404,20 +403,16 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct IGBTx *tx,
     }
 
     if (net_tx_pkt_get_packet_type(tx->tx_pkt) == ETH_PKT_UCAST) {
-        ehdr = net_tx_pkt_get_eth_hdr(tx->tx_pkt);
-        if (igb_receive_route(core, ehdr)) {
-            send_both = false;
-            goto send_back;
+        if (igb_receive_route(core, net_tx_pkt_get_eth_hdr(tx->tx_pkt))) {
+            return net_tx_pkt_send_loopback(tx->tx_pkt, nc);
         }
+
         /* Unicast packet which doesn't target a VF is send to lan. */
         goto send_out;
-    } else {
-        send_both = true;
     }
 
-send_back:
     ret = net_tx_pkt_send_loopback(tx->tx_pkt, nc);
-    if (!send_both) {
+    if (!ret) {
         return ret;
     }
 
