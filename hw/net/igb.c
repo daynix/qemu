@@ -262,7 +262,7 @@ static void igb_init_net_peer(IgbState *s, PCIDevice *dev, uint8_t *macaddr)
     s->nic = qemu_new_nic(&net_igb_info, &s->conf,
         object_get_typename(OBJECT(s)), ds->id, s);
 
-    s->core.max_queue_num = s->conf.peers.queues - 1;
+    s->core.max_queue_num = s->conf.peers.queues ? s->conf.peers.queues - 1 : 0;
 
     trace_igb_mac_set_permanent(MAC_ARG(macaddr));
     memcpy(s->core.permanent_mac, macaddr, sizeof(s->core.permanent_mac));
