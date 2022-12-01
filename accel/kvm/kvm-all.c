@@ -2765,7 +2765,7 @@ static void do_kvm_cpu_synchronize_state(CPUState *cpu, run_on_cpu_data arg)
     if (!cpu->vcpu_dirty) {
         int ret = kvm_arch_get_registers(cpu);
         if (ret) {
-            error_report("Failed to get registers: %s\n", strerror(-ret));
+            error_report("Failed to get registers: %s", strerror(-ret));
             cpu_dump_state(cpu, stderr, CPU_DUMP_CODE);
             vm_stop(RUN_STATE_INTERNAL_ERROR);
         }
@@ -2785,7 +2785,7 @@ static void do_kvm_cpu_synchronize_post_reset(CPUState *cpu, run_on_cpu_data arg
 {
     int ret = kvm_arch_put_registers(cpu, KVM_PUT_RESET_STATE);
     if (ret) {
-        error_report("Failed to put registers after reset: %s\n", strerror(-ret));
+        error_report("Failed to put registers after reset: %s", strerror(-ret));
         cpu_dump_state(cpu, stderr, CPU_DUMP_CODE);
         vm_stop(RUN_STATE_INTERNAL_ERROR);
     }
@@ -2802,7 +2802,7 @@ static void do_kvm_cpu_synchronize_post_init(CPUState *cpu, run_on_cpu_data arg)
 {
     int ret = kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
     if (ret) {
-        error_report("Failed to put registers after init: %s\n", strerror(-ret));
+        error_report("Failed to put registers after init: %s", strerror(-ret));
         exit(1);
     }
 
@@ -2900,7 +2900,8 @@ int kvm_cpu_exec(CPUState *cpu)
         if (cpu->vcpu_dirty) {
             ret = kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
             if (ret) {
-                error_report("Failed to put registers after init: %s\n", strerror(-ret));
+                error_report("Failed to put registers after init: %s",
+                             strerror(-ret));
                 ret = -1;
                 break;
             }
