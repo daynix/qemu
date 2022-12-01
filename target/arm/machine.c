@@ -799,7 +799,7 @@ static int cpu_post_load(void *opaque, int version_id)
     if (kvm_enabled()) {
         ret = write_list_to_kvmstate(cpu, KVM_PUT_FULL_STATE);
         if (ret) {
-            error_report("Failed to set KVM register: %s\n", strerror(-ret));
+            error_report("Failed to set KVM register: %s", strerror(-ret));
             return -1;
         }
         /* Note that it's OK for the TCG side not to know about
