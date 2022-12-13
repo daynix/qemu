@@ -45,6 +45,7 @@
 #include "hw/intc/intc.h"
 #include "hw/rdma/rdma.h"
 #include "monitor/stats.h"
+#include "qemu-helper-stamp-utils.h"
 
 NameInfo *qmp_query_name(Error **errp)
 {
@@ -598,4 +599,35 @@ bool apply_str_list_filter(const char *string, strList *list)
         }
     }
     return false;
+}
+
+HelperPathList *qmp_query_helper_paths(Error **errp)
+{
+    HelperPathList *ret = NULL;
+    struct {
+        const char *helper;
+        bool check_stamp;
+    } helpers_list[] = {
+#ifdef CONFIG_EBPF
+        { "qemu-ebpf-rss-helper", true },
+#endif
+        { "qemu-pr-helper", false },
+        { "qemu-bridge-helper", false },
+        { NULL, false },
+    }, *helper_iter;
+    helper_iter = helpers_list;
+
+    for (; helper_iter->helper != NULL; ++helper_iter) {
+        char *path = qemu_find_helper(helper_iter->helper,
+                                      helper_iter->check_stamp);
+        if (path) {
+            HelperPath *helper = g_new0(HelperPath, 1);
+            helper->name = g_strdup(helper_iter->helper);
+            helper->path = path;
+
+            QAPI_LIST_PREPEND(ret, helper);
+        }
+    }
+
+    return ret;
 }

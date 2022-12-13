@@ -584,3 +584,35 @@
 { 'event': 'VFU_CLIENT_HANGUP',
   'data': { 'vfu-id': 'str', 'vfu-qom-path': 'str',
             'dev-id': 'str', 'dev-qom-path': 'str' } }
+
+# @HelperPath:
+#
+# Name of the helper and binary location.
+##
+{ 'struct': 'HelperPath',
+  'data': {'name': 'str', 'path': 'str'} }
+
+##
+# @query-helper-paths:
+#
+# Query helper paths. Initially, this command was added for
+# qemu-ebpf-rss-helper. The qemu would check "the stamp" and
+# returns proper helper.
+#
+# Returns: list of object that contains name and path for helper.
+#
+# Since: 6.1
+#
+# Example:
+#
+# -> { "execute": "query-helper-paths" }
+# <- { "return": [
+#        {
+#          "name": "qemu-ebpf-rss-helper",
+#          "path": "/usr/local/libexec/qemu-ebpf-rss-helper"
+#        }
+#      ]
+#    }
+#
+##
+{ 'command': 'query-helper-paths', 'returns': ['HelperPath'] }
