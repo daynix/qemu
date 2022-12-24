@@ -545,8 +545,7 @@ static uint32_t igb_tx_wb_eic(IGBCore *core, int queue_idx)
     return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
-static uint32_t igb_rx_wb_eic(IGBCore *core, int queue_idx,
-                              bool min_threshold_hit)
+static uint32_t igb_rx_wb_eic(IGBCore *core, int queue_idx)
 {
     uint32_t n, ent = 0;
 
@@ -1284,7 +1283,6 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     E1000E_RSSInfo rss_info;
     size_t total_size;
     ssize_t retval;
-    bool rdmts_hit;
     int i;
 
     trace_e1000e_rx_receive_iov(iovcnt);
@@ -1356,6 +1354,8 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     }
 
     if (retval) {
+        n = E1000_ICR_RXT0;
+
         for (i = 0; i < IGB_NUM_QUEUES; i++) {
             if (!(queues & BIT(i))) {
                 continue;
@@ -1371,11 +1371,13 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
             igb_write_packet_to_guest(core, core->rx_pkt, &rxr, &rss_info);
 
             /* Check if receive descriptor minimum threshold hit */
-            rdmts_hit = igb_rx_descr_threshold_hit(core, rxr.i);
-            core->mac[EICR] |= igb_rx_wb_eic(core, rxr.i->idx, rdmts_hit);
+            if (igb_rx_descr_threshold_hit(core, rxr.i)) {
+                n |= E1000_ICS_RXDMT0;
+            }
+
+            core->mac[EICR] |= igb_rx_wb_eic(core, rxr.i->idx);
         }
 
-        n = E1000_ICR_RXT0;
         trace_e1000e_rx_written_to_guest(n);
     } else {
         n = E1000_ICS_RXO;
