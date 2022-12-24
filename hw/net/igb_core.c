@@ -1678,7 +1678,7 @@ static void igb_set_eics(IGBCore *core, int index, uint32_t val)
     trace_igb_irq_write_eics(val, msix);
 
     core->mac[EICS] |=
-        msix ? (val & E1000_EICR_MSIX_MASK) : (val & E1000_EICR_LEGACY_MASK);
+        val & (msix ? E1000_EICR_MSIX_MASK : E1000_EICR_LEGACY_MASK);
 
     // TODO: Move to igb_update_interrupt_state if EICS is modified in other
     // places.
@@ -1694,7 +1694,7 @@ static void igb_set_eims(IGBCore *core, int index, uint32_t val)
     trace_igb_irq_write_eims(val, msix);
 
     core->mac[EIMS] |=
-        msix ? (val & E1000_EICR_MSIX_MASK) : (val & E1000_EICR_LEGACY_MASK);
+        val & (msix ? E1000_EICR_MSIX_MASK : E1000_EICR_LEGACY_MASK);
 
     igb_update_interrupt_state(core);
 }
