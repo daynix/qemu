@@ -642,12 +642,6 @@ igb_ring_enabled(IGBCore *core, const E1000E_RingInfo *r)
     return core->mac[r->dlen] > 0;
 }
 
-static inline uint32_t
-igb_ring_len(IGBCore *core, const E1000E_RingInfo *r)
-{
-    return core->mac[r->dlen];
-}
-
 typedef struct IGBTxRing {
     const E1000E_RingInfo *i;
     struct IGBTx *tx;
@@ -1179,7 +1173,7 @@ static inline bool
 igb_rx_descr_threshold_hit(IGBCore *core, const E1000E_RingInfo *rxi)
 {
     return igb_ring_free_descr_num(core, rxi) ==
-           igb_ring_len(core, rxi) >> core->rxbuf_min_shift;
+           ((core->mac[E1000_SRRCTL(rxi->idx) >> 2] >> 20) & 31) * 16;
 }
 
 static void
@@ -1543,9 +1537,6 @@ igb_set_rx_control(IGBCore *core, int index, uint32_t val)
     if (val & E1000_RCTL_EN) {
         igb_parse_rxbufsize(core);
         igb_calc_rxdesclen(core);
-        core->rxbuf_min_shift = ((val / E1000_RCTL_RDMTS_QUAT) & 3) + 1 +
-                                E1000_RING_DESC_LEN_SHIFT;
-
         igb_start_recv(core);
     }
 }
@@ -3689,8 +3680,6 @@ static void igb_reset(IGBCore *core, bool sw)
 
         core->mac[i] = i < ARRAY_SIZE(igb_mac_reg_init) ? igb_mac_reg_init[i] : 0;
     }
-
-    core->rxbuf_min_shift = 1 + E1000_RING_DESC_LEN_SHIFT;
 
     if (qemu_get_queue(core->owner_nic)->link_down) {
         igb_link_down(core);

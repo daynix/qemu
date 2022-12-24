@@ -69,7 +69,6 @@ struct IGBCore {
     uint16_t eeprom[IGB_EEPROM_SIZE];
 
     uint32_t rx_desc_buf_size;
-    uint32_t rxbuf_min_shift;
     uint8_t rx_desc_len;
 
     QEMUTimer *autoneg_timer;

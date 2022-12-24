@@ -485,7 +485,6 @@ static const VMStateDescription igb_vmstate = {
         VMSTATE_MSIX(parent_obj, IgbState),
 
         VMSTATE_UINT32(ioaddr, IgbState),
-        VMSTATE_UINT32(core.rxbuf_min_shift, IgbState),
         VMSTATE_UINT8(core.rx_desc_len, IgbState),
         VMSTATE_UINT32(core.rx_desc_buf_size, IgbState),
         VMSTATE_UINT16_ARRAY(core.eeprom, IgbState, IGB_EEPROM_SIZE),
