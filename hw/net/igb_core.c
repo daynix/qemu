@@ -895,7 +895,7 @@ igb_read_lgcy_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
 }
 
 static inline void
-igb_read_ext_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
+igb_read_adv_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
 {
     union e1000_adv_rx_desc *d = (union e1000_adv_rx_desc *) desc;
     *buff_addr = le64_to_cpu(d->read.pkt_addr);
@@ -907,7 +907,7 @@ igb_read_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
     if (igb_rx_use_legacy_descriptor(core)) {
         igb_read_lgcy_rx_descr(core, desc, buff_addr);
     } else {
-        igb_read_ext_rx_descr(core, desc, buff_addr);
+        igb_read_adv_rx_descr(core, desc, buff_addr);
     }
 }
 
@@ -1099,7 +1099,7 @@ igb_write_lgcy_rx_descr(IGBCore *core, uint8_t *desc,
 }
 
 static inline void
-igb_write_ext_rx_descr(IGBCore *core, uint8_t *desc,
+igb_write_adv_rx_descr(IGBCore *core, uint8_t *desc,
                        struct NetRxPkt *pkt,
                        const E1000E_RSSInfo *rss_info,
                        uint16_t length)
@@ -1125,7 +1125,7 @@ igb_write_rx_descr(IGBCore *core, uint8_t *desc, struct NetRxPkt *pkt,
     if (igb_rx_use_legacy_descriptor(core)) {
         igb_write_lgcy_rx_descr(core, desc, pkt, rss_info, length);
     } else {
-        igb_write_ext_rx_descr(core, desc, pkt, rss_info, length);
+        igb_write_adv_rx_descr(core, desc, pkt, rss_info, length);
     }
 }
 
