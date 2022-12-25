@@ -53,6 +53,11 @@
 
 #define E1000E_MAX_TX_FRAGS (64)
 
+union e1000_rx_desc_union {
+    struct e1000_rx_desc legacy;
+    union e1000_adv_rx_desc adv;
+};
+
 static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr);
 static void igb_update_interrupt_state(IGBCore *core);
 static void igb_reset(IGBCore *core, bool warm);
@@ -888,26 +893,27 @@ static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
 }
 
 static inline void
-igb_read_lgcy_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
+igb_read_lgcy_rx_descr(IGBCore *core, struct e1000_rx_desc *desc,
+                       hwaddr *buff_addr)
 {
-    struct e1000_rx_desc *d = (struct e1000_rx_desc *) desc;
-    *buff_addr = le64_to_cpu(d->buffer_addr);
+    *buff_addr = le64_to_cpu(desc->buffer_addr);
 }
 
 static inline void
-igb_read_adv_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
+igb_read_adv_rx_descr(IGBCore *core, union e1000_adv_rx_desc *desc,
+                      hwaddr *buff_addr)
 {
-    union e1000_adv_rx_desc *d = (union e1000_adv_rx_desc *) desc;
-    *buff_addr = le64_to_cpu(d->read.pkt_addr);
+    *buff_addr = le64_to_cpu(desc->read.pkt_addr);
 }
 
 static inline void
-igb_read_rx_descr(IGBCore *core, uint8_t *desc, hwaddr *buff_addr)
+igb_read_rx_descr(IGBCore *core, union e1000_rx_desc_union *desc,
+                  hwaddr *buff_addr)
 {
     if (igb_rx_use_legacy_descriptor(core)) {
-        igb_read_lgcy_rx_descr(core, desc, buff_addr);
+        igb_read_lgcy_rx_descr(core, &desc->legacy, buff_addr);
     } else {
-        igb_read_adv_rx_descr(core, desc, buff_addr);
+        igb_read_adv_rx_descr(core, &desc->adv, buff_addr);
     }
 }
 
@@ -1074,7 +1080,7 @@ func_exit:
 }
 
 static inline void
-igb_write_lgcy_rx_descr(IGBCore *core, uint8_t *desc,
+igb_write_lgcy_rx_descr(IGBCore *core, struct e1000_rx_desc *desc,
                         struct NetRxPkt *pkt,
                         const E1000E_RSSInfo *rss_info,
                         uint16_t length)
@@ -1082,50 +1088,47 @@ igb_write_lgcy_rx_descr(IGBCore *core, uint8_t *desc,
     uint32_t status_flags, rss;
     uint16_t ip_id;
 
-    struct e1000_rx_desc *d = (struct e1000_rx_desc *) desc;
-
     assert(!rss_info->enabled);
-    d->length = cpu_to_le16(length);
-    d->csum = 0;
+    desc->length = cpu_to_le16(length);
+    desc->csum = 0;
 
     igb_build_rx_metadata(core, pkt, pkt != NULL,
                           rss_info,
                           NULL, NULL, &rss,
                           &status_flags, &ip_id,
-                          &d->special);
-    d->errors = (uint8_t) (le32_to_cpu(status_flags) >> 24);
-    d->status = (uint8_t) le32_to_cpu(status_flags);
-    d->special = 0;
+                          &desc->special);
+    desc->errors = (uint8_t) (le32_to_cpu(status_flags) >> 24);
+    desc->status = (uint8_t) le32_to_cpu(status_flags);
+    desc->special = 0;
 }
 
 static inline void
-igb_write_adv_rx_descr(IGBCore *core, uint8_t *desc,
+igb_write_adv_rx_descr(IGBCore *core, union e1000_adv_rx_desc *desc,
                        struct NetRxPkt *pkt,
                        const E1000E_RSSInfo *rss_info,
                        uint16_t length)
 {
-    union e1000_adv_rx_desc *d = (union e1000_adv_rx_desc *) desc;
-
-    memset(&d->wb, 0, sizeof(d->wb));
-    d->wb.upper.length = cpu_to_le16(length);
+    memset(&desc->wb, 0, sizeof(desc->wb));
+    desc->wb.upper.length = cpu_to_le16(length);
 
     igb_build_rx_metadata(core, pkt, pkt != NULL, rss_info,
-        &d->wb.lower.lo_dword.pkt_info,
-        &d->wb.lower.lo_dword.hdr_info,
-        &d->wb.lower.hi_dword.rss,
-        &d->wb.upper.status_error,
-        &d->wb.lower.hi_dword.csum_ip.ip_id,
-        &d->wb.upper.vlan);
+        &desc->wb.lower.lo_dword.pkt_info,
+        &desc->wb.lower.lo_dword.hdr_info,
+        &desc->wb.lower.hi_dword.rss,
+        &desc->wb.upper.status_error,
+        &desc->wb.lower.hi_dword.csum_ip.ip_id,
+        &desc->wb.upper.vlan);
 }
 
 static inline void
-igb_write_rx_descr(IGBCore *core, uint8_t *desc, struct NetRxPkt *pkt,
+igb_write_rx_descr(IGBCore *core, union e1000_rx_desc_union *desc,
+                   struct NetRxPkt *pkt,
                    const E1000E_RSSInfo *rss_info, uint16_t length)
 {
     if (igb_rx_use_legacy_descriptor(core)) {
-        igb_write_lgcy_rx_descr(core, desc, pkt, rss_info, length);
+        igb_write_lgcy_rx_descr(core, &desc->legacy, pkt, rss_info, length);
     } else {
-        igb_write_adv_rx_descr(core, desc, pkt, rss_info, length);
+        igb_write_adv_rx_descr(core, &desc->adv, pkt, rss_info, length);
     }
 }
 
@@ -1182,7 +1185,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 {
     PCIDevice *d = core->owner;
     dma_addr_t base;
-    uint8_t desc[E1000_MAX_RX_DESC_LEN];
+    union e1000_rx_desc_union desc;
     size_t desc_size;
     size_t desc_offset = 0;
     size_t iov_ofs = 0;
@@ -1215,7 +1218,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 
         trace_e1000e_rx_descr(rxi->idx, base, core->rx_desc_len);
 
-        igb_read_rx_descr(core, desc, &ba);
+        igb_read_rx_descr(core, &desc, &ba);
 
         if (ba) {
             if (desc_offset < size) {
@@ -1255,7 +1258,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
             is_last = true;
         }
 
-        igb_write_rx_descr(core, desc, is_last ? core->rx_pkt : NULL,
+        igb_write_rx_descr(core, &desc, is_last ? core->rx_pkt : NULL,
                            rss_info, written);
 
         pci_dma_write(d, base, &desc, core->rx_desc_len);
