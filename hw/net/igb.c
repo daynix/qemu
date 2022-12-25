@@ -522,7 +522,6 @@ static void igb_class_init(ObjectClass *class, void *data)
     c->vendor_id = PCI_VENDOR_ID_INTEL;
     c->device_id = E1000_DEV_ID_82576;
     c->revision = 1;
-    c->romfile = NULL;
     c->class_id = PCI_CLASS_NETWORK_ETHERNET;
 
     rc->phases.hold = igb_reset;

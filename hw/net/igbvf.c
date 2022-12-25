@@ -287,7 +287,6 @@ static void igbvf_class_init(ObjectClass *class, void *data)
     c->vendor_id = PCI_VENDOR_ID_INTEL;
     c->device_id = E1000_DEV_ID_82576_VF;
     c->revision = 1;
-    c->romfile = NULL;
     c->class_id = PCI_CLASS_NETWORK_ETHERNET;
 
     dc->desc = "Intel 82576 Virtual Function";
