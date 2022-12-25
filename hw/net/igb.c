@@ -46,6 +46,7 @@
 #include "igb_common.h"
 #include "trace.h"
 #include "qapi/error.h"
+#include "qom/object.h"
 
 #define TYPE_IGB "igb"
 OBJECT_DECLARE_SIMPLE_TYPE(IgbState, IGB)
