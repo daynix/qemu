@@ -97,8 +97,6 @@ struct IGBCore {
 
     uint32_t eitr_guest_value[IGB_MSIX_VEC_NUM];
 
-    uint16_t vet;
-
     uint8_t permanent_mac[ETH_ALEN];
 
     NICState *owner_nic;

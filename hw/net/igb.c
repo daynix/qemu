@@ -501,8 +501,6 @@ static const VMStateDescription igb_vmstate = {
         VMSTATE_UINT32_ARRAY(core.eitr_guest_value, IgbState,
                              IGB_MSIX_VEC_NUM),
 
-        VMSTATE_UINT16(core.vet, IgbState),
-
         VMSTATE_STRUCT_ARRAY(core.tx, IgbState, IGB_NUM_QUEUES, 0,
                              igb_vmstate_tx, struct IGBTx),
         VMSTATE_END_OF_LIST()

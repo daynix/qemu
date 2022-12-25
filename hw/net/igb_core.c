@@ -527,7 +527,7 @@ static void igb_process_tx_desc(IGBCore *core, struct IGBTx *tx,
         if (!tx->skip_cp && net_tx_pkt_parse(tx->tx_pkt)) {
             if (cmd_type_len & E1000_TXD_CMD_VLE) {
                 net_tx_pkt_setup_vlan_header_ex(tx->tx_pkt, tx->vlan,
-                    core->vet);
+                    core->mac[VET] & 0xffff);
             }
             if (igb_tx_pkt_send(core, tx, queue_index)) {
                 igb_on_tx_done_update_stats(core, tx->tx_pkt);
@@ -812,7 +812,7 @@ static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
     uint16_t queues = 0;
     int i;
 
-    if (e1000x_is_vlan_packet(ehdr->h_dest, core->vet) &&
+    if (e1000x_is_vlan_packet(ehdr->h_dest, core->mac[VET] & 0xffff) &&
         e1000x_vlan_rx_filter_enabled(core->mac)) {
         uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci);
         uint32_t vfta = ldl_le_p((uint32_t *)(core->mac + VFTA) +
@@ -1328,7 +1328,8 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     }
 
     net_rx_pkt_attach_iovec_ex(core->rx_pkt, iov, iovcnt, iov_ofs,
-                               e1000x_vlan_enabled(core->mac), core->vet);
+                               e1000x_vlan_enabled(core->mac),
+                               core->mac[VET] & 0xffff);
 
     // TODO: Fix RETA for virtualized environment
     if (!pcie_sriov_is_iov(core->owner)) {
