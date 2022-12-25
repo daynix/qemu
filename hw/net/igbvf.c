@@ -35,7 +35,7 @@
 #include "qapi/error.h"
 
 #define TYPE_IGBVF "igbvf"
-#define IGBVF(obj) OBJECT_CHECK(IgbVfState, (obj), TYPE_IGBVF)
+OBJECT_DECLARE_SIMPLE_TYPE(IgbVfState, IGBVF)
 
 #define IGBVF_MSIX_VECTORS  (3)
 
@@ -45,12 +45,12 @@
 #define IGBVF_MMIO_SIZE     (16 * 1024)
 #define IGBVF_MSIX_SIZE     (16 * 1024)
 
-typedef struct IgbVfState {
+struct IgbVfState {
     PCIDevice parent_obj;
 
     MemoryRegion mmio;
     MemoryRegion msix;
-} IgbVfState;
+};
 
 static hwaddr vf_to_pf_addr(hwaddr addr, uint16_t vfn, bool write)
 {

@@ -48,7 +48,7 @@
 #include "qapi/error.h"
 
 #define TYPE_IGB "igb"
-#define IGB(obj) OBJECT_CHECK(IgbState, (obj), TYPE_IGB)
+OBJECT_DECLARE_SIMPLE_TYPE(IgbState, IGB)
 
 #define IGB_TOTAL_VFS       (8)
 #define IGB_MSIX_VECTORS    (10)
@@ -67,7 +67,7 @@
 #define IGB_IO_SIZE     (32)
 #define IGB_MSIX_SIZE   (16 * 1024)
 
-typedef struct IgbState {
+struct IgbState {
     PCIDevice parent_obj;
     NICState *nic;
     NICConf conf;
@@ -80,7 +80,7 @@ typedef struct IgbState {
     uint32_t ioaddr;
 
     IGBCore core;
-} IgbState;
+};
 
 static void igb_write_config(PCIDevice *dev, uint32_t addr,
     uint32_t val, int len)
