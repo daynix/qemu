@@ -1947,7 +1947,7 @@ igb_get_reg_index_with_offset(const uint16_t *mac_reg_access, hwaddr addr)
     return index + (mac_reg_access[index] & 0xfffe);
 }
 
-static const char igb_phy_regcap[0x20] = {
+static const char igb_phy_regcap[MAX_PHY_REG_ADDRESS + 1] = {
     [MII_BMCR]                   = PHY_RW,
     [MII_BMSR]                   = PHY_R,
     [MII_PHYID1]                 = PHY_R,
@@ -3212,7 +3212,7 @@ static const writeops igb_macreg_writeops[] = {
     [RA2 ... RA2 + 31]       = igb_mac_writereg,
     [WUPM ... WUPM + 31]     = igb_mac_writereg,
     [MTA ... MTA + E1000_MC_TBL_SIZE - 1] = igb_mac_writereg,
-    [VFTA ... VFTA + E1000_VLAN_FILTER_TBL_SIZE - 1]    = igb_mac_writereg,
+    [VFTA ... VFTA + E1000_VLAN_FILTER_TBL_SIZE - 1] = igb_mac_writereg,
     [FFMT ... FFMT + 254]    = igb_set_4bit,
     [MDEF ... MDEF + 7]      = igb_mac_writereg,
     [FTFT ... FTFT + 254]    = igb_mac_writereg,
