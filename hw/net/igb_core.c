@@ -1514,13 +1514,10 @@ igb_parse_rxbufsize(IGBCore *core)
 static void
 igb_calc_rxdesclen(IGBCore *core)
 {
-    core->rx_desc_len = sizeof(union e1000_adv_rx_desc);
-    return;
-
     if (igb_rx_use_legacy_descriptor(core)) {
         core->rx_desc_len = sizeof(struct e1000_rx_desc);
     } else {
-        core->rx_desc_len = sizeof(union e1000_rx_desc_extended);
+        core->rx_desc_len = sizeof(union e1000_adv_rx_desc);
     }
     trace_e1000e_rx_desc_len(core->rx_desc_len);
 }
