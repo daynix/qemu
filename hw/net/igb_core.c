@@ -200,7 +200,6 @@ igb_intrmgr_pci_unint(IGBCore *core)
     int i;
 
     for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
-        timer_del(core->eitr[i].timer);
         timer_free(core->eitr[i].timer);
     }
 }
