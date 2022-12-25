@@ -1099,7 +1099,6 @@ igb_write_lgcy_rx_descr(IGBCore *core, struct e1000_rx_desc *desc,
                           &desc->special);
     desc->errors = (uint8_t) (le32_to_cpu(status_flags) >> 24);
     desc->status = (uint8_t) le32_to_cpu(status_flags);
-    desc->special = 0;
 }
 
 static inline void
