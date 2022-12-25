@@ -30,6 +30,7 @@
 #include "qemu/osdep.h"
 #include "qemu/module.h"
 #include "qemu/range.h"
+#include "qemu/units.h"
 #include "sysemu/sysemu.h"
 #include "net/net.h"
 #include "net/eth.h"
@@ -64,10 +65,10 @@ OBJECT_DECLARE_SIMPLE_TYPE(IgbState, IGB)
 #define IGB_IO_BAR_IDX      (2)
 #define IGB_MSIX_BAR_IDX    (3)
 
-#define IGB_MMIO_SIZE   (128 * 1024)
-#define IGB_FLASH_SIZE  (128 * 1024)
+#define IGB_MMIO_SIZE   (128 * KiB)
+#define IGB_FLASH_SIZE  (128 * KiB)
 #define IGB_IO_SIZE     (32)
-#define IGB_MSIX_SIZE   (16 * 1024)
+#define IGB_MSIX_SIZE   (16 * KiB)
 
 struct IgbState {
     PCIDevice parent_obj;
@@ -367,10 +368,10 @@ static void pci_igb_realize(PCIDevice *dev, Error **err)
 
     pcie_sriov_pf_init_vf_bar(dev, 0,
         PCI_BASE_ADDRESS_MEM_TYPE_64 | PCI_BASE_ADDRESS_MEM_PREFETCH,
-        16 * 1024);
+        16 * KiB);
     pcie_sriov_pf_init_vf_bar(dev, 3,
         PCI_BASE_ADDRESS_MEM_TYPE_64 | PCI_BASE_ADDRESS_MEM_PREFETCH,
-        16 * 1024);
+        16 * KiB);
 
     /* Create networking backend */
     qemu_macaddr_default_if_unset(&s->conf.macaddr);
