@@ -602,17 +602,10 @@ static void vfu_msix_irq_state(vfu_ctx_t *vfu_ctx, uint32_t start,
                                uint32_t count, bool mask)
 {
     VfuObject *o = vfu_get_private(vfu_ctx);
-    Error *err = NULL;
     uint32_t vector;
 
     for (vector = start; vector < count; vector++) {
-        msix_set_mask(o->pci_dev, vector, mask, &err);
-        if (err) {
-            VFU_OBJECT_ERROR(o, "vfu: %s: %s", o->device,
-                             error_get_pretty(err));
-            error_free(err);
-            err = NULL;
-        }
+        msix_set_mask(o->pci_dev, vector, mask);
     }
 }
 
@@ -685,7 +678,7 @@ static int vfu_object_device_reset(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type)
         return 0;
     }
 
-    qdev_reset_all(DEVICE(o->pci_dev));
+    device_cold_reset(DEVICE(o->pci_dev));
 
     return 0;
 }
@@ -726,7 +719,6 @@ static void vfu_object_machine_done(Notifier *notifier, void *data)
  */
 static void vfu_object_init_ctx(VfuObject *o, Error **errp)
 {
-    ERRP_GUARD();
     DeviceState *dev = NULL;
     vfu_pci_type_t pci_type = VFU_PCI_TYPE_CONVENTIONAL;
     int ret;

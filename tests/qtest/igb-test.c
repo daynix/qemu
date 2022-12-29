@@ -32,7 +32,7 @@
 #include "qemu/iov.h"
 #include "qemu/module.h"
 #include "qemu/bitops.h"
-#include "libqos/malloc.h"
+#include "libqos/libqos-malloc.h"
 #include "libqos/e1000e.h"
 #include "hw/net/igb_regs.h"
 

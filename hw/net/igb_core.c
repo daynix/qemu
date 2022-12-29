@@ -1131,6 +1131,40 @@ igb_write_rx_descr(IGBCore *core, union e1000_rx_desc_union *desc,
 }
 
 static inline void
+igb_pci_dma_write_rx_desc(IGBCore *core, dma_addr_t addr,
+                          union e1000_rx_desc_union *desc, dma_addr_t len)
+{
+    PCIDevice *dev = core->owner;
+
+    if (igb_rx_use_legacy_descriptor(core)) {
+        struct e1000_rx_desc *d = &desc->legacy;
+        size_t offset = offsetof(struct e1000_rx_desc, status);
+        uint8_t status = d->status;
+
+        d->status &= ~E1000_RXD_STAT_DD;
+        pci_dma_write(dev, addr, desc, len);
+
+        if (status & E1000_RXD_STAT_DD) {
+            d->status = status;
+            pci_dma_write(dev, addr + offset, &status, sizeof(status));
+        }
+    } else {
+        union e1000_adv_rx_desc *d = &desc->adv;
+        size_t offset =
+            offsetof(union e1000_adv_rx_desc, wb.upper.status_error);
+        uint32_t status = d->wb.upper.status_error;
+
+        d->wb.upper.status_error &= ~E1000_RXD_STAT_DD;
+        pci_dma_write(dev, addr, desc, len);
+
+        if (status & E1000_RXD_STAT_DD) {
+            d->wb.upper.status_error = status;
+            pci_dma_write(dev, addr + offset, &status, sizeof(status));
+        }
+    }
+}
+
+static inline void
 igb_write_hdr_to_rx_buffers(IGBCore *core, hwaddr ba, uint16_t *written,
                             const char *data, dma_addr_t data_len)
 {
@@ -1258,8 +1292,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 
         igb_write_rx_descr(core, &desc, is_last ? core->rx_pkt : NULL,
                            rss_info, written);
-
-        pci_dma_write(d, base, &desc, core->rx_desc_len);
+        igb_pci_dma_write_rx_desc(core, base, &desc, core->rx_desc_len);
 
         igb_ring_advance(core, rxi, core->rx_desc_len / E1000_MIN_RX_DESC_LEN);
 

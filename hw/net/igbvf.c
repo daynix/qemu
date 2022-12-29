@@ -253,7 +253,7 @@ static void igbvf_pci_realize(PCIDevice *dev, Error **errp)
     }
 
     for (i = 0; i < IGBVF_MSIX_VECTORS; i++) {
-        assert(!msix_vector_use(dev, i));
+        msix_vector_use(dev, i);
     }
 
     if (pcie_endpoint_cap_init(dev, 0xa0) < 0) {

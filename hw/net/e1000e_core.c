@@ -1360,6 +1360,55 @@ struct NetRxPkt *pkt, const E1000E_RSSInfo *rss_info,
     }
 }
 
+static inline void
+e1000e_pci_dma_write_rx_desc(E1000ECore *core, dma_addr_t addr,
+                             union e1000_rx_desc_union *desc, dma_addr_t len)
+{
+    PCIDevice *dev = core->owner;
+
+    if (e1000e_rx_use_legacy_descriptor(core)) {
+        struct e1000_rx_desc *d = &desc->legacy;
+        size_t offset = offsetof(struct e1000_rx_desc, status);
+        uint8_t status = d->status;
+
+        d->status &= ~E1000_RXD_STAT_DD;
+        pci_dma_write(dev, addr, desc, len);
+
+        if (status & E1000_RXD_STAT_DD) {
+            d->status = status;
+            pci_dma_write(dev, addr + offset, &status, sizeof(status));
+        }
+    } else {
+        if (core->mac[RCTL] & E1000_RCTL_DTYP_PS) {
+            union e1000_rx_desc_packet_split *d = &desc->packet_split;
+            size_t offset = offsetof(union e1000_rx_desc_packet_split,
+                wb.middle.status_error);
+            uint32_t status = d->wb.middle.status_error;
+
+            d->wb.middle.status_error &= ~E1000_RXD_STAT_DD;
+            pci_dma_write(dev, addr, desc, len);
+
+            if (status & E1000_RXD_STAT_DD) {
+                d->wb.middle.status_error = status;
+                pci_dma_write(dev, addr + offset, &status, sizeof(status));
+            }
+        } else {
+            union e1000_rx_desc_extended *d = &desc->extended;
+            size_t offset = offsetof(union e1000_rx_desc_extended,
+                wb.upper.status_error);
+            uint32_t status = d->wb.upper.status_error;
+
+            d->wb.upper.status_error &= ~E1000_RXD_STAT_DD;
+            pci_dma_write(dev, addr, desc, len);
+
+            if (status & E1000_RXD_STAT_DD) {
+                d->wb.upper.status_error = status;
+                pci_dma_write(dev, addr + offset, &status, sizeof(status));
+            }
+        }
+    }
+}
+
 typedef struct e1000e_ba_state_st {
     uint16_t written[MAX_PS_BUFFERS];
     uint8_t cur_idx;
@@ -1596,7 +1645,7 @@ e1000e_write_packet_to_guest(E1000ECore *core, struct NetRxPkt *pkt,
 
         e1000e_write_rx_descr(core, &desc, is_last ? core->rx_pkt : NULL,
                            rss_info, do_ps ? ps_hdr_len : 0, &bastate.written);
-        pci_dma_write(d, base, &desc, core->rx_desc_len);
+        e1000e_pci_dma_write_rx_desc(core, base, &desc, core->rx_desc_len);
 
         e1000e_ring_advance(core, rxi,
                             core->rx_desc_len / E1000_MIN_RX_DESC_LEN);

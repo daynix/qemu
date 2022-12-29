@@ -241,8 +241,6 @@
 #define M88E1000_PHY_VCO_REG_BIT8  0x100 /* Bits 8 & 11 are adjusted for */
 #define M88E1000_PHY_VCO_REG_BIT11 0x800    /* improved BER performance */
 
-#define E1000_CTRL_EXT_DRV_LOAD 0x10000000 /* Driver loaded bit for FW */
-
 #define E1000_STATUS_FUNC_MASK  0x0000000C      /* PCI Function Mask */
 #define E1000_STATUS_FUNC_SHIFT 2
 #define E1000_STATUS_FUNC_0     0x00000000      /* Function 0 */

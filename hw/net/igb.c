@@ -347,7 +347,7 @@ static void pci_igb_realize(PCIDevice *dev, Error **err)
     }
 
     for (i = 0; i < IGB_MSIX_VECTORS; i++) {
-        assert(!msix_vector_use(dev, i));
+        msix_vector_use(dev, i);
     }
 
     if (igb_add_pm_capability(dev, 0x40, PCI_PM_CAP_DSI) < 0) {
