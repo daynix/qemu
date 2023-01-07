@@ -45,8 +45,7 @@
 #include "net_tx_pkt.h"
 #include "net_rx_pkt.h"
 
-#include "e1000x_common.h"
-#include "igb_enums.h"
+#include "igb_common.h"
 #include "igb_core.h"
 
 #include "trace.h"

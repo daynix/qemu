@@ -29,7 +29,7 @@
 #include "hw/pci/pci.h"
 #include "hw/pci/pcie.h"
 #include "hw/pci/msix.h"
-#include "igb_regs.h"
+#include "net/net.h"
 #include "igb_common.h"
 #include "trace.h"
 #include "qapi/error.h"
