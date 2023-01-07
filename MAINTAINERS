@@ -2208,6 +2208,11 @@ S: Maintained
 F: hw/net/e1000e*
 F: tests/qtest/fuzz-e1000e-test.c
 
+igb
+M: Akihiko Odaki <akihiko.odaki@daynix.com>
+S: Maintained
+F: hw/net/igb*
+
 eepro100
 M: Stefan Weil <sw@weilnetz.de>
 S: Maintained
