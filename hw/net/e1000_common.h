@@ -22,9 +22,10 @@
 * License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef HW_NET_E1000X_ENUMS_H
-#define HW_NET_E1000X_ENUMS_H
+#ifndef HW_NET_E1000_COMMON_H
+#define HW_NET_E1000_COMMON_H
 
+#include "e1000x_common.h"
 #include "e1000_regs.h"
 
 #define defreg(x)   x = (E1000_##x >> 2)
