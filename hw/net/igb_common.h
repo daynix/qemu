@@ -18,7 +18,6 @@
 #ifndef HW_NET_IGB_COMMON_H
 #define HW_NET_IGB_COMMON_H
 
-#include "e1000x_common.h"
 #include "igb_regs.h"
 
 #define defreg(x) x = (E1000_##x >> 2)
@@ -130,6 +129,8 @@ enum {
 
     defreg(VTIVAR), defreg(VTIVAR_MISC),
 };
+
+#include "e1000x_common.h"
 
 uint64_t igb_mmio_read(void *opaque, hwaddr addr, unsigned size);
 void igb_mmio_write(void *opaque, hwaddr addr, uint64_t val, unsigned size);

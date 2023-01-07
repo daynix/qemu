@@ -26,6 +26,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/hw.h"
+#include "hw/net/mii.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/pcie.h"
 #include "hw/pci/msix.h"

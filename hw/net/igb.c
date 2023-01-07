@@ -34,6 +34,7 @@
 #include "sysemu/sysemu.h"
 #include "net/net.h"
 #include "net/eth.h"
+#include "hw/net/mii.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/pcie.h"
 #include "hw/pci/pcie_sriov.h"

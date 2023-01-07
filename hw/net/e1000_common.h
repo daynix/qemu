@@ -25,7 +25,6 @@
 #ifndef HW_NET_E1000_COMMON_H
 #define HW_NET_E1000_COMMON_H
 
-#include "e1000x_common.h"
 #include "e1000_regs.h"
 
 #define defreg(x)   x = (E1000_##x >> 2)
@@ -99,5 +98,7 @@ enum {
     defreg(TDBAL_A), defreg(TDLEN_A), defreg(VFTA_A),  defreg(RDLEN0_A),
     defreg(FCRTL_A), defreg(FCRTH_A)
 };
+
+#include "e1000x_common.h"
 
 #endif
