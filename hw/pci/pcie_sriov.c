@@ -306,7 +306,7 @@ bool pcie_sriov_is_iov(PCIDevice *dev)
 	return dev->exp.sriov_pf.num_vfs > 0;
 }
 
-uint16_t pcie_sriov_vfs_count(PCIDevice *dev)
+uint16_t pcie_sriov_num_vfs(PCIDevice *dev)
 {
 	return dev->exp.sriov_pf.num_vfs;
 }

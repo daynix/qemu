@@ -86,7 +86,7 @@ static void igb_msix_notify(IGBCore *core, unsigned int vector)
 
 	if (pcie_sriov_is_iov(core->owner)) {
 		vfn = 8 - (vector + 2) / 3;
-		if (vfn < pcie_sriov_vfs_count(core->owner)) {
+		if (vfn < pcie_sriov_num_vfs(core->owner)) {
 			dev = pcie_sriov_get_vf_at_index(core->owner, vfn);
             assert(dev);
             vector = (vector + 2) % 3;
@@ -2309,7 +2309,7 @@ static uint32_t igb_get_status(IGBCore *core, int index)
 
     if (pcie_sriov_is_iov(core->owner)) {
         status |=
-            (pcie_sriov_vfs_count(core->owner) << E1000_STATUS_NUM_VFS_SHIFT);
+            (pcie_sriov_num_vfs(core->owner) << E1000_STATUS_NUM_VFS_SHIFT);
         status |= E1000_STATUS_IOV_MODE;
     }
 
