@@ -301,11 +301,6 @@ PCIDevice *pcie_sriov_get_vf_at_index(PCIDevice *dev, int n)
     return NULL;
 }
 
-bool pcie_sriov_is_iov(PCIDevice *dev)
-{
-	return dev->exp.sriov_pf.num_vfs > 0;
-}
-
 uint16_t pcie_sriov_num_vfs(PCIDevice *dev)
 {
 	return dev->exp.sriov_pf.num_vfs;

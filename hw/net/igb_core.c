@@ -84,13 +84,11 @@ static void igb_msix_notify(IGBCore *core, unsigned int vector)
     PCIDevice *dev = core->owner;
     uint16_t vfn;
 
-	if (pcie_sriov_is_iov(core->owner)) {
-		vfn = 8 - (vector + 2) / 3;
-		if (vfn < pcie_sriov_num_vfs(core->owner)) {
-			dev = pcie_sriov_get_vf_at_index(core->owner, vfn);
-            assert(dev);
-            vector = (vector + 2) % 3;
-        }
+	vfn = 8 - (vector + 2) / 3;
+	if (vfn < pcie_sriov_num_vfs(core->owner)) {
+		dev = pcie_sriov_get_vf_at_index(core->owner, vfn);
+        assert(dev);
+        vector = (vector + 2) % 3;
     }
 
     msix_notify(dev, vector);
@@ -396,7 +394,7 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct IGBTx *tx,
     bool ret;
 
 	/* TX switching is only used to serve VM to VM traffic. */
-	if (!pcie_sriov_is_iov(core->owner)) {
+	if (!pcie_sriov_num_vfs(core->owner)) {
         goto send_out;
     }
 
@@ -1363,7 +1361,7 @@ ssize_t igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
                                core->mac[VET] & 0xffff);
 
     // TODO: Fix RETA for virtualized environment
-    if (!pcie_sriov_is_iov(core->owner)) {
+    if (!pcie_sriov_num_vfs(core->owner)) {
         igb_rss_parse_packet(core, core->rx_pkt, &rss_info);
         queues = BIT(rss_info.queue);
     }
@@ -2282,6 +2280,7 @@ igb_get_ctrl(IGBCore *core, int index)
 static uint32_t igb_get_status(IGBCore *core, int index)
 {
     uint32_t status = core->mac[STATUS];
+    uint16_t num_vfs = pcie_sriov_num_vfs(core->owner);
 
     if (core->mac[CTRL] & E1000_CTRL_FRCDPX) {
         status |= (core->mac[CTRL] & E1000_CTRL_FD) ? E1000_STATUS_FD : 0;
@@ -2307,9 +2306,8 @@ static uint32_t igb_get_status(IGBCore *core, int index)
         status |= E1000_STATUS_SPEED_1000;
     }
 
-    if (pcie_sriov_is_iov(core->owner)) {
-        status |=
-            (pcie_sriov_num_vfs(core->owner) << E1000_STATUS_NUM_VFS_SHIFT);
+    if (num_vfs) {
+        status |= num_vfs << E1000_STATUS_NUM_VFS_SHIFT;
         status |= E1000_STATUS_IOV_MODE;
     }
 
