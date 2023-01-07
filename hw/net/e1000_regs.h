@@ -38,6 +38,11 @@
 #define E1000_EIAC     0x000DC  /* Ext. Interrupt Auto Clear - RW */
 #define E1000_IVAR     0x000E4  /* Interrupt Vector Allocation Register - RW */
 #define E1000_EITR     0x000E8  /* Extended Interrupt Throttling Rate - RW */
+#define E1000_RDBAL1   0x02900  /* RX Descriptor Base Address Low (1) - RW */
+#define E1000_RDBAH1   0x02904  /* RX Descriptor Base Address High (1) - RW */
+#define E1000_RDLEN1   0x02908  /* RX Descriptor Length (1) - RW */
+#define E1000_RDH1     0x02910  /* RX Descriptor Head (1) - RW */
+#define E1000_RDT1     0x02918  /* RX Descriptor Tail (1) - RW */
 #define E1000_FCRTV    0x05F40  /* Flow Control Refresh Timer Value - RW */
 #define E1000_TXCW     0x00178  /* TX Configuration Word - RW */
 #define E1000_RXCW     0x00180  /* RX Configuration Word - RO */
@@ -58,15 +63,6 @@
 #define E1000_ERT      0x02008  /* Early Rx Threshold - RW */
 #define E1000_FCRTH_A  0x00160  /* Alias to FCRTH */
 #define E1000_PSRCTL   0x02170  /* Packet Split Receive Control - RW */
-#define E1000_TXDMAC   0x03000  /* TX DMA Control - RW */
-#define E1000_KABGTXD  0x03004  /* AFE Band Gap Transmit Ref Data */
-#define E1000_POEMB    0x00F10  /* PHY OEM Bits Register - RW */
-#define E1000_RDTR1    0x02820  /* RX Delay Timer (1) - RW */
-#define E1000_RDBAL1   0x02900  /* RX Descriptor Base Address Low (1) - RW */
-#define E1000_RDBAH1   0x02904  /* RX Descriptor Base Address High (1) - RW */
-#define E1000_RDLEN1   0x02908  /* RX Descriptor Length (1) - RW */
-#define E1000_RDH1     0x02910  /* RX Descriptor Head (1) - RW */
-#define E1000_RDT1     0x02918  /* RX Descriptor Tail (1) - RW */
 #define E1000_RDBAL    0x02800  /* RX Descriptor Base Address Low - RW */
 #define E1000_RDBAH    0x02804  /* RX Descriptor Base Address High - RW */
 #define E1000_RDLEN    0x02808  /* RX Descriptor Length - RW */
@@ -90,6 +86,7 @@
 #define E1000_RADV     0x0282C  /* RX Interrupt Absolute Delay Timer - RW */
 #define E1000_RSRPD    0x02C00  /* RX Small Packet Detect - RW */
 #define E1000_RAID     0x02C08  /* Receive Ack Interrupt Delay - RW */
+#define E1000_POEMB    0x00F10  /* PHY OEM Bits Register - RW */
 #define E1000_TDBAL    0x03800  /* TX Descriptor Base Address Low - RW */
 #define E1000_TDBAL_A  0x00420  /* Alias to TDBAL */
 #define E1000_TDBAH    0x03804  /* TX Descriptor Base Address High - RW */
@@ -106,13 +103,13 @@
 #define E1000_TADV     0x0382C  /* TX Interrupt Absolute Delay Val - RW */
 #define E1000_TSPMT    0x03830  /* TCP Segmentation PAD & Min Threshold - RW */
 #define E1000_TARC0    0x03840  /* TX Arbitration Count (0) */
-#define E1000_TARC1    0x03940  /* TX Arbitration Count (1) */
 #define E1000_TDBAL1   0x03900  /* TX Desc Base Address Low (1) - RW */
 #define E1000_TDBAH1   0x03904  /* TX Desc Base Address High (1) - RW */
 #define E1000_TDLEN1   0x03908  /* TX Desc Length (1) - RW */
 #define E1000_TDH1     0x03910  /* TX Desc Head (1) - RW */
 #define E1000_TDT1     0x03918  /* TX Desc Tail (1) - RW */
 #define E1000_TXDCTL1  0x03928  /* TX Descriptor Control (1) - RW */
+#define E1000_TARC1    0x03940  /* TX Arbitration Count (1) */
 #define E1000_SEQEC    0x04038  /* Sequence Error Count - R/clr */
 #define E1000_CEXTERR  0x0403C  /* Carrier Extension Error Count - R/clr */
 #define E1000_TSCTFC   0x040FC  /* TCP Segmentation Context TX Fail - R/clr */
