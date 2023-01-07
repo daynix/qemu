@@ -853,6 +853,35 @@ union e1000_rx_desc_packet_split {
 /* Receive Address */
 #define E1000_RAH_AV  0x80000000        /* Receive descriptor valid */
 
+/* Offload Context Descriptor */
+struct e1000_context_desc {
+    union {
+        uint32_t ip_config;
+        struct {
+            uint8_t ipcss;      /* IP checksum start */
+            uint8_t ipcso;      /* IP checksum offset */
+            uint16_t ipcse;     /* IP checksum end */
+        } ip_fields;
+    } lower_setup;
+    union {
+        uint32_t tcp_config;
+        struct {
+            uint8_t tucss;      /* TCP checksum start */
+            uint8_t tucso;      /* TCP checksum offset */
+            uint16_t tucse;     /* TCP checksum end */
+        } tcp_fields;
+    } upper_setup;
+    uint32_t cmd_and_length;    /* */
+    union {
+        uint32_t data;
+        struct {
+            uint8_t status;     /* Descriptor status */
+            uint8_t hdr_len;    /* Header length */
+            uint16_t mss;       /* Maximum segment size */
+        } fields;
+    } tcp_seg_setup;
+};
+
 /* Filters */
 #define E1000_NUM_UNICAST          16	/* Unicast filter entries */
 #define E1000_MC_TBL_SIZE          128	/* Multicast Filter Table (4096 bits) */
