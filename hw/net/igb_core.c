@@ -227,7 +227,7 @@ igb_rx_use_legacy_descriptor(IGBCore *core)
 static inline bool
 igb_rss_enabled(IGBCore *core)
 {
-    return E1000_MRQC_ENABLED(core->mac[MRQC]) &&
+    return (core->mac[MRQC] & 3) == E1000_MRQC_ENABLE_RSS_MQ &&
            !igb_rx_csum_enabled(core) &&
            !igb_rx_use_legacy_descriptor(core);
 }

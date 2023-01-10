@@ -287,8 +287,6 @@
 #define E1000_RETA      0x05C00 /* Redirection Table - RW Array */
 #define E1000_RSSRK     0x05C80 /* RSS Random Key - RW Array */
 
-#define E1000_MRQC_ENABLED(mrqc) (((mrqc) & (BIT(0) | BIT(1))) == BIT(0))
-
 #define E1000_RETA_IDX(hash)        ((hash) & (BIT(7) - 1))
 #define E1000_RETA_VAL(reta, hash)  (((uint8_t *)(reta))[E1000_RETA_IDX(hash)])
 

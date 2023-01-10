@@ -136,6 +136,8 @@
 #define E1000_RXUDP      0x0B638 /* Time Sync Rx UDP Port - RW */
 #define E1000_RXCFGL     0x0B634 /* RX Ethertype and Message Type - RW*/
 
+#define E1000_MRQC_ENABLED(mrqc) (((mrqc) & (BIT(0) | BIT(1))) == BIT(0))
+
 #define E1000_CPUVEC    0x02C10 /* CPU Vector Register - RW */
 #define E1000_RSSIM     0x05864 /* RSS Interrupt Mask */
 #define E1000_RSSIR     0x05868 /* RSS Interrupt Request */

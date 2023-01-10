@@ -153,6 +153,13 @@ union e1000_adv_rx_desc {
 
 /* from igb/e1000_82575.h */
 
+#define E1000_MRQC_ENABLE_RSS_MQ            0x00000002
+#define E1000_MRQC_ENABLE_VMDQ              0x00000003
+#define E1000_MRQC_RSS_FIELD_IPV4_UDP       0x00400000
+#define E1000_MRQC_ENABLE_VMDQ_RSS_MQ       0x00000005
+#define E1000_MRQC_RSS_FIELD_IPV6_UDP       0x00800000
+#define E1000_MRQC_RSS_FIELD_IPV6_UDP_EX    0x01000000
+
 /* Additional Receive Descriptor Control definitions */
 #define E1000_RXDCTL_QUEUE_ENABLE  0x02000000 /* Enable specific Rx Queue */
 
