@@ -3633,7 +3633,7 @@ igb_phy_reg_init[] = {
     [MII_ANLPAR]            = MII_ANLPAR_10 | MII_ANLPAR_10FD |
                               MII_ANLPAR_TX | MII_ANLPAR_TXFD |
                               MII_ANLPAR_T4 | MII_ANLPAR_PAUSE,
-    [MII_ANER]              = MII_ANER_NP,
+    [MII_ANER]              = MII_ANER_NP | MII_ANER_NWAY,
     [MII_ANNP]              = 0x1 | MII_ANNP_MP,
     [MII_CTRL1000]          = MII_CTRL1000_HALF | MII_CTRL1000_FULL |
                               MII_CTRL1000_PORT | MII_CTRL1000_MASTER,
