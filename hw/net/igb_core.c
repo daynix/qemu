@@ -2360,7 +2360,12 @@ static uint32_t igb_get_status(IGBCore *core, int index)
         res |= E1000_STATUS_IOV_MODE;
     }
 
-    if (!(core->mac[CTRL] & E1000_CTRL_GIO_MASTER_DISABLE)) {
+    /*
+     * Windows driver 12.18.9.23 resets if E1000_STATUS_GIO_MASTER_ENABLE is
+     * left set after E1000_CTRL_LRST is set.
+     */
+    if (!(core->mac[CTRL] & E1000_CTRL_GIO_MASTER_DISABLE) &&
+        !(core->mac[CTRL] & E1000_CTRL_LRST)) {
         res |= E1000_STATUS_GIO_MASTER_ENABLE;
     }
 
