@@ -60,7 +60,6 @@ union e1000_rx_desc_union {
 static inline void
 igb_set_interrupt_cause(IGBCore *core, uint32_t val);
 
-static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr);
 static void igb_update_interrupt_state(IGBCore *core);
 static void igb_reset(IGBCore *core, bool sw);
 
@@ -402,15 +401,6 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct igb_tx *tx,
 
     /* TX switching requires DTXSWC.Loopback_en bit enabled. */
     if (!(core->mac[DTXSWC] & E1000_DTXSWC_VMDQ_LOOPBACK_EN)) {
-        goto send_out;
-    }
-
-    if (net_tx_pkt_get_packet_type(tx->tx_pkt) == ETH_PKT_UCAST) {
-        if (igb_receive_route(core, net_tx_pkt_get_eth_hdr(tx->tx_pkt))) {
-            return net_tx_pkt_send_loopback(tx->tx_pkt, nc);
-        }
-
-        /* Unicast packet which doesn't target a VF is send to lan. */
         goto send_out;
     }
 
@@ -820,12 +810,16 @@ igb_rx_l4_cso_enabled(IGBCore *core)
     return !!(core->mac[RXCSUM] & E1000_RXCSUM_TUOFLD);
 }
 
-static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
+static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
+                                   E1000E_RSSInfo *rss_info)
 {
     static const int ta_shift[] = { 4, 3, 2, 0 };
     uint32_t f, ra[2], *macp, rctl = core->mac[RCTL];
     uint16_t queues = 0;
+    bool accepted = false;
     int i;
+
+    memset(rss_info, 0, sizeof(E1000E_RSSInfo));
 
     if (e1000x_is_vlan_packet(ehdr->h_dest, core->mac[VET] & 0xffff) &&
         e1000x_vlan_rx_filter_enabled(core->mac)) {
@@ -841,69 +835,110 @@ static uint16_t igb_receive_route(IGBCore *core, const struct eth_header *ehdr)
         }
     }
 
-    if (is_broadcast_ether_addr(ehdr->h_dest)) {
-        for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
-            if (core->mac[VMOLR0 + i] & E1000_VMOLR_BAM) {
-                queues |= BIT(i);
+    if (pcie_sriov_num_vfs(core->owner)) {
+        if (is_broadcast_ether_addr(ehdr->h_dest)) {
+            for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+                if (core->mac[VMOLR0 + i] & E1000_VMOLR_BAM) {
+                    queues |= BIT(i);
+                }
+            }
+
+            return queues;
+        }
+
+        for (macp = core->mac + RA; macp < core->mac + RA + 32; macp += 2) {
+            if (!(macp[1] & E1000_RAH_AV)) {
+                continue;
+            }
+            ra[0] = cpu_to_le32(macp[0]);
+            ra[1] = cpu_to_le32(macp[1]);
+            if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
+                queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
             }
         }
 
-        return queues;
-    }
-
-    for (macp = core->mac + RA; macp < core->mac + RA + 32; macp += 2) {
-        if (!(macp[1] & E1000_RAH_AV)) {
-            continue;
-        }
-        ra[0] = cpu_to_le32(macp[0]);
-        ra[1] = cpu_to_le32(macp[1]);
-        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
-            trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA) / 2,
-                                            MAC_ARG(ehdr->h_dest));
-
-            queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
-        }
-    }
-
-    for (macp = core->mac + RA2; macp < core->mac + RA2 + 16; macp += 2) {
-        if (!(macp[1] & E1000_RAH_AV)) {
-            continue;
-        }
-        ra[0] = cpu_to_le32(macp[0]);
-        ra[1] = cpu_to_le32(macp[1]);
-        if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
-            trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA2) / 2,
-                                            MAC_ARG(ehdr->h_dest));
-
-            queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
-        }
-    }
-
-    if (queues) {
-        return queues;
-    }
-
-    macp = core->mac + (is_multicast_ether_addr(ehdr->h_dest) ? MTA : UTA);
-
-    f = ta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
-    f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
-    if (macp[f >> 5] & (1 << (f & 0x1f))) {
-        for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
-            if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
-                queues |= BIT(i);
+        for (macp = core->mac + RA2; macp < core->mac + RA2 + 16; macp += 2) {
+            if (!(macp[1] & E1000_RAH_AV)) {
+                continue;
+            }
+            ra[0] = cpu_to_le32(macp[0]);
+            ra[1] = cpu_to_le32(macp[1]);
+            if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
+                queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
             }
         }
-    }
 
-    if (queues) {
-        e1000x_inc_reg_if_not_full(core->mac, MPRC);
-        return queues;
-    }
+        if (queues) {
+            return queues;
+        }
 
-    trace_e1000x_rx_flt_inexact_mismatch(MAC_ARG(ehdr->h_dest),
-                                         (rctl >> E1000_RCTL_MO_SHIFT) & 3,
-                                         f >> 5,
-                                         macp[f >> 5]);
+        macp = core->mac + (is_multicast_ether_addr(ehdr->h_dest) ? MTA : UTA);
+
+        f = ta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
+        f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
+        if (macp[f >> 5] & (1 << (f & 0x1f))) {
+            for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+                if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
+                        queues |= BIT(i);
+                }
+            }
+        }
+
+        if (queues) {
+            return queues;
+        }
+    } else {
+        switch (net_rx_pkt_get_packet_type(core->rx_pkt)) {
+        case ETH_PKT_UCAST:
+            if (rctl & E1000_RCTL_UPE) {
+                accepted = true; /* promiscuous ucast */
+            }
+            break;
+
+        case ETH_PKT_BCAST:
+            if (rctl & E1000_RCTL_BAM) {
+                accepted = true; /* broadcast enabled */
+            }
+            break;
+
+        case ETH_PKT_MCAST:
+            if (rctl & E1000_RCTL_MPE) {
+                accepted = true; /* promiscuous mcast */
+            }
+            break;
+
+        default:
+            g_assert_not_reached();
+        }
+
+        if (!accepted) {
+            accepted = e1000x_rx_group_filter(core->mac, ehdr->h_dest);
+        }
+
+        if (!accepted) {
+            for (macp = core->mac + RA2; macp < core->mac + RA2 + 16; macp += 2) {
+                if (!(macp[1] & E1000_RAH_AV)) {
+                    continue;
+                }
+                ra[0] = cpu_to_le32(macp[0]);
+                ra[1] = cpu_to_le32(macp[1]);
+                if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
+                    trace_e1000x_rx_flt_ucast_match((int)(macp - core->mac - RA2) / 2,
+                                                    MAC_ARG(ehdr->h_dest));
+
+                    accepted = true;
+                    break;
+                }
+            }
+        }
+
+        if (accepted) {
+            igb_rss_parse_packet(core, core->rx_pkt, rss_info);
+            queues = BIT(rss_info->queue);
+
+            return queues;
+        }
+    }
 
     return queues;
 }
@@ -1380,20 +1415,14 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     ehdr = PKT_GET_ETH_HDR(filter_buf);
     net_rx_pkt_set_packet_type(core->rx_pkt, get_eth_packet_type(ehdr));
 
-    queues = igb_receive_route(core, ehdr);
-    if (!queues) {
-        trace_e1000e_rx_flt_dropped();
-        return orig_size;
-    }
-
     net_rx_pkt_attach_iovec_ex(core->rx_pkt, iov, iovcnt, iov_ofs,
                                e1000x_vlan_enabled(core->mac),
                                core->mac[VET] & 0xffff);
 
-    /* TODO: Fix RETA for virtualized environment */
-    if (!pcie_sriov_num_vfs(core->owner)) {
-        igb_rss_parse_packet(core, core->rx_pkt, &rss_info);
-        queues = BIT(rss_info.queue);
+    queues = igb_receive_assign(core, ehdr, &rss_info);
+    if (!queues) {
+        trace_e1000e_rx_flt_dropped();
+        return orig_size;
     }
 
     total_size = net_rx_pkt_get_total_len(core->rx_pkt) +
@@ -1422,11 +1451,6 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
             if (!(queues & BIT(i))) {
                 continue;
             }
-
-            rss_info.enabled = false;
-            rss_info.hash = 0;
-            rss_info.queue = i;
-            rss_info.type = 0;
 
             igb_rx_ring_init(core, &rxr, i);
 
