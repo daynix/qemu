@@ -3669,8 +3669,7 @@ static const uint32_t igb_mac_reg_init[] = {
     [TIPG]          = 0x08 | (0x04 << 10) | (0x06 << 20),
     [CTRL]          = E1000_CTRL_FD | E1000_CTRL_LRST | E1000_CTRL_SPD_1000 |
                       E1000_CTRL_ADVD3WUC,
-    [STATUS]        = E1000_STATUS_PHYRA | E1000_STATUS_GIO_MASTER_ENABLE |
-                      BIT(31),
+    [STATUS]        = E1000_STATUS_PHYRA | BIT(31),
     [EECD]          = E1000_EECD_FWE_DIS | E1000_EECD_PRES |
                       (2 << E1000_EECD_SIZE_EX_SHIFT),
     [GCR]           = E1000_L0S_ADJUST |
