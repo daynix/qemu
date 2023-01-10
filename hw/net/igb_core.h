@@ -38,15 +38,13 @@
 
 #define E1000E_MAC_SIZE         (0x8000)
 #define IGB_EEPROM_SIZE         (1024)
-#define IGB_MSIX_VEC_NUM        (25)
-#define IGB_NUM_QUEUES          (16)
 
 /*
  * TBD: handle igb sizes, vectors = 25, queues = 16!
  * Just set some conservative values here to work with for now
  */
-#define IGB_MSIX_VEC_NUM     (25)
-#define IGB_NUM_QUEUES       (16)
+#define IGB_MSIX_VEC_NUM        (25)
+#define IGB_NUM_QUEUES          (16)
 
 typedef struct IGBCore IGBCore;
 

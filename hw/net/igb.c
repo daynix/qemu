@@ -78,7 +78,6 @@ struct IGBState {
     IGBCore core;
 };
 
-#define IGB_TOTAL_VFS       (8)
 #define IGB_MSIX_VECTORS    (10)
 
 #define IGB_CAP_SRIOV_OFFSET    (0x160)
@@ -407,8 +406,8 @@ static void igb_pci_realize(PCIDevice *pci_dev, Error **errp)
     pcie_ari_init(pci_dev, 0x150, 1);
 
     pcie_sriov_pf_init(pci_dev, IGB_CAP_SRIOV_OFFSET, "igbvf",
-        IGB_82576_VF_DEV_ID, IGB_TOTAL_VFS, IGB_TOTAL_VFS, IGB_VF_OFFSET,
-        IGB_VF_STRIDE);
+        IGB_82576_VF_DEV_ID, IGB_MAX_VF_FUNCTIONS, IGB_MAX_VF_FUNCTIONS,
+        IGB_VF_OFFSET, IGB_VF_STRIDE);
 
     pcie_sriov_pf_init_vf_bar(pci_dev, 0,
         PCI_BASE_ADDRESS_MEM_TYPE_64 | PCI_BASE_ADDRESS_MEM_PREFETCH,

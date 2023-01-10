@@ -3715,11 +3715,11 @@ static const uint32_t igb_mac_reg_init[] = {
     [DTXCTL]        = E1000_DTXCTL_8023LL | E1000_DTXCTL_SPOOF_INT,
     [VET]           = ETH_P_VLAN | (ETH_P_VLAN << 16),
 
-    [V2PMAILBOX0 ... V2PMAILBOX0 + 7] = E1000_V2PMAILBOX_RSTI,
+    [V2PMAILBOX0 ... V2PMAILBOX0 + IGB_MAX_VF_FUNCTIONS - 1] = E1000_V2PMAILBOX_RSTI,
     [MBVFIMR]       = 0xFF,
     [VFRE]          = 0xFF,
     [VFTE]          = 0xFF,
-    [VMOLR0 ... VMOLR0 + 7] = 0x2600 | E1000_VMOLR_STRCRC,
+    [VMOLR0 ... VMOLR0 + IGB_MAX_VF_FUNCTIONS - 1] = 0x2600 | E1000_VMOLR_STRCRC,
     [RPLOLR]        = E1000_RPLOLR_STRCRC,
     [RLPML]         = 0x2600,
     [TXCTL0]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
