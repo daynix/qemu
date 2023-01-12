@@ -555,25 +555,6 @@ static uint32_t igb_rx_wb_eic(IGBCore *core, int queue_idx)
     return (ent & E1000_IVAR_VALID) ? BIT(ent & 0x1f) : 0;
 }
 
-static uint32_t
-igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
-                     union e1000_adv_tx_desc *tx_desc, int queue_idx)
-{
-    uint32_t cmd_type_len = le32_to_cpu(tx_desc->read.cmd_type_len);
-    uint32_t status;
-
-    if (!(cmd_type_len & E1000_TXD_CMD_RS)) {
-        return 0;
-    }
-
-    status = le32_to_cpu(tx_desc->wb.status) | E1000_TXD_STAT_DD;
-
-    tx_desc->wb.status = cpu_to_le32(status);
-    pci_dma_write(core->owner, base + offsetof(union e1000_adv_tx_desc, wb),
-        &tx_desc->wb, sizeof(tx_desc->wb));
-    return igb_tx_wb_eic(core, queue_idx);
-}
-
 typedef struct E1000E_RingInfo_st {
     int dbah;
     int dbal;
@@ -710,6 +691,35 @@ igb_rx_ring_init(IGBCore *core, E1000E_RxRing *rxr, int idx)
     rxr->i      = &i[idx];
 }
 
+static uint32_t
+igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
+                     union e1000_adv_tx_desc *tx_desc,
+                     const E1000E_RingInfo *txi)
+{
+    uint32_t cmd_type_len = le32_to_cpu(tx_desc->read.cmd_type_len);
+    uint64_t tdwba;
+
+    tdwba = core->mac[E1000_TDWBAL(txi->idx) >> 2];
+    tdwba |= (uint64_t)core->mac[E1000_TDWBAH(txi->idx) >> 2] << 32;
+
+    if (!(cmd_type_len & E1000_TXD_CMD_RS)) {
+        return 0;
+    }
+
+    if (tdwba & 1) {
+        uint32_t buffer = cpu_to_le32(core->mac[txi->dh]);
+        pci_dma_write(core->owner, tdwba & ~3, &buffer, sizeof(buffer));
+    } else {
+        uint32_t status = le32_to_cpu(tx_desc->wb.status) | E1000_TXD_STAT_DD;
+
+        tx_desc->wb.status = cpu_to_le32(status);
+        pci_dma_write(core->owner, base + offsetof(union e1000_adv_tx_desc, wb),
+            &tx_desc->wb, sizeof(tx_desc->wb));
+    }
+
+    return igb_tx_wb_eic(core, txi->idx);
+}
+
 static void
 igb_start_xmit(IGBCore *core, const IGB_TxRing *txr)
 {
@@ -733,9 +743,8 @@ igb_start_xmit(IGBCore *core, const IGB_TxRing *txr)
                               desc.read.cmd_type_len, desc.wb.status);
 
         igb_process_tx_desc(core, txr->tx, &desc, txi->idx);
-        eic |= igb_txdesc_writeback(core, base, &desc, txi->idx);
-
         igb_ring_advance(core, txi, 1);
+        eic |= igb_txdesc_writeback(core, base, &desc, txi);
     }
 
     if (eic) {
@@ -2730,6 +2739,38 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(TXCTL13),
     igb_getreg(TXCTL14),
     igb_getreg(TXCTL15),
+    igb_getreg(TDWBAL0),
+    igb_getreg(TDWBAL1),
+    igb_getreg(TDWBAL2),
+    igb_getreg(TDWBAL3),
+    igb_getreg(TDWBAL4),
+    igb_getreg(TDWBAL5),
+    igb_getreg(TDWBAL6),
+    igb_getreg(TDWBAL7),
+    igb_getreg(TDWBAL8),
+    igb_getreg(TDWBAL9),
+    igb_getreg(TDWBAL10),
+    igb_getreg(TDWBAL11),
+    igb_getreg(TDWBAL12),
+    igb_getreg(TDWBAL13),
+    igb_getreg(TDWBAL14),
+    igb_getreg(TDWBAL15),
+    igb_getreg(TDWBAH0),
+    igb_getreg(TDWBAH1),
+    igb_getreg(TDWBAH2),
+    igb_getreg(TDWBAH3),
+    igb_getreg(TDWBAH4),
+    igb_getreg(TDWBAH5),
+    igb_getreg(TDWBAH6),
+    igb_getreg(TDWBAH7),
+    igb_getreg(TDWBAH8),
+    igb_getreg(TDWBAH9),
+    igb_getreg(TDWBAH10),
+    igb_getreg(TDWBAH11),
+    igb_getreg(TDWBAH12),
+    igb_getreg(TDWBAH13),
+    igb_getreg(TDWBAH14),
+    igb_getreg(TDWBAH15),
     igb_getreg(PVTCTRL0),
     igb_getreg(PVTCTRL1),
     igb_getreg(PVTCTRL2),
@@ -3135,6 +3176,38 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(TXCTL13),
     igb_putreg(TXCTL14),
     igb_putreg(TXCTL15),
+    igb_putreg(TDWBAL0),
+    igb_putreg(TDWBAL1),
+    igb_putreg(TDWBAL2),
+    igb_putreg(TDWBAL3),
+    igb_putreg(TDWBAL4),
+    igb_putreg(TDWBAL5),
+    igb_putreg(TDWBAL6),
+    igb_putreg(TDWBAL7),
+    igb_putreg(TDWBAL8),
+    igb_putreg(TDWBAL9),
+    igb_putreg(TDWBAL10),
+    igb_putreg(TDWBAL11),
+    igb_putreg(TDWBAL12),
+    igb_putreg(TDWBAL13),
+    igb_putreg(TDWBAL14),
+    igb_putreg(TDWBAL15),
+    igb_putreg(TDWBAH0),
+    igb_putreg(TDWBAH1),
+    igb_putreg(TDWBAH2),
+    igb_putreg(TDWBAH3),
+    igb_putreg(TDWBAH4),
+    igb_putreg(TDWBAH5),
+    igb_putreg(TDWBAH6),
+    igb_putreg(TDWBAH7),
+    igb_putreg(TDWBAH8),
+    igb_putreg(TDWBAH9),
+    igb_putreg(TDWBAH10),
+    igb_putreg(TDWBAH11),
+    igb_putreg(TDWBAH12),
+    igb_putreg(TDWBAH13),
+    igb_putreg(TDWBAH14),
+    igb_putreg(TDWBAH15),
     igb_putreg(TIPG),
     igb_putreg(RXSTMPH),
     igb_putreg(RXSTMPL),
