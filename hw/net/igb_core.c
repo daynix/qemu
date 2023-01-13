@@ -1400,6 +1400,12 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
         return -1;
     }
 
+    /* Pull virtio header in */
+    if (core->has_vnet) {
+        net_rx_pkt_set_vhdr_iovec(core->rx_pkt, iov, iovcnt);
+        iov_ofs = sizeof(struct virtio_net_hdr);
+    }
+
     filter_buf = iov->iov_base + iov_ofs;
     orig_size = iov_size(iov, iovcnt);
     size = orig_size - iov_ofs;
@@ -2474,6 +2480,11 @@ igb_update_rx_offloads(IGBCore *core)
     int cso_state = igb_rx_l4_cso_enabled(core);
 
     trace_e1000e_rx_set_cso(cso_state);
+
+    if (core->has_vnet) {
+        qemu_set_offload(qemu_get_queue(core->owner_nic)->peer,
+                         cso_state, 0, 0, 0, 0);
+    }
 }
 
 static void
@@ -3682,10 +3693,10 @@ igb_core_pci_realize(IGBCore        *core,
 
     for (i = 0; i < IGB_NUM_QUEUES; i++) {
         net_tx_pkt_init(&core->tx[i].tx_pkt, core->owner,
-                        E1000E_MAX_TX_FRAGS, false);
+                        E1000E_MAX_TX_FRAGS, core->has_vnet);
     }
 
-    net_rx_pkt_init(&core->rx_pkt, false);
+    net_rx_pkt_init(&core->rx_pkt, core->has_vnet);
 
     e1000x_core_prepare_eeprom(core->eeprom,
                                eeprom_templ,

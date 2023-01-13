@@ -41,6 +41,7 @@
 #include "qemu/units.h"
 #include "net/eth.h"
 #include "net/net.h"
+#include "net/tap.h"
 #include "qemu/module.h"
 #include "qemu/range.h"
 #include "sysemu/sysemu.h"
@@ -308,6 +309,8 @@ static void
 igb_init_net_peer(IGBState *s, PCIDevice *pci_dev, uint8_t *macaddr)
 {
     DeviceState *dev = DEVICE(pci_dev);
+    NetClientState *nc;
+    int i;
 
     s->nic = qemu_new_nic(&net_igb_info, &s->conf,
         object_get_typename(OBJECT(s)), dev->id, s);
@@ -318,6 +321,24 @@ igb_init_net_peer(IGBState *s, PCIDevice *pci_dev, uint8_t *macaddr)
     memcpy(s->core.permanent_mac, macaddr, sizeof(s->core.permanent_mac));
 
     qemu_format_nic_info_str(qemu_get_queue(s->nic), macaddr);
+
+    /* Setup virtio headers */
+    for (i = 0; i < s->conf.peers.queues; i++) {
+        nc = qemu_get_subqueue(s->nic, i);
+        if (!nc->peer || !qemu_has_vnet_hdr(nc->peer)) {
+            trace_e1000e_cfg_support_virtio(false);
+            return;
+        }
+    }
+
+    trace_e1000e_cfg_support_virtio(true);
+    s->core.has_vnet = true;
+
+    for (i = 0; i < s->conf.peers.queues; i++) {
+        nc = qemu_get_subqueue(s->nic, i);
+        qemu_set_vnet_hdr_len(nc->peer, sizeof(struct virtio_net_hdr));
+        qemu_using_vnet_hdr(nc->peer, true);
+    }
 }
 
 static int

@@ -89,6 +89,7 @@ struct IGBCore {
 
     struct NetRxPkt *rx_pkt;
 
+    bool has_vnet;
     int max_queue_num;
 
     IGBIntrDelayTimer eitr[IGB_MSIX_VEC_NUM];
