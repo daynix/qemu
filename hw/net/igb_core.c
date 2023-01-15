@@ -858,7 +858,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
         }
     }
 
-    if (pcie_sriov_num_vfs(core->owner)) {
+    if (pcie_sriov_num_vfs(core->owner) || (core->mac[MRQC] & 1)) {
         if (is_broadcast_ether_addr(ehdr->h_dest)) {
             for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
                 if (core->mac[VMOLR0 + i] & E1000_VMOLR_BAM) {
