@@ -839,6 +839,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
     static const int ta_shift[] = { 4, 3, 2, 0 };
     uint32_t f, ra[2], *macp, rctl = core->mac[RCTL];
     uint16_t queues = 0;
+    uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci) & VLAN_VID_MASK;
     bool accepted = false;
     int i;
 
@@ -846,7 +847,6 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
 
     if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
         e1000x_vlan_rx_filter_enabled(core->mac)) {
-        uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci);
         uint32_t vfta =
             ldl_le_p((uint32_t *)(core->mac + VFTA) +
                      ((vid >> E1000_VFTA_ENTRY_SHIFT) & E1000_VFTA_ENTRY_MASK));
@@ -901,6 +901,28 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
                     }
                 }
             }
+        }
+
+        if (e1000x_vlan_rx_filter_enabled(core->mac)) {
+            uint16_t mask = 0;
+
+            if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff)) {
+                for (i = 0; i < E1000_VLVF_ARRAY_SIZE; i++) {
+                    if ((core->mac[VLVF0 + i] & E1000_VLVF_VLANID_MASK) == vid &&
+                        (core->mac[VLVF0 + i] & E1000_VLVF_VLANID_ENABLE)) {
+                        uint32_t poolsel = core->mac[VLVF0 + i] & E1000_VLVF_POOLSEL_MASK;
+                        mask |= poolsel >> E1000_VLVF_POOLSEL_SHIFT;
+                    }
+                }
+            } else {
+                for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+                    if ((core->mac[VMOLR0 + i] & E1000_VMOLR_AUPE)) {
+                        mask |= BIT(i);
+                    }
+                }
+            }
+
+            queues &= mask;
         }
 
         igb_rss_parse_packet(core, core->rx_pkt, rss_info);
