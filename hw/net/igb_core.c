@@ -925,7 +925,8 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
             queues &= mask;
         }
 
-        if (!queues && !(core->mac[VT_CTL] & E1000_VT_CTL_DISABLE_DEF_POOL)) {
+        if (is_unicast_ether_addr(ehdr->h_dest) && !queues &&
+            !(core->mac[VT_CTL] & E1000_VT_CTL_DISABLE_DEF_POOL)) {
             uint32_t def_pl = core->mac[VT_CTL] & E1000_VT_CTL_DEFAULT_POOL_MASK;
             queues = BIT(def_pl >> E1000_VT_CTL_DEFAULT_POOL_SHIFT);
         }
