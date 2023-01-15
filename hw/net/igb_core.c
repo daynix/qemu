@@ -1385,6 +1385,18 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
     igb_update_rx_stats(core, size, total_size);
 }
 
+static inline void
+igb_rx_fix_l4_csum(IGBCore *core, struct NetRxPkt *pkt)
+{
+    if (net_rx_pkt_has_virt_hdr(pkt)) {
+        struct virtio_net_hdr *vhdr = net_rx_pkt_get_vhdr(pkt);
+
+        if (vhdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
+            net_rx_pkt_fix_l4_csum(pkt);
+        }
+    }
+}
+
 ssize_t
 igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 {
@@ -1475,6 +1487,8 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 
     if (retval) {
         n = E1000_ICR_RXT0;
+
+        igb_rx_fix_l4_csum(core, core->rx_pkt);
 
         for (i = 0; i < IGB_NUM_QUEUES; i++) {
             if (!(queues & BIT(i))) {
