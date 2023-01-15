@@ -860,7 +860,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
 
     if (core->mac[MRQC] & 1) {
         if (is_broadcast_ether_addr(ehdr->h_dest)) {
-            for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+            for (i = 0; i < 8; i++) {
                 if (core->mac[VMOLR0 + i] & E1000_VMOLR_BAM) {
                     queues |= BIT(i);
                 }
@@ -894,7 +894,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
                 f = ta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
                 f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
                 if (macp[f >> 5] & (1 << (f & 0x1f))) {
-                    for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+                    for (i = 0; i < 8; i++) {
                         if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
                             queues |= BIT(i);
                         }
@@ -915,8 +915,8 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
                     }
                 }
             } else {
-                for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
-                    if ((core->mac[VMOLR0 + i] & E1000_VMOLR_AUPE)) {
+                for (i = 0; i < 8; i++) {
+                    if (core->mac[VMOLR0 + i] & E1000_VMOLR_AUPE) {
                         mask |= BIT(i);
                     }
                 }
@@ -3856,7 +3856,7 @@ static const uint32_t igb_mac_reg_init[] = {
     [MBVFIMR]       = 0xFF,
     [VFRE]          = 0xFF,
     [VFTE]          = 0xFF,
-    [VMOLR0 ... VMOLR0 + IGB_MAX_VF_FUNCTIONS - 1] = 0x2600 | E1000_VMOLR_STRCRC,
+    [VMOLR0 ... VMOLR0 + 7] = 0x2600 | E1000_VMOLR_STRCRC,
     [RPLOLR]        = E1000_RPLOLR_STRCRC,
     [RLPML]         = 0x2600,
     [TXCTL0]       = E1000_DCA_TXCTRL_DATA_RRO_EN |
