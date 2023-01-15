@@ -925,6 +925,11 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
             queues &= mask;
         }
 
+        if (!queues && !(core->mac[VT_CTL] & E1000_VT_CTL_DISABLE_DEF_POOL)) {
+            uint32_t def_pl = core->mac[VT_CTL] & E1000_VT_CTL_DEFAULT_POOL_MASK;
+            queues = BIT(def_pl >> E1000_VT_CTL_DEFAULT_POOL_SHIFT);
+        }
+
         igb_rss_parse_packet(core, core->rx_pkt, rss_info);
         if (rss_info->queue & 1) {
             queues <<= 8;

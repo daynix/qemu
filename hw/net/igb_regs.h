@@ -191,6 +191,15 @@ union e1000_adv_rx_desc {
 #define E1000_DTXSWC_VLAN_SPOOF_SHIFT 8
 #define E1000_DTXSWC_VMDQ_LOOPBACK_EN BIT(31)  /* global VF LB enable */
 
+/* Easy defines for setting default pool, would normally be left a zero */
+#define E1000_VT_CTL_DEFAULT_POOL_SHIFT 7
+#define E1000_VT_CTL_DEFAULT_POOL_MASK  (0x7 << E1000_VT_CTL_DEFAULT_POOL_SHIFT)
+
+/* Other useful VMD_CTL register defines */
+#define E1000_VT_CTL_IGNORE_MAC         BIT(28)
+#define E1000_VT_CTL_DISABLE_DEF_POOL   BIT(29)
+#define E1000_VT_CTL_VM_REPL_EN         BIT(30)
+
 /* Per VM Offload register setup */
 #define E1000_VMOLR_RLPML_MASK 0x00003FFF /* Long Packet Maximum Length mask */
 #define E1000_VMOLR_LPE        0x00010000 /* Accept Long packet */
@@ -358,6 +367,7 @@ union e1000_adv_rx_desc {
 #define E1000_RLPML       0x05004  /* RX Long Packet Max Length */
 #define E1000_RA2         0x054E0  /* 2nd half of Rx address array - RW Array */
 #define E1000_PSRTYPE(_i) (0x05480 + ((_i) * 4))
+#define E1000_VT_CTL   0x0581C  /* VMDq Control - RW */
 
 /* VT Registers */
 #define E1000_MBVFICR   0x00C80 /* Mailbox VF Cause - RWC */

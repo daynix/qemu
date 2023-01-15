@@ -123,6 +123,8 @@ enum {
     defregd(TDT),        defregd(TXDCTL),     defregd(TXCTL),
     defregd(TDWBAL),     defregd(TDWBAH),
 
+    defreg(VT_CTL),
+
     defregv(P2VMAILBOX), defregv(V2PMAILBOX), defreg(MBVFICR),    defreg(MBVFIMR),
     defreg(VFLRE),       defreg(VFRE),        defreg(VFTE),       defreg(WVBR),
     defreg(QDE),         defreg(DTXSWC),      defreg_indexed(VLVF, 0),
