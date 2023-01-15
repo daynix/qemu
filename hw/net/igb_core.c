@@ -844,7 +844,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
 
     memset(rss_info, 0, sizeof(E1000E_RSSInfo));
 
-    if (e1000x_is_vlan_packet(ehdr->h_dest, core->mac[VET] & 0xffff) &&
+    if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
         e1000x_vlan_rx_filter_enabled(core->mac)) {
         uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci);
         uint32_t vfta =
