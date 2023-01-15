@@ -865,50 +865,47 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
                     queues |= BIT(i);
                 }
             }
-
-            return queues;
-        }
-
-        for (macp = core->mac + RA; macp < core->mac + RA + 32; macp += 2) {
-            if (!(macp[1] & E1000_RAH_AV)) {
-                continue;
+        } else {
+            for (macp = core->mac + RA; macp < core->mac + RA + 32; macp += 2) {
+                if (!(macp[1] & E1000_RAH_AV)) {
+                    continue;
+                }
+                ra[0] = cpu_to_le32(macp[0]);
+                ra[1] = cpu_to_le32(macp[1]);
+                if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
+                    queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
+                }
             }
-            ra[0] = cpu_to_le32(macp[0]);
-            ra[1] = cpu_to_le32(macp[1]);
-            if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
-                queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
+
+            for (macp = core->mac + RA2; macp < core->mac + RA2 + 16; macp += 2) {
+                if (!(macp[1] & E1000_RAH_AV)) {
+                    continue;
+                }
+                ra[0] = cpu_to_le32(macp[0]);
+                ra[1] = cpu_to_le32(macp[1]);
+                if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
+                    queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
+                }
             }
-        }
 
-        for (macp = core->mac + RA2; macp < core->mac + RA2 + 16; macp += 2) {
-            if (!(macp[1] & E1000_RAH_AV)) {
-                continue;
-            }
-            ra[0] = cpu_to_le32(macp[0]);
-            ra[1] = cpu_to_le32(macp[1]);
-            if (!memcmp(ehdr->h_dest, (uint8_t *)ra, ETH_ALEN)) {
-                queues |= (macp[1] & E1000_RAH_POOL_MASK) / E1000_RAH_POOL_1;
-            }
-        }
+            if (!queues) {
+                macp = core->mac + (is_multicast_ether_addr(ehdr->h_dest) ? MTA : UTA);
 
-        if (queues) {
-            return queues;
-        }
-
-        macp = core->mac + (is_multicast_ether_addr(ehdr->h_dest) ? MTA : UTA);
-
-        f = ta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
-        f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
-        if (macp[f >> 5] & (1 << (f & 0x1f))) {
-            for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
-                if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
-                        queues |= BIT(i);
+                f = ta_shift[(rctl >> E1000_RCTL_MO_SHIFT) & 3];
+                f = (((ehdr->h_dest[5] << 8) | ehdr->h_dest[4]) >> f) & 0xfff;
+                if (macp[f >> 5] & (1 << (f & 0x1f))) {
+                    for (i = 0; i < IGB_MAX_VF_FUNCTIONS; i++) {
+                        if (core->mac[VMOLR0 + i] & E1000_VMOLR_ROMPE) {
+                            queues |= BIT(i);
+                        }
+                    }
                 }
             }
         }
 
-        if (queues) {
-            return queues;
+        igb_rss_parse_packet(core, core->rx_pkt, rss_info);
+        if (rss_info->queue & 1) {
+            queues <<= 8;
         }
     } else {
         switch (net_rx_pkt_get_packet_type(core->rx_pkt)) {
@@ -958,8 +955,6 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
         if (accepted) {
             igb_rss_parse_packet(core, core->rx_pkt, rss_info);
             queues = BIT(rss_info->queue);
-
-            return queues;
         }
     }
 
