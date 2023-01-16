@@ -69,7 +69,6 @@ struct IGBCore {
     uint16_t phy[MAX_PHY_REG_ADDRESS + 1];
     uint16_t eeprom[IGB_EEPROM_SIZE];
 
-    uint32_t rx_desc_buf_size;
     uint8_t rx_desc_len;
 
     QEMUTimer *autoneg_timer;

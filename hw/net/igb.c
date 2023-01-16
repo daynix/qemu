@@ -543,7 +543,6 @@ static const VMStateDescription igb_vmstate = {
 
         VMSTATE_UINT32(ioaddr, IGBState),
         VMSTATE_UINT8(core.rx_desc_len, IGBState),
-        VMSTATE_UINT32(core.rx_desc_buf_size, IGBState),
         VMSTATE_UINT16_ARRAY(core.eeprom, IGBState, IGB_EEPROM_SIZE),
         VMSTATE_UINT16_ARRAY(core.phy, IGBState, MAX_PHY_REG_ADDRESS + 1),
         VMSTATE_UINT32_ARRAY(core.mac, IGBState, E1000E_MAC_SIZE),

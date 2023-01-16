@@ -763,16 +763,28 @@ igb_start_xmit(IGBCore *core, const IGB_TxRing *txr)
     }
 }
 
+static uint32_t
+igb_rxbufsize(IGBCore *core, const E1000E_RingInfo *r)
+{
+    uint32_t srrctl = core->mac[E1000_SRRCTL(r->idx) >> 2];
+    uint32_t bsizepkt = srrctl & E1000_SRRCTL_BSIZEPKT_MASK;
+    if (bsizepkt) {
+        return bsizepkt << E1000_SRRCTL_BSIZEPKT_SHIFT;
+    }
+
+    return e1000x_rxbufsize(core->mac[RCTL]);
+}
+
 static bool
 igb_has_rxbufs(IGBCore *core, const E1000E_RingInfo *r, size_t total_size)
 {
     uint32_t bufs = igb_ring_free_descr_num(core, r);
+    uint32_t bufsize = igb_rxbufsize(core, r);
 
-    trace_e1000e_rx_has_buffers(r->idx, bufs, total_size,
-                                core->rx_desc_buf_size);
+    trace_e1000e_rx_has_buffers(r->idx, bufs, total_size, bufsize);
 
     return total_size <= bufs / (core->rx_desc_len / E1000_MIN_RX_DESC_LEN) *
-                         core->rx_desc_buf_size;
+                         bufsize;
 }
 
 void
@@ -1272,8 +1284,6 @@ igb_write_hdr_to_rx_buffers(IGBCore *core,
                             const char *data,
                             dma_addr_t data_len)
 {
-    assert(data_len <= core->rx_desc_buf_size - *written);
-
     pci_dma_write(core->owner, ba + *written, data, data_len);
     *written += data_len;
 }
@@ -1285,7 +1295,6 @@ igb_write_to_rx_buffers(IGBCore *core,
                         const char *data,
                         dma_addr_t data_len)
 {
-    assert(data_len <= core->rx_desc_buf_size - *written);
     trace_igb_rx_desc_buff_write(ba, *written, data, data_len);
     pci_dma_write(core->owner, ba + *written, data, data_len);
     *written += data_len;
@@ -1332,9 +1341,8 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
     struct iovec *iov = net_rx_pkt_get_iovec(pkt);
     size_t size = net_rx_pkt_get_total_len(pkt);
     size_t total_size = size + e1000x_fcs_len(core->mac);
-    const E1000E_RingInfo *rxi;
-
-    rxi = rxr->i;
+    const E1000E_RingInfo *rxi = rxr->i;
+    size_t bufsize = igb_rxbufsize(core, rxi);
 
     do {
         hwaddr ba;
@@ -1343,8 +1351,8 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 
         desc_size = total_size - desc_offset;
 
-        if (desc_size > core->rx_desc_buf_size) {
-            desc_size = core->rx_desc_buf_size;
+        if (desc_size > bufsize) {
+            desc_size = bufsize;
         }
 
         if (igb_ring_empty(core, rxi)) {
@@ -1364,8 +1372,8 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
                 static const uint32_t fcs_pad;
                 size_t iov_copy;
                 size_t copy_size = size - desc_offset;
-                if (copy_size > core->rx_desc_buf_size) {
-                    copy_size = core->rx_desc_buf_size;
+                if (copy_size > bufsize) {
+                    copy_size = bufsize;
                 }
 
                 /* Copy packet payload */
@@ -1650,21 +1658,6 @@ igb_set_rfctl(IGBCore *core, int index, uint32_t val)
 }
 
 static void
-igb_parse_rxbufsize(IGBCore *core)
-{
-    uint32_t rctl = core->mac[RCTL];
-
-    if (rctl & E1000_RCTL_FLXBUF_MASK) {
-        int flxbuf = rctl & E1000_RCTL_FLXBUF_MASK;
-        core->rx_desc_buf_size = (flxbuf >> E1000_RCTL_FLXBUF_SHIFT) * 1024;
-    } else {
-        core->rx_desc_buf_size = e1000x_rxbufsize(rctl);
-    }
-
-    trace_igb_rx_desc_buff_size(core->rx_desc_buf_size);
-}
-
-static void
 igb_calc_rxdesclen(IGBCore *core)
 {
     if (igb_rx_use_legacy_descriptor(core)) {
@@ -1687,7 +1680,6 @@ igb_set_rx_control(IGBCore *core, int index, uint32_t val)
     }
 
     if (val & E1000_RCTL_EN) {
-        igb_parse_rxbufsize(core);
         igb_calc_rxdesclen(core);
         igb_start_recv(core);
     }
