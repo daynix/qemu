@@ -62,6 +62,10 @@ union e1000_rx_desc_union {
     union e1000_rx_desc_packet_split packet_split;
 };
 
+static ssize_t
+e1000e_receive_internal(E1000ECore *core, const struct iovec *iov, int iovcnt,
+                        bool has_vnet);
+
 static inline void
 e1000e_set_interrupt_cause(E1000ECore *core, uint32_t val);
 
@@ -656,6 +660,15 @@ e1000e_setup_tx_offloads(E1000ECore *core, struct e1000e_tx *tx)
     return true;
 }
 
+static void e1000e_tx_pkt_callback(void *core,
+                                   const struct iovec *iov,
+                                   int iovcnt,
+                                   const struct iovec *virt_iov,
+                                   int virt_iovcnt)
+{
+    e1000e_receive_internal(core, virt_iov, virt_iovcnt, true);
+}
+
 static bool
 e1000e_tx_pkt_send(E1000ECore *core, struct e1000e_tx *tx, int queue_index)
 {
@@ -670,7 +683,8 @@ e1000e_tx_pkt_send(E1000ECore *core, struct e1000e_tx *tx, int queue_index)
 
     if ((core->phy[0][MII_BMCR] & MII_BMCR_LOOPBACK) ||
         ((core->mac[RCTL] & E1000_RCTL_LBM_MAC) == E1000_RCTL_LBM_MAC)) {
-        return net_tx_pkt_send_loopback(tx->tx_pkt, queue);
+        return net_tx_pkt_send_custom(tx->tx_pkt, false,
+                                      e1000e_tx_pkt_callback, core);
     } else {
         return net_tx_pkt_send(tx->tx_pkt, queue);
     }
@@ -1684,6 +1698,13 @@ e1000e_rx_fix_l4_csum(E1000ECore *core, struct NetRxPkt *pkt)
 ssize_t
 e1000e_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
 {
+    return e1000e_receive_internal(core, iov, iovcnt, core->has_vnet);
+}
+
+static ssize_t
+e1000e_receive_internal(E1000ECore *core, const struct iovec *iov, int iovcnt,
+                        bool has_vnet)
+{
     static const int maximum_ethernet_hdr_len = (ETH_HLEN + 4);
 
     uint32_t n = 0;
@@ -1705,7 +1726,7 @@ e1000e_receive_iov(E1000ECore *core, const struct iovec *iov, int iovcnt)
     }
 
     /* Pull virtio header in */
-    if (core->has_vnet) {
+    if (has_vnet) {
         net_rx_pkt_set_vhdr_iovec(core->rx_pkt, iov, iovcnt);
         iov_ofs = sizeof(struct virtio_net_hdr);
     }
@@ -3377,8 +3398,7 @@ e1000e_core_pci_realize(E1000ECore     *core,
         qemu_add_vm_change_state_handler(e1000e_vm_state_change, core);
 
     for (i = 0; i < E1000E_NUM_QUEUES; i++) {
-        net_tx_pkt_init(&core->tx[i].tx_pkt, core->owner,
-                        E1000E_MAX_TX_FRAGS, core->has_vnet);
+        net_tx_pkt_init(&core->tx[i].tx_pkt, core->owner, E1000E_MAX_TX_FRAGS);
     }
 
     net_rx_pkt_init(&core->rx_pkt, core->has_vnet);

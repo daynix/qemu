@@ -54,6 +54,7 @@
 #include "igb_core.h"
 
 #include "trace.h"
+#include <sys/types.h>
 
 #define E1000E_MAX_TX_FRAGS (64)
 
@@ -61,6 +62,16 @@ union e1000_rx_desc_union {
     struct e1000_rx_desc legacy;
     union e1000_adv_rx_desc adv;
 };
+
+typedef struct IGBTxPktVmdqCallbackContext {
+    IGBCore *core;
+    NetClientState *nc;
+    bool unicast;
+} IGBTxPktVmdqCallbackContext;
+
+static ssize_t
+igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
+                     bool has_vnet, bool *assigned);
 
 static inline void
 igb_set_interrupt_cause(IGBCore *core, uint32_t val);
@@ -400,11 +411,41 @@ igb_setup_tx_offloads(IGBCore *core, struct igb_tx *tx)
     return true;
 }
 
+static void igb_tx_pkt_mac_callback(void *core,
+                                    const struct iovec *iov,
+                                    int iovcnt,
+                                    const struct iovec *virt_iov,
+                                    int virt_iovcnt)
+{
+    bool assigned;
+    igb_receive_internal(core, virt_iov, virt_iovcnt, true, &assigned);
+}
+
+static void igb_tx_pkt_vmdq_callback(void *opaque,
+                                     const struct iovec *iov,
+                                     int iovcnt,
+                                     const struct iovec *virt_iov,
+                                     int virt_iovcnt)
+{
+    IGBTxPktVmdqCallbackContext *context = opaque;
+    bool assigned;
+
+    igb_receive_internal(context->core, virt_iov, virt_iovcnt, true, &assigned);
+
+    if (!context->unicast || !assigned) {
+        if (context->core->has_vnet) {
+            qemu_sendv_packet(context->nc, virt_iov, virt_iovcnt);
+        } else {
+            qemu_sendv_packet(context->nc, iov, iovcnt);
+        }
+    }
+}
+
 /* TX Packets Switching (7.10.3.6) */
 static bool igb_tx_pkt_switch(IGBCore *core, struct igb_tx *tx,
                               NetClientState *nc)
 {
-    bool ret;
+    IGBTxPktVmdqCallbackContext context;
 
     /* TX switching is only used to serve VM to VM traffic. */
     if (!pcie_sriov_num_vfs(core->owner)) {
@@ -416,10 +457,12 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct igb_tx *tx,
         goto send_out;
     }
 
-    ret = net_tx_pkt_send_loopback(tx->tx_pkt, nc);
-    if (!ret) {
-        return ret;
-    }
+    context.core = core;
+    context.nc = nc;
+    context.unicast = net_tx_pkt_get_packet_type(tx->tx_pkt) == ETH_PKT_UCAST;
+
+    return net_tx_pkt_send_custom(tx->tx_pkt, false,
+                                  igb_tx_pkt_vmdq_callback, &context);
 
 send_out:
     return net_tx_pkt_send(tx->tx_pkt, nc);
@@ -439,7 +482,8 @@ igb_tx_pkt_send(IGBCore *core, struct igb_tx *tx, int queue_index)
 
     if ((core->phy[MII_BMCR] & MII_BMCR_LOOPBACK) ||
         ((core->mac[RCTL] & E1000_RCTL_LBM_MAC) == E1000_RCTL_LBM_MAC)) {
-        return net_tx_pkt_send_loopback(tx->tx_pkt, queue);
+        return net_tx_pkt_send_custom(tx->tx_pkt, false,
+                                      igb_tx_pkt_mac_callback, core);
     } else {
         return igb_tx_pkt_switch(core, tx, queue);
     }
@@ -1431,6 +1475,14 @@ igb_rx_fix_l4_csum(IGBCore *core, struct NetRxPkt *pkt)
 ssize_t
 igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 {
+    bool assigned;
+    return igb_receive_internal(core, iov, iovcnt, core->has_vnet, &assigned);
+}
+
+static ssize_t
+igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
+                     bool has_vnet, bool *assigned)
+{
     static const int maximum_ethernet_hdr_len = (ETH_HLEN + 4);
 
     uint16_t queues = 0;
@@ -1450,11 +1502,12 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     trace_e1000e_rx_receive_iov(iovcnt);
 
     if (!e1000x_hw_rx_enabled(core->mac)) {
+        *assigned = false;
         return -1;
     }
 
     /* Pull virtio header in */
-    if (core->has_vnet) {
+    if (has_vnet) {
         net_rx_pkt_set_vhdr_iovec(core->rx_pkt, iov, iovcnt);
         iov_ofs = sizeof(struct virtio_net_hdr);
     }
@@ -1481,6 +1534,7 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 
     /* Discard oversized packets if !LPE and !SBP. */
     if (e1000x_is_oversized(core->mac, size)) {
+        *assigned = false;
         return orig_size;
     }
 
@@ -1493,6 +1547,7 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 
     queues = igb_receive_assign(core, ehdr, &rss_info);
     if (!queues) {
+        *assigned = false;
         trace_e1000e_rx_flt_dropped();
         return orig_size;
     }
@@ -1547,6 +1602,7 @@ igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
     trace_e1000e_rx_interrupt_set(n);
     igb_set_interrupt_cause(core, n);
 
+    *assigned = true;
     return retval;
 }
 
@@ -3733,8 +3789,7 @@ igb_core_pci_realize(IGBCore        *core,
     core->vmstate = qemu_add_vm_change_state_handler(igb_vm_state_change, core);
 
     for (i = 0; i < IGB_NUM_QUEUES; i++) {
-        net_tx_pkt_init(&core->tx[i].tx_pkt, core->owner,
-                        E1000E_MAX_TX_FRAGS, core->has_vnet);
+        net_tx_pkt_init(&core->tx[i].tx_pkt, core->owner, E1000E_MAX_TX_FRAGS);
     }
 
     net_rx_pkt_init(&core->rx_pkt, core->has_vnet);
