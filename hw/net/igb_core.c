@@ -448,7 +448,7 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct igb_tx *tx,
     IGBTxPktVmdqCallbackContext context;
 
     /* TX switching is only used to serve VM to VM traffic. */
-    if (!pcie_sriov_num_vfs(core->owner)) {
+    if (core->mac[MRQC] & 1) {
         goto send_out;
     }
 
