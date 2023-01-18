@@ -1321,17 +1321,6 @@ igb_pci_dma_write_rx_desc(IGBCore *core, dma_addr_t addr,
     }
 }
 
-static inline void
-igb_write_hdr_to_rx_buffers(IGBCore *core,
-                            hwaddr ba,
-                            uint16_t *written,
-                            const char *data,
-                            dma_addr_t data_len)
-{
-    pci_dma_write(core->owner, ba + *written, data, data_len);
-    *written += data_len;
-}
-
 static void
 igb_write_to_rx_buffers(IGBCore *core,
                         hwaddr ba,
