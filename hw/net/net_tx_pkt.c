@@ -554,10 +554,12 @@ static size_t net_tx_pkt_fetch_fragment(struct NetTxPkt *pkt,
 }
 
 static void net_tx_pkt_sendv(
-    void *nc, const struct iovec *iov, int iov_cnt,
+    void *opaque, const struct iovec *iov, int iov_cnt,
     const struct iovec *virt_iov, int virt_iov_cnt)
 {
-    if (qemu_get_using_vnet_hdr(nc)) {
+    NetClientState *nc = opaque;
+
+    if (qemu_get_using_vnet_hdr(nc->peer)) {
         qemu_sendv_packet(nc, virt_iov, virt_iov_cnt);
     } else {
         qemu_sendv_packet(nc, iov, iov_cnt);
@@ -622,7 +624,7 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
 
 bool net_tx_pkt_send(struct NetTxPkt *pkt, NetClientState *nc)
 {
-    bool offload = qemu_get_using_vnet_hdr(nc);
+    bool offload = qemu_get_using_vnet_hdr(nc->peer);
     return net_tx_pkt_send_custom(pkt, offload, net_tx_pkt_sendv, nc);
 }
 
