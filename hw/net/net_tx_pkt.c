@@ -599,9 +599,8 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
 
     /* Put as much data as possible and send */
     do {
-        fragment_len = net_tx_pkt_fetch_fragment(pkt,
-                                                 &src_idx, &src_offset,
-                                                 fragment, &dst_idx);
+        fragment_len = net_tx_pkt_fetch_fragment(pkt, &src_idx, &src_offset,
+            fragment, &dst_idx);
 
         more_frags = (fragment_offset + fragment_len < pkt->payload_len);
 
