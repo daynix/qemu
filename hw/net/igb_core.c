@@ -54,7 +54,6 @@
 #include "igb_core.h"
 
 #include "trace.h"
-#include <sys/types.h>
 
 #define E1000E_MAX_TX_FRAGS (64)
 
