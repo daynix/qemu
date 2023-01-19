@@ -65,7 +65,6 @@ union e1000_rx_desc_union {
 typedef struct IGBTxPktVmdqCallbackContext {
     IGBCore *core;
     NetClientState *nc;
-    bool unicast;
 } IGBTxPktVmdqCallbackContext;
 
 static ssize_t
@@ -355,11 +354,12 @@ igb_rss_calc_hash(IGBCore *core, struct NetRxPkt *pkt, E1000E_RSSInfo *info)
 }
 
 static void
-igb_rss_parse_packet(IGBCore *core, struct NetRxPkt *pkt, E1000E_RSSInfo *info)
+igb_rss_parse_packet(IGBCore *core, struct NetRxPkt *pkt, bool tx,
+                     E1000E_RSSInfo *info)
 {
     trace_e1000e_rx_rss_started();
 
-    if (!igb_rss_enabled(core)) {
+    if (tx || !igb_rss_enabled(core)) {
         info->enabled = false;
         info->hash = 0;
         info->queue = 0;
@@ -416,8 +416,7 @@ static void igb_tx_pkt_mac_callback(void *core,
                                     const struct iovec *virt_iov,
                                     int virt_iovcnt)
 {
-    bool assigned;
-    igb_receive_internal(core, virt_iov, virt_iovcnt, true, &assigned);
+    igb_receive_internal(core, virt_iov, virt_iovcnt, true, NULL);
 }
 
 static void igb_tx_pkt_vmdq_callback(void *opaque,
@@ -427,11 +426,12 @@ static void igb_tx_pkt_vmdq_callback(void *opaque,
                                      int virt_iovcnt)
 {
     IGBTxPktVmdqCallbackContext *context = opaque;
-    bool assigned;
+    bool external_tx;
 
-    igb_receive_internal(context->core, virt_iov, virt_iovcnt, true, &assigned);
+    igb_receive_internal(context->core, virt_iov, virt_iovcnt, true,
+                         &external_tx);
 
-    if (!context->unicast || !assigned) {
+    if (external_tx) {
         if (context->core->has_vnet) {
             qemu_sendv_packet(context->nc, virt_iov, virt_iovcnt);
         } else {
@@ -447,7 +447,7 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct igb_tx *tx,
     IGBTxPktVmdqCallbackContext context;
 
     /* TX switching is only used to serve VM to VM traffic. */
-    if (core->mac[MRQC] & 1) {
+    if (!(core->mac[MRQC] & 1)) {
         goto send_out;
     }
 
@@ -458,7 +458,6 @@ static bool igb_tx_pkt_switch(IGBCore *core, struct igb_tx *tx,
 
     context.core = core;
     context.nc = nc;
-    context.unicast = net_tx_pkt_get_packet_type(tx->tx_pkt) == ETH_PKT_UCAST;
 
     return net_tx_pkt_send_custom(tx->tx_pkt, false,
                                   igb_tx_pkt_vmdq_callback, &context);
@@ -889,7 +888,7 @@ igb_rx_l4_cso_enabled(IGBCore *core)
 }
 
 static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
-                                   E1000E_RSSInfo *rss_info)
+                                   E1000E_RSSInfo *rss_info, bool *external_tx)
 {
     static const int ta_shift[] = { 4, 3, 2, 0 };
     uint32_t f, ra[2], *macp, rctl = core->mac[RCTL];
@@ -899,6 +898,10 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
     int i;
 
     memset(rss_info, 0, sizeof(E1000E_RSSInfo));
+
+    if (external_tx) {
+        *external_tx = true;
+    }
 
     if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
         e1000x_vlan_rx_filter_enabled(core->mac)) {
@@ -955,6 +958,8 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
                         }
                     }
                 }
+            } else if (is_unicast_ether_addr(ehdr->h_dest) && external_tx) {
+                *external_tx = false;
             }
         }
 
@@ -980,13 +985,13 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
             queues &= mask;
         }
 
-        if (is_unicast_ether_addr(ehdr->h_dest) && !queues &&
+        if (is_unicast_ether_addr(ehdr->h_dest) && !queues && !external_tx &&
             !(core->mac[VT_CTL] & E1000_VT_CTL_DISABLE_DEF_POOL)) {
             uint32_t def_pl = core->mac[VT_CTL] & E1000_VT_CTL_DEFAULT_POOL_MASK;
             queues = BIT(def_pl >> E1000_VT_CTL_DEFAULT_POOL_SHIFT);
         }
 
-        igb_rss_parse_packet(core, core->rx_pkt, rss_info);
+        igb_rss_parse_packet(core, core->rx_pkt, external_tx != NULL, rss_info);
         if (rss_info->queue & 1) {
             queues <<= 8;
         }
@@ -1036,7 +1041,8 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
         }
 
         if (accepted) {
-            igb_rss_parse_packet(core, core->rx_pkt, rss_info);
+            igb_rss_parse_packet(core, core->rx_pkt, false, rss_info);
+
             queues = BIT(rss_info->queue);
         }
     }
@@ -1455,13 +1461,12 @@ igb_rx_fix_l4_csum(IGBCore *core, struct NetRxPkt *pkt)
 ssize_t
 igb_receive_iov(IGBCore *core, const struct iovec *iov, int iovcnt)
 {
-    bool assigned;
-    return igb_receive_internal(core, iov, iovcnt, core->has_vnet, &assigned);
+    return igb_receive_internal(core, iov, iovcnt, core->has_vnet, NULL);
 }
 
 static ssize_t
 igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
-                     bool has_vnet, bool *assigned)
+                     bool has_vnet, bool *external_tx)
 {
     static const int maximum_ethernet_hdr_len = (ETH_HLEN + 4);
 
@@ -1481,8 +1486,11 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
 
     trace_e1000e_rx_receive_iov(iovcnt);
 
+    if (external_tx) {
+        *external_tx = true;
+    }
+
     if (!e1000x_hw_rx_enabled(core->mac)) {
-        *assigned = false;
         return -1;
     }
 
@@ -1516,7 +1524,6 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
 
     /* Discard oversized packets if !LPE and !SBP. */
     if (e1000x_is_oversized(core->mac, size)) {
-        *assigned = false;
         return orig_size;
     }
 
@@ -1527,9 +1534,8 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
                                e1000x_vlan_enabled(core->mac),
                                core->mac[VET] & 0xffff);
 
-    queues = igb_receive_assign(core, ehdr, &rss_info);
+    queues = igb_receive_assign(core, ehdr, &rss_info, external_tx);
     if (!queues) {
-        *assigned = false;
         trace_e1000e_rx_flt_dropped();
         return orig_size;
     }
@@ -1584,7 +1590,6 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
     trace_e1000e_rx_interrupt_set(n);
     igb_set_interrupt_cause(core, n);
 
-    *assigned = true;
     return retval;
 }
 
