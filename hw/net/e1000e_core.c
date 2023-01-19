@@ -1721,6 +1721,8 @@ e1000e_receive_internal(E1000ECore *core, const struct iovec *iov, int iovcnt,
     if (has_vnet) {
         net_rx_pkt_set_vhdr_iovec(core->rx_pkt, iov, iovcnt);
         iov_ofs = sizeof(struct virtio_net_hdr);
+    } else {
+        net_rx_pkt_unset_vhdr(core->rx_pkt);
     }
 
     filter_buf = iov->iov_base + iov_ofs;
