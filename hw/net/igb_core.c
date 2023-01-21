@@ -1042,7 +1042,6 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
 
         if (accepted) {
             igb_rss_parse_packet(core, core->rx_pkt, false, rss_info);
-
             queues = BIT(rss_info->queue);
         }
     }
