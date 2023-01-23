@@ -332,7 +332,8 @@ bool net_tx_pkt_build_vheader(struct NetTxPkt *pkt, bool tso_enable,
     case VIRTIO_NET_HDR_GSO_TCPV6:
         bytes_read = iov_to_buf(&pkt->vec[NET_TX_PKT_PL_START_FRAG],
                                 pkt->payload_frags, 0, &l4hdr, sizeof(l4hdr));
-        if (bytes_read < sizeof(l4hdr)) {
+        if (bytes_read < sizeof(l4hdr) ||
+            l4hdr.th_off * sizeof(uint32_t) < sizeof(l4hdr)) {
             return false;
         }
 
@@ -512,12 +513,13 @@ static void net_tx_pkt_do_sw_csum(struct NetTxPkt *pkt,
 #define NET_MAX_FRAG_SG_LIST (64)
 
 static size_t net_tx_pkt_fetch_fragment(struct NetTxPkt *pkt,
-    int *src_idx, size_t *src_offset, struct iovec *dst, int *dst_idx)
+    int *src_idx, size_t *src_offset, size_t src_len,
+    struct iovec *dst, int *dst_idx)
 {
     size_t fetched = 0;
     struct iovec *src = pkt->vec;
 
-    while (fetched < IP_FRAG_ALIGN_SIZE(pkt->virt_hdr.gso_size)) {
+    while (fetched < src_len) {
 
         /* no more place in fragment iov */
         if (*dst_idx == NET_MAX_FRAG_SG_LIST) {
@@ -532,7 +534,7 @@ static size_t net_tx_pkt_fetch_fragment(struct NetTxPkt *pkt,
 
         dst[*dst_idx].iov_base = src[*src_idx].iov_base + *src_offset;
         dst[*dst_idx].iov_len = MIN(src[*src_idx].iov_len - *src_offset,
-            IP_FRAG_ALIGN_SIZE(pkt->virt_hdr.gso_size) - fetched);
+            src_len - fetched);
 
         *src_offset += dst[*dst_idx].iov_len;
         fetched += dst[*dst_idx].iov_len;
@@ -564,25 +566,46 @@ static void net_tx_pkt_sendv(
 static bool net_tx_pkt_tcp_fragment_init(struct NetTxPkt *pkt,
                                          struct iovec *fragment,
                                          int *pl_idx,
-                                         size_t *l4hdr_len)
+                                         size_t *l4hdr_len,
+                                         int *src_idx,
+                                         size_t *src_offset,
+                                         size_t *src_len)
 {
     struct iovec *l4 = fragment + NET_TX_PKT_PL_START_FRAG;
-    size_t bytes_read;
+    size_t bytes_read = 0;
     struct tcp_hdr *th;
 
-    *pl_idx = NET_TX_PKT_PL_START_FRAG + 1;
-    *l4hdr_len = pkt->virt_hdr.hdr_len - pkt->hdr_len;
-    l4->iov_len = *l4hdr_len;
-    l4->iov_base = g_malloc(l4->iov_len);
-    bytes_read = iov_to_buf(pkt->vec + NET_TX_PKT_PL_START_FRAG,
-                            pkt->payload_frags, 0, l4->iov_base, l4->iov_len);
-    if (bytes_read < l4->iov_len) {
-        g_free(l4->iov_base);
+    if (!pkt->payload_frags) {
         return false;
     }
 
+    l4->iov_len = pkt->virt_hdr.hdr_len - pkt->hdr_len;
+    l4->iov_base = g_malloc(l4->iov_len);
+
+    *src_idx = NET_TX_PKT_PL_START_FRAG;
+    while (pkt->vec[*src_idx].iov_len < l4->iov_len - bytes_read) {
+        memcpy((char *)l4->iov_base + bytes_read, pkt->vec[*src_idx].iov_base,
+               pkt->vec[*src_idx].iov_len);
+
+        (*src_idx)++;
+        if (*src_idx >= pkt->payload_frags + NET_TX_PKT_PL_START_FRAG) {
+            g_free(l4->iov_base);
+            return false;
+        }
+
+        bytes_read += pkt->vec[*src_idx].iov_len;
+    }
+
+    *src_offset = l4->iov_len - bytes_read;
+    memcpy((char *)l4->iov_base + bytes_read, pkt->vec[*src_idx].iov_base,
+           *src_offset);
+
     th = l4->iov_base;
     th->th_flags &= ~(TH_FIN | TH_PUSH);
+
+    *pl_idx = NET_TX_PKT_PL_START_FRAG + 1;
+    *l4hdr_len = l4->iov_len;
+    *src_len = pkt->virt_hdr.gso_size;
 
     return true;
 }
@@ -601,29 +624,50 @@ static void net_tx_pkt_tcp_fragment_fix(struct NetTxPkt *pkt,
     struct iovec *l4hdr = fragment + NET_TX_PKT_PL_START_FRAG;
     struct ip_header *ip = l3hdr->iov_base;
     struct ip6_header *ip6 = l3hdr->iov_base;
-    struct tcp_hdr *th = l4hdr->iov_base;
     size_t len = l3hdr->iov_len + l4hdr->iov_len + fragment_len;
-
-    th->th_seq = cpu_to_be32(be32_to_cpu(th->th_seq) + fragment_len);
-    th->th_flags &= ~TH_CWR;
 
     switch (gso_type) {
     case VIRTIO_NET_HDR_GSO_TCPV4:
-        ip->ip_id = cpu_to_be16(be16_to_cpu(ip->ip_id) + 1);
         ip->ip_len = cpu_to_be16(len);
         eth_fix_ip4_checksum(l3hdr->iov_base, l3hdr->iov_len);
         break;
 
     case VIRTIO_NET_HDR_GSO_TCPV6:
-        ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = len - sizeof(struct ip6_header);
+        len -= sizeof(struct ip6_header);
+        ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = cpu_to_be16(len);
         break;
     }
 }
 
-static void net_tx_pkt_udp_fragment_init(int *pl_idx, size_t *l4hdr_len)
+static void net_tx_pkt_tcp_fragment_advance(struct NetTxPkt *pkt,
+                                            struct iovec *fragment,
+                                            size_t fragment_len,
+                                            uint8_t gso_type)
+{
+    struct iovec *l3hdr = fragment + NET_TX_PKT_L3HDR_FRAG;
+    struct iovec *l4hdr = fragment + NET_TX_PKT_PL_START_FRAG;
+    struct ip_header *ip = l3hdr->iov_base;
+    struct tcp_hdr *th = l4hdr->iov_base;
+
+    if (gso_type == VIRTIO_NET_HDR_GSO_TCPV4) {
+        ip->ip_id = cpu_to_be16(be16_to_cpu(ip->ip_id) + 1);
+    }
+
+    th->th_seq = cpu_to_be32(be32_to_cpu(th->th_seq) + fragment_len);
+    th->th_flags &= ~TH_CWR;
+}
+
+static void net_tx_pkt_udp_fragment_init(struct NetTxPkt *pkt,
+                                         int *pl_idx,
+                                         size_t *l4hdr_len,
+                                         int *src_idx, size_t *src_offset,
+                                         size_t *src_len)
 {
     *pl_idx = NET_TX_PKT_PL_START_FRAG;
     *l4hdr_len = 0;
+    *src_idx = NET_TX_PKT_PL_START_FRAG;
+    *src_offset = 0;
+    *src_len = IP_FRAG_ALIGN_SIZE(pkt->virt_hdr.gso_size);
 }
 
 static void net_tx_pkt_udp_fragment_fix(struct NetTxPkt *pkt,
@@ -641,8 +685,8 @@ static void net_tx_pkt_udp_fragment_fix(struct NetTxPkt *pkt,
     assert(fragment_offset % IP_FRAG_UNIT_SIZE == 0);
     assert((frag_off_units & ~IP_OFFMASK) == 0);
 
-    orig_flags = be16_to_cpu(ip->ip_off) & ~(IP_OFFMASK|IP_MF);
-    new_ip_off = frag_off_units | orig_flags  | (more_frags ? IP_MF : 0);
+    orig_flags = be16_to_cpu(ip->ip_off) & ~(IP_OFFMASK | IP_MF);
+    new_ip_off = frag_off_units | orig_flags | (more_frags ? IP_MF : 0);
     ip->ip_off = cpu_to_be16(new_ip_off);
     ip->ip_len = cpu_to_be16(l3hdr->iov_len + fragment_len);
 
@@ -658,8 +702,9 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
     struct iovec fragment[NET_MAX_FRAG_SG_LIST];
     size_t fragment_len;
     size_t l4hdr_len;
+    size_t src_len;
 
-    int src_idx =  NET_TX_PKT_PL_START_FRAG, dst_idx, pl_idx;
+    int src_idx, dst_idx, pl_idx;
     size_t src_offset;
     size_t fragment_offset = 0;
     struct virtio_net_hdr virt_hdr = {
@@ -676,26 +721,29 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
     switch (gso_type) {
     case VIRTIO_NET_HDR_GSO_TCPV4:
     case VIRTIO_NET_HDR_GSO_TCPV6:
-        net_tx_pkt_tcp_fragment_init(pkt, fragment, &pl_idx, &l4hdr_len);
+        if (!net_tx_pkt_tcp_fragment_init(pkt, fragment, &pl_idx, &l4hdr_len,
+                                          &src_idx, &src_offset, &src_len)) {
+            return false;
+        }
         break;
 
     case VIRTIO_NET_HDR_GSO_UDP:
-        net_tx_pkt_udp_fragment_init(&pl_idx, &l4hdr_len);
+        net_tx_pkt_udp_fragment_init(pkt, &pl_idx, &l4hdr_len,
+                                     &src_idx, &src_offset, &src_len);
         break;
 
     default:
         abort();
     }
 
-    src_offset = l4hdr_len;
-
     /* Put as much data as possible and send */
     while (true) {
         dst_idx = pl_idx;
         fragment_len = net_tx_pkt_fetch_fragment(pkt,
-            &src_idx, &src_offset, fragment, &dst_idx);
-        if (!fragment_len)
+            &src_idx, &src_offset, src_len, fragment, &dst_idx);
+        if (!fragment_len) {
             break;
+        }
 
         switch (gso_type) {
         case VIRTIO_NET_HDR_GSO_TCPV4:
@@ -709,14 +757,19 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
             break;
         }
 
-        if (pkt->virt_hdr.flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-            net_tx_pkt_do_sw_csum(pkt, fragment, dst_idx,
-                                  l4hdr_len + fragment_len);
-        }
+        net_tx_pkt_do_sw_csum(pkt, fragment + NET_TX_PKT_L2HDR_FRAG,
+                              dst_idx - NET_TX_PKT_L2HDR_FRAG,
+                              l4hdr_len + fragment_len);
 
         callback(context,
                  fragment + NET_TX_PKT_L2HDR_FRAG, dst_idx - NET_TX_PKT_L2HDR_FRAG,
                  fragment + NET_TX_PKT_VHDR_FRAG, dst_idx - NET_TX_PKT_VHDR_FRAG);
+
+        if (gso_type == VIRTIO_NET_HDR_GSO_TCPV4 ||
+            gso_type == VIRTIO_NET_HDR_GSO_TCPV6) {
+            net_tx_pkt_tcp_fragment_advance(pkt, fragment, fragment_len,
+                                            gso_type);
+        }
 
         fragment_offset += fragment_len;
     }
