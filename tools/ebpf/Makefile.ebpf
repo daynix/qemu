@@ -13,9 +13,10 @@ clean:
 	rm -f $(OBJS)
 
 $(OBJS):  %.o:%.c
-	$(CLANG) $(INC_FLAGS) \
-                -D__KERNEL__ -D__ASM_SYSREG_H \
-                -I../include $(LINUXINCLUDE) \
-                $(EXTRA_CFLAGS) -c $< -o -| $(LLC) -march=bpf -filetype=obj -o $@
+#	$(CLANG) $(INC_FLAGS) \
+#                -D__KERNEL__ -D__ASM_SYSREG_H \
+#                -I../include $(LINUXINCLUDE) \
+#                $(EXTRA_CFLAGS) -c $< -o -| $(LLC) -march=bpf -filetype=obj --debug-pass=btf -o $@
+	$(CLANG) -O2 -target bpf -g -c $< -o $@
 	bpftool gen skeleton rss.bpf.o > rss.bpf.skeleton.h
 	cp rss.bpf.skeleton.h ../../ebpf/

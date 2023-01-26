@@ -64,7 +64,7 @@ bool ebpf_rss_load(struct EBPFRSSContext *ctx)
     ctx->map_configuration = bpf_map__fd(
             rss_bpf_ctx->maps.tap_rss_map_configurations);
 
-    ctx->mmap_configuration = mmap(NULL, qemu_real_host_page_size,
+    ctx->mmap_configuration = mmap(NULL, qemu_real_host_page_size(),
                                    PROT_READ | PROT_WRITE, MAP_SHARED,
                                    ctx->map_configuration, 0);
     if (ctx->mmap_configuration == MAP_FAILED) {
@@ -83,7 +83,7 @@ error:
 }
 
 bool ebpf_rss_load_fds(struct EBPFRSSContext *ctx, int program_fd,
-                       int config_fd, int toeplitz_fd, int table_fd)
+                       int config_fd)
 {
     if (ctx == NULL || ebpf_rss_is_loaded(ctx)) {
         return false;
@@ -92,7 +92,7 @@ bool ebpf_rss_load_fds(struct EBPFRSSContext *ctx, int program_fd,
     ctx->program_fd = program_fd;
     ctx->map_configuration = config_fd;
 
-    ctx->mmap_configuration = mmap(NULL, qemu_real_host_page_size,
+    ctx->mmap_configuration = mmap(NULL, qemu_real_host_page_size(),
                                    PROT_READ | PROT_WRITE, MAP_SHARED,
                                    ctx->map_configuration, 0);
     if (ctx->mmap_configuration == MAP_FAILED) {
@@ -145,7 +145,7 @@ void ebpf_rss_unload(struct EBPFRSSContext *ctx)
     }
 
     if (ctx->mmap_configuration) {
-        munmap(ctx->mmap_configuration, qemu_real_host_page_size);
+        munmap(ctx->mmap_configuration, qemu_real_host_page_size());
     }
 
     if (ctx->obj != NULL) {

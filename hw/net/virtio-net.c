@@ -1329,7 +1329,7 @@ static bool virtio_net_load_ebpf_fds(VirtIONet *n)
     }
 
     if (nfds == EBPF_RSS_MAX_FDS) {
-        ret = ebpf_rss_load_fds(&n->ebpf_rss, fds[0], fds[1], fds[2], fds[3]);
+        ret = ebpf_rss_load_fds(&n->ebpf_rss, fds[0], fds[1]);
     }
 
     if (!ret) {

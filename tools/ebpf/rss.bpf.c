@@ -80,14 +80,13 @@ struct rss_config_t {
     __u16 indirections_table[INDIRECTION_TABLE_SIZE];
 } __attribute__((packed));
 
-struct bpf_map_def SEC("maps")
-tap_rss_map_configurations = {
-        .type        = BPF_MAP_TYPE_ARRAY,
-        .key_size    = sizeof(__u32),
-        .value_size  = sizeof(struct rss_config_t),
-        .max_entries = 1,
-        .map_flags = BPF_F_MMAPABLE,
-};
+struct {
+        __uint(type, BPF_MAP_TYPE_ARRAY);
+        __uint(key_size, sizeof(__u32));
+        __uint(value_size, sizeof(struct rss_config_t));
+        __uint(max_entries, 1);
+        __uint(map_flags, BPF_F_MMAPABLE);
+} tap_rss_map_configurations SEC(".maps");
 
 static inline void net_rx_rss_add_chunk(__u8 *rss_input, size_t *bytes_written,
                                         const void *ptr, size_t size) {

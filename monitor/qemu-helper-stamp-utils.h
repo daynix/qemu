@@ -17,8 +17,10 @@
 
 #define QEMU_HELPER_STAMP_STR     stringify(QEMU_HELPER_STAMP)
 
-bool qemu_check_helper_stamp(const char *path, const char *stamp);
+#define QEMU_DEFAULT_EBPF_HELPER_BIN_NAME "qemu-ebpf-rss-helper"
 
-char *qemu_find_helper(const char *name, bool check_stamp);
+char *qemu_find_default_ebpf_helper(void);
+
+char *qemu_check_suggested_ebpf_helper(const char *path);
 
 #endif /* QEMU_QEMU_HELPER_STAMP_UTILS_H */

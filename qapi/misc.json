@@ -585,34 +585,44 @@
   'data': { 'vfu-id': 'str', 'vfu-qom-path': 'str',
             'dev-id': 'str', 'dev-qom-path': 'str' } }
 
+##
 # @HelperPath:
 #
 # Name of the helper and binary location.
 ##
 { 'struct': 'HelperPath',
-  'data': {'name': 'str', 'path': 'str'} }
+  'data': {'path': 'str'} }
 
 ##
-# @query-helper-paths:
+# @find-ebpf-rss-helper:
 #
-# Query helper paths. Initially, this command was added for
-# qemu-ebpf-rss-helper. The qemu would check "the stamp" and
-# returns proper helper.
+# Query helper paths to find qemu-ebpf-rss-helper.
+# The qemu would check "the stamp" and
+# returns the proper helper.
+# It's possible to provide paths where to look for a helper.
+# If the path is provided to a file - qemu would check the file for the stamp.
+# If the path is provided to a directory - qemu would look for
+# a file "qemu-ebpf-rss-helper" and check its stamp. 
 #
-# Returns: list of object that contains name and path for helper.
+# Returns: path to the helper with a valid stamp.
 #
-# Since: 6.1
+# Note: Provided path arguments have the highest priority where to look
+#       for a helper. Then, default "helper directory" and then
+#       near the qemu binary.
+#
+# Since: 7.2
 #
 # Example:
 #
-# -> { "execute": "query-helper-paths" }
+# -> { "execute": "find-ebpf-rss-helper", "arguments": { "path": "/opt/qemu_helpers/" } }
 # <- { "return": [
 #        {
-#          "name": "qemu-ebpf-rss-helper",
 #          "path": "/usr/local/libexec/qemu-ebpf-rss-helper"
 #        }
 #      ]
 #    }
 #
 ##
-{ 'command': 'query-helper-paths', 'returns': ['HelperPath'] }
+{ 'command': 'find-ebpf-rss-helper',  
+  'data': {'*path': ['str']},
+  'returns': 'HelperPath' }

@@ -214,7 +214,7 @@ static bool elf32_check_stamp(int fd, Elf32_Ehdr *elf_header, const char *stamp)
     return ret;
 }
 
-bool qemu_check_helper_stamp(const char *path, const char *stamp)
+static bool qemu_check_helper_stamp(const char *path, const char *stamp)
 {
     int fd;
     bool ret = false;
@@ -250,27 +250,23 @@ error:
 
 #else
 
-bool qemu_check_helper_stamp(const char *path, const char *stamp)
+static bool qemu_check_helper_stamp(const char *path, const char *stamp)
 {
     return false;
 }
 
 #endif
 
-char *qemu_find_helper(const char *name, bool check_stamp)
+char *qemu_find_default_ebpf_helper(void)
 {
     char *qemu_exec = NULL;
     char *qemu_dir = NULL;
     char *helper = NULL;
+//    const char *name = QEMU_DEFAULT_EBPF_HELPER_BIN_NAME;
 
-    if (name == NULL) {
-        return NULL;
-    }
-
-    helper = g_build_filename(CONFIG_QEMU_HELPERDIR, name, NULL);
-    if (g_access(helper, F_OK) == 0
-        && (!check_stamp
-            || qemu_check_helper_stamp(helper, QEMU_HELPER_STAMP_STR))) {
+    helper = g_build_filename(CONFIG_QEMU_HELPERDIR, QEMU_DEFAULT_EBPF_HELPER_BIN_NAME, NULL);
+    if (g_access(helper, X_OK) == 0
+        && qemu_check_helper_stamp(helper, QEMU_HELPER_STAMP_STR)) {
         return helper;
     }
     g_free(helper);
@@ -283,15 +279,41 @@ char *qemu_find_helper(const char *name, bool check_stamp)
     if (qemu_exec != NULL) {
         qemu_dir = g_path_get_dirname(qemu_exec);
         g_free(qemu_exec);
-        helper = g_build_filename(qemu_dir, name, NULL);
+        helper = g_build_filename(qemu_dir, QEMU_DEFAULT_EBPF_HELPER_BIN_NAME, NULL);
         g_free(qemu_dir);
-        if (g_access(helper, F_OK) == 0
-           && (!check_stamp
-               || qemu_check_helper_stamp(helper, QEMU_HELPER_STAMP_STR))) {
+        if (g_access(helper, X_OK) == 0
+           && qemu_check_helper_stamp(helper, QEMU_HELPER_STAMP_STR)) {
             return helper;
         }
         g_free(helper);
     }
+
+    return NULL;
+}
+
+char *qemu_check_suggested_ebpf_helper(const char *path) {
+    char *helperbin = NULL;
+    struct stat statbuf; /* NOTE: use GStatBuf? */
+
+    /* check is dir or file */
+    if (g_stat(path, &statbuf) < 0) {
+        return NULL;
+    }
+
+    if (statbuf.st_mode & S_IFDIR) {
+        /* is dir */
+        helperbin = g_build_filename(path, QEMU_DEFAULT_EBPF_HELPER_BIN_NAME, NULL);
+
+    } else if (statbuf.st_mode & S_IFREG) {
+        /* is file */
+        helperbin = g_strdup(path);
+    }
+
+    if (qemu_check_helper_stamp(helperbin, QEMU_HELPER_STAMP_STR)) {
+        return helperbin;
+    }
+
+    g_free(helperbin);
 
     return NULL;
 }

@@ -601,33 +601,24 @@ bool apply_str_list_filter(const char *string, strList *list)
     return false;
 }
 
-HelperPathList *qmp_query_helper_paths(Error **errp)
-{
-    HelperPathList *ret = NULL;
-    struct {
-        const char *helper;
-        bool check_stamp;
-    } helpers_list[] = {
-#ifdef CONFIG_EBPF
-        { "qemu-ebpf-rss-helper", true },
-#endif
-        { "qemu-pr-helper", false },
-        { "qemu-bridge-helper", false },
-        { NULL, false },
-    }, *helper_iter;
-    helper_iter = helpers_list;
-
-    for (; helper_iter->helper != NULL; ++helper_iter) {
-        char *path = qemu_find_helper(helper_iter->helper,
-                                      helper_iter->check_stamp);
-        if (path) {
-            HelperPath *helper = g_new0(HelperPath, 1);
-            helper->name = g_strdup(helper_iter->helper);
-            helper->path = path;
-
-            QAPI_LIST_PREPEND(ret, helper);
+HelperPath *qmp_find_ebpf_rss_helper(bool has_path, strList *path, Error **errp) {
+    HelperPath *ret = NULL;
+    char *helperbin = NULL;
+    
+    /* Look for helper in the suggested pathes */
+    if (has_path) {
+        strList *str_list = NULL;
+        for (str_list = path; str_list && !helperbin; str_list = str_list->next) {
+            helperbin = qemu_check_suggested_ebpf_helper(str_list->value);
         }
     }
-
+    
+    if (helperbin == NULL)
+        helperbin = qemu_find_default_ebpf_helper();
+    
+    if (helperbin) {
+        ret = g_new0(HelperPath, 1);
+        ret->path = helperbin;
+    }
     return ret;
 }
