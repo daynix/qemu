@@ -748,6 +748,7 @@ igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
                      union e1000_adv_tx_desc *tx_desc,
                      const E1000E_RingInfo *txi)
 {
+    PCIDevice *d;
     uint32_t cmd_type_len = le32_to_cpu(tx_desc->read.cmd_type_len);
     uint64_t tdwba;
 
@@ -758,14 +759,19 @@ igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
         return 0;
     }
 
+    d = pcie_sriov_get_vf_at_index(core->owner, txi->idx % 8);
+    if (!d) {
+        d = core->owner;
+    }
+
     if (tdwba & 1) {
         uint32_t buffer = cpu_to_le32(core->mac[txi->dh]);
-        pci_dma_write(core->owner, tdwba & ~3, &buffer, sizeof(buffer));
+        pci_dma_write(d, tdwba & ~3, &buffer, sizeof(buffer));
     } else {
         uint32_t status = le32_to_cpu(tx_desc->wb.status) | E1000_TXD_STAT_DD;
 
         tx_desc->wb.status = cpu_to_le32(status);
-        pci_dma_write(core->owner, base + offsetof(union e1000_adv_tx_desc, wb),
+        pci_dma_write(d, base + offsetof(union e1000_adv_tx_desc, wb),
             &tx_desc->wb, sizeof(tx_desc->wb));
     }
 
@@ -775,6 +781,7 @@ igb_txdesc_writeback(IGBCore *core, dma_addr_t base,
 static void
 igb_start_xmit(IGBCore *core, const IGB_TxRing *txr)
 {
+    PCIDevice *d;
     dma_addr_t base;
     union e1000_adv_tx_desc desc;
     const E1000E_RingInfo *txi = txr->i;
@@ -786,10 +793,15 @@ igb_start_xmit(IGBCore *core, const IGB_TxRing *txr)
         return;
     }
 
+    d = pcie_sriov_get_vf_at_index(core->owner, txi->idx % 8);
+    if (!d) {
+        d = core->owner;
+    }
+
     while (!igb_ring_empty(core, txi)) {
         base = igb_ring_head_descr(core, txi);
 
-        pci_dma_read(core->owner, base, &desc, sizeof(desc));
+        pci_dma_read(d, base, &desc, sizeof(desc));
 
         trace_e1000e_tx_descr((void *)(intptr_t)desc.read.buffer_addr,
                               desc.read.cmd_type_len, desc.wb.status);
@@ -1286,11 +1298,9 @@ struct NetRxPkt *pkt, const E1000E_RSSInfo *rss_info, uint16_t length)
 }
 
 static inline void
-igb_pci_dma_write_rx_desc(IGBCore *core, dma_addr_t addr,
+igb_pci_dma_write_rx_desc(IGBCore *core, PCIDevice *dev, dma_addr_t addr,
                           union e1000_rx_desc_union *desc, dma_addr_t len)
 {
-    PCIDevice *dev = core->owner;
-
     if (igb_rx_use_legacy_descriptor(core)) {
         struct e1000_rx_desc *d = &desc->legacy;
         size_t offset = offsetof(struct e1000_rx_desc, status);
@@ -1321,13 +1331,14 @@ igb_pci_dma_write_rx_desc(IGBCore *core, dma_addr_t addr,
 
 static void
 igb_write_to_rx_buffers(IGBCore *core,
+                        PCIDevice *d,
                         hwaddr ba,
                         uint16_t *written,
                         const char *data,
                         dma_addr_t data_len)
 {
     trace_igb_rx_desc_buff_write(ba, *written, data, data_len);
-    pci_dma_write(core->owner, ba + *written, data, data_len);
+    pci_dma_write(d, ba + *written, data, data_len);
     *written += data_len;
 }
 
@@ -1362,7 +1373,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
                           const E1000E_RxRing *rxr,
                           const E1000E_RSSInfo *rss_info)
 {
-    PCIDevice *d = core->owner;
+    PCIDevice *d;
     dma_addr_t base;
     union e1000_rx_desc_union desc;
     size_t desc_size;
@@ -1374,6 +1385,11 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
     size_t total_size = size + e1000x_fcs_len(core->mac);
     const E1000E_RingInfo *rxi = rxr->i;
     size_t bufsize = igb_rxbufsize(core, rxi);
+
+    d = pcie_sriov_get_vf_at_index(core->owner, rxi->idx % 8);
+    if (!d) {
+        d = core->owner;
+    }
 
     do {
         hwaddr ba;
@@ -1411,7 +1427,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
                 while (copy_size) {
                     iov_copy = MIN(copy_size, iov->iov_len - iov_ofs);
 
-                    igb_write_to_rx_buffers(core, ba, &written,
+                    igb_write_to_rx_buffers(core, d, ba, &written,
                                             iov->iov_base + iov_ofs, iov_copy);
 
                     copy_size -= iov_copy;
@@ -1424,7 +1440,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 
                 if (desc_offset + desc_size >= total_size) {
                     /* Simulate FCS checksum presence in the last descriptor */
-                    igb_write_to_rx_buffers(core, ba, &written,
+                    igb_write_to_rx_buffers(core, d, ba, &written,
                           (const char *) &fcs_pad, e1000x_fcs_len(core->mac));
                 }
             }
@@ -1438,7 +1454,7 @@ igb_write_packet_to_guest(IGBCore *core, struct NetRxPkt *pkt,
 
         igb_write_rx_descr(core, &desc, is_last ? core->rx_pkt : NULL,
                            rss_info, written);
-        igb_pci_dma_write_rx_desc(core, base, &desc, core->rx_desc_len);
+        igb_pci_dma_write_rx_desc(core, d, base, &desc, core->rx_desc_len);
 
         igb_ring_advance(core, rxi, core->rx_desc_len / E1000_MIN_RX_DESC_LEN);
 
