@@ -69,7 +69,7 @@ typedef struct IGBTxPktVmdqCallbackContext {
 
 static ssize_t
 igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
-                     bool has_vnet, bool *assigned);
+                     bool has_vnet, bool *external_tx);
 
 static inline void
 igb_set_interrupt_cause(IGBCore *core, uint32_t val);
