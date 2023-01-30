@@ -43,15 +43,15 @@
 #include "hw/pci/pci_device.h"
 #include "hw/pci/pcie.h"
 #include "hw/pci/msix.h"
+#include "net/eth.h"
 #include "net/net.h"
 #include "igb_common.h"
+#include "igb_core.h"
 #include "trace.h"
 #include "qapi/error.h"
 
 #define TYPE_IGBVF "igbvf"
 OBJECT_DECLARE_SIMPLE_TYPE(IgbVfState, IGBVF)
-
-#define IGBVF_MSIX_VECTORS  (3)
 
 #define IGBVF_MMIO_BAR_IDX  (0)
 #define IGBVF_MSIX_BAR_IDX  (3)
@@ -259,13 +259,13 @@ static void igbvf_pci_realize(PCIDevice *dev, Error **errp)
     memory_region_init(&s->msix, OBJECT(dev), "igbvf-msix", IGBVF_MSIX_SIZE);
     pcie_sriov_vf_register_bar(dev, IGBVF_MSIX_BAR_IDX, &s->msix);
 
-    ret = msix_init(dev, IGBVF_MSIX_VECTORS, &s->msix, IGBVF_MSIX_BAR_IDX, 0,
+    ret = msix_init(dev, IGBVF_MSIX_VEC_NUM, &s->msix, IGBVF_MSIX_BAR_IDX, 0,
         &s->msix, IGBVF_MSIX_BAR_IDX, 0x2000, 0x70, errp);
     if (ret) {
         return;
     }
 
-    for (i = 0; i < IGBVF_MSIX_VECTORS; i++) {
+    for (i = 0; i < IGBVF_MSIX_VEC_NUM; i++) {
         msix_vector_use(dev, i);
     }
 

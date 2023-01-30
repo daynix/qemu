@@ -97,11 +97,15 @@ static void igb_msix_notify(IGBCore *core, unsigned int vector)
     PCIDevice *dev = core->owner;
     uint16_t vfn;
 
-    vfn = 8 - (vector + 2) / 3;
+    vfn = 8 - (vector + 2) / IGBVF_MSIX_VEC_NUM;
     if (vfn < pcie_sriov_num_vfs(core->owner)) {
         dev = pcie_sriov_get_vf_at_index(core->owner, vfn);
         assert(dev);
-        vector = (vector + 2) % 3;
+        vector = (vector + 2) % IGBVF_MSIX_VEC_NUM;
+    } else if (vector >= IGB_MSIX_VEC_NUM) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "igb: Tried to use vector unavailable for PF");
+        return;
     }
 
     msix_notify(dev, vector);
@@ -153,7 +157,7 @@ igb_intrmgr_initialize_all_timers(IGBCore *core, bool create)
 {
     int i;
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         core->eitr[i].core = core;
         core->eitr[i].delay_reg = EITR0 + i;
         core->eitr[i].delay_resolution_ns = E1000_INTR_DELAY_NS_RES;
@@ -163,7 +167,7 @@ igb_intrmgr_initialize_all_timers(IGBCore *core, bool create)
         return;
     }
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         core->eitr[i].timer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                            igb_intrmgr_on_msix_throttling_timer,
                                            &core->eitr[i]);
@@ -175,7 +179,7 @@ igb_intrmgr_resume(IGBCore *core)
 {
     int i;
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         igb_intmgr_timer_resume(&core->eitr[i]);
     }
 }
@@ -185,7 +189,7 @@ igb_intrmgr_pause(IGBCore *core)
 {
     int i;
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         igb_intmgr_timer_pause(&core->eitr[i]);
     }
 }
@@ -195,7 +199,7 @@ igb_intrmgr_reset(IGBCore *core)
 {
     int i;
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         if (core->eitr[i].running) {
             timer_del(core->eitr[i].timer);
             igb_intrmgr_on_msix_throttling_timer(&core->eitr[i]);
@@ -208,7 +212,7 @@ igb_intrmgr_pci_unint(IGBCore *core)
 {
     int i;
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         timer_free(core->eitr[i].timer);
     }
 }
@@ -1776,7 +1780,7 @@ static void igb_send_msix(IGBCore *core)
     uint32_t effective_eiac;
     int vector;
 
-    for (vector = 0; vector < IGB_MSIX_VEC_NUM; ++vector) {
+    for (vector = 0; vector < IGB_INTR_NUM; ++vector) {
         if ((causes & BIT(vector)) && !igb_eitr_should_postpone(core, vector)) {
 
             trace_e1000e_irq_msix_notify_vec(vector);
@@ -1913,7 +1917,7 @@ static void mailbox_interrupt_to_vf(IGBCore *core, uint16_t vfn)
     uint32_t ent = core->mac[VTIVAR_MISC + vfn];
 
     if ((ent & E1000_IVAR_VALID)) {
-        core->mac[EICR] |= (ent & 0x3) << (22 - vfn * 3);
+        core->mac[EICR] |= (ent & 0x3) << (22 - vfn * IGBVF_MSIX_VEC_NUM);
         igb_update_interrupt_state(core);
     }
 }
@@ -2061,7 +2065,7 @@ static void igb_set_vteics(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEICS0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eics(core, EICS, (val & 0x7) << (22 - vfn * 3));
+    igb_set_eics(core, EICS, (val & 0x7) << (22 - vfn * IGBVF_MSIX_VEC_NUM));
 }
 
 static void igb_set_vteims(IGBCore *core, int index, uint32_t val)
@@ -2069,7 +2073,7 @@ static void igb_set_vteims(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIMS0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eims(core, EIMS, (val & 0x7) << (22 - vfn * 3));
+    igb_set_eims(core, EIMS, (val & 0x7) << (22 - vfn * IGBVF_MSIX_VEC_NUM));
 }
 
 static void igb_set_vteimc(IGBCore *core, int index, uint32_t val)
@@ -2077,7 +2081,7 @@ static void igb_set_vteimc(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIMC0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eimc(core, EIMC, (val & 0x7) << (22 - vfn * 3));
+    igb_set_eimc(core, EIMC, (val & 0x7) << (22 - vfn * IGBVF_MSIX_VEC_NUM));
 }
 
 static void igb_set_vteiac(IGBCore *core, int index, uint32_t val)
@@ -2085,7 +2089,7 @@ static void igb_set_vteiac(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIAC0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eiac(core, EIAC, (val & 0x7) << (22 - vfn * 3));
+    igb_set_eiac(core, EIAC, (val & 0x7) << (22 - vfn * IGBVF_MSIX_VEC_NUM));
 }
 
 static void igb_set_vteiam(IGBCore *core, int index, uint32_t val)
@@ -2093,7 +2097,7 @@ static void igb_set_vteiam(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEIAM0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eiam(core, EIAM, (val & 0x7) << (22 - vfn * 3));
+    igb_set_eiam(core, EIAM, (val & 0x7) << (22 - vfn * IGBVF_MSIX_VEC_NUM));
 }
 
 static void igb_set_vteicr(IGBCore *core, int index, uint32_t val)
@@ -2101,7 +2105,7 @@ static void igb_set_vteicr(IGBCore *core, int index, uint32_t val)
     uint16_t vfn = (index - PVTEICR0) / 0x40;
 
     core->mac[index] = val;
-    igb_set_eicr(core, EICR, (val & 0x7) << (22 - vfn * 3));
+    igb_set_eicr(core, EICR, (val & 0x7) << (22 - vfn * IGBVF_MSIX_VEC_NUM));
 }
 
 static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
@@ -2116,7 +2120,7 @@ static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
     /* Get assigned vector associated with queue Rx#0. */
     if ((val & E1000_IVAR_VALID)) {
         n = igb_ivar_entry_rx(qn);
-        ent = E1000_IVAR_VALID | (24 - vfn * 3 - (2 - (val & 0x7)));
+        ent = E1000_IVAR_VALID | (24 - vfn * IGBVF_MSIX_VEC_NUM - (2 - (val & 0x7)));
         core->mac[IVAR0 + n / 4] |= ent << 8 * (n % 4);
     }
 
@@ -2124,7 +2128,7 @@ static void igb_set_vtivar(IGBCore *core, int index, uint32_t val)
     ent = val >> 8;
     if ((ent & E1000_IVAR_VALID)) {
         n = igb_ivar_entry_tx(qn);
-        ent = E1000_IVAR_VALID | (24 - vfn * 3 - (2 - (ent & 0x7)));
+        ent = E1000_IVAR_VALID | (24 - vfn * IGBVF_MSIX_VEC_NUM - (2 - (ent & 0x7)));
         core->mac[IVAR0 + n / 4] |= ent << 8 * (n % 4);
     }
 
@@ -2260,7 +2264,7 @@ igb_set_pbaclr(IGBCore *core, int index, uint32_t val)
         return;
     }
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+    for (i = 0; i < IGB_INTR_NUM; i++) {
         if (core->mac[PBACLR] & BIT(i)) {
             msix_clr_pending(core->owner, i);
         }
@@ -3112,7 +3116,7 @@ static const readops igb_macreg_readops[] = {
     [RETA ... RETA + 31]   = igb_mac_readreg,
     [RSSRK ... RSSRK + 9]  = igb_mac_readreg,
     [MAVTV0 ... MAVTV3]    = igb_mac_readreg,
-    [EITR0 ... EITR0 + IGB_MSIX_VEC_NUM - 1] = igb_mac_eitr_read,
+    [EITR0 ... EITR0 + IGB_INTR_NUM - 1] = igb_mac_eitr_read,
     [PVTEICR0] = igb_mac_read_clr4,
     [PVTEICR1] = igb_mac_read_clr4,
     [PVTEICR2] = igb_mac_read_clr4,
@@ -3525,7 +3529,7 @@ static const writeops igb_macreg_writeops[] = {
     [RETA ... RETA + 31]     = igb_mac_writereg,
     [RSSRK ... RSSRK + 9]    = igb_mac_writereg,
     [MAVTV0 ... MAVTV3]      = igb_mac_writereg,
-    [EITR0 ... EITR0 + IGB_MSIX_VEC_NUM - 1] = igb_set_eitr,
+    [EITR0 ... EITR0 + IGB_INTR_NUM - 1] = igb_set_eitr,
 
     /* IGB specific: */
     [FWSM]     = igb_mac_writereg,
@@ -3986,7 +3990,7 @@ static void igb_reset(IGBCore *core, bool sw)
     for (i = 0; i < E1000E_MAC_SIZE; i++) {
         if (sw &&
             (i == RXPBS || i == TXPBS ||
-             (i >= EITR0 && i < EITR0 + IGB_MSIX_VEC_NUM))) {
+             (i >= EITR0 && i < EITR0 + IGB_INTR_NUM))) {
             continue;
         }
 

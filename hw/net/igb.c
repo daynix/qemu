@@ -80,8 +80,6 @@ struct IGBState {
     IGBCore core;
 };
 
-#define IGB_MSIX_VECTORS    (10)
-
 #define IGB_CAP_SRIOV_OFFSET    (0x160)
 #define IGB_VF_OFFSET           (0x80)
 #define IGB_VF_STRIDE           (2)
@@ -286,14 +284,14 @@ igb_init_msix(IGBState *s)
 {
     int i;
 
-    msix_init(PCI_DEVICE(s), IGB_MSIX_VECTORS,
+    msix_init(PCI_DEVICE(s), IGB_MSIX_VEC_NUM,
               &s->msix,
               E1000E_MSIX_IDX, 0,
               &s->msix,
               E1000E_MSIX_IDX, 0x2000,
               0x70, &error_abort);
 
-    for (i = 0; i < IGB_MSIX_VECTORS; i++) {
+    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
         msix_vector_use(PCI_DEVICE(s), i);
     }
 }
@@ -549,9 +547,9 @@ static const VMStateDescription igb_vmstate = {
         VMSTATE_UINT8_ARRAY(core.permanent_mac, IGBState, ETH_ALEN),
 
         VMSTATE_IGB_INTR_DELAY_TIMER_ARRAY(core.eitr, IGBState,
-                                           IGB_MSIX_VEC_NUM),
+                                           IGB_INTR_NUM),
 
-        VMSTATE_UINT32_ARRAY(core.eitr_guest_value, IGBState, IGB_MSIX_VEC_NUM),
+        VMSTATE_UINT32_ARRAY(core.eitr_guest_value, IGBState, IGB_INTR_NUM),
 
         VMSTATE_STRUCT_ARRAY(core.tx, IGBState, IGB_NUM_QUEUES, 0,
                              igb_vmstate_tx, struct igb_tx),

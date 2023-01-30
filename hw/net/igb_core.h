@@ -43,11 +43,9 @@
 #define E1000E_MAC_SIZE         (0x8000)
 #define IGB_EEPROM_SIZE         (1024)
 
-/*
- * TBD: handle igb sizes, vectors = 25, queues = 16!
- * Just set some conservative values here to work with for now
- */
-#define IGB_MSIX_VEC_NUM        (25)
+#define IGB_INTR_NUM            (25)
+#define IGB_MSIX_VEC_NUM        (10)
+#define IGBVF_MSIX_VEC_NUM      (3)
 #define IGB_NUM_QUEUES          (16)
 
 typedef struct IGBCore IGBCore;
@@ -91,11 +89,11 @@ struct IGBCore {
     bool has_vnet;
     int max_queue_num;
 
-    IGBIntrDelayTimer eitr[IGB_MSIX_VEC_NUM];
+    IGBIntrDelayTimer eitr[IGB_INTR_NUM];
 
     VMChangeStateEntry *vmstate;
 
-    uint32_t eitr_guest_value[IGB_MSIX_VEC_NUM];
+    uint32_t eitr_guest_value[IGB_INTR_NUM];
 
     uint8_t permanent_mac[ETH_ALEN];
 
