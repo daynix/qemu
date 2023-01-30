@@ -728,6 +728,9 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
         break;
 
     case VIRTIO_NET_HDR_GSO_UDP:
+        net_tx_pkt_do_sw_csum(pkt, &pkt->vec[NET_TX_PKT_L2HDR_FRAG],
+                              pkt->payload_frags + NET_TX_PKT_PL_START_FRAG - 1,
+                              pkt->payload_len);
         net_tx_pkt_udp_fragment_init(pkt, &pl_idx, &l4hdr_len,
                                      &src_idx, &src_offset, &src_len);
         break;
@@ -749,6 +752,9 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
         case VIRTIO_NET_HDR_GSO_TCPV4:
         case VIRTIO_NET_HDR_GSO_TCPV6:
             net_tx_pkt_tcp_fragment_fix(pkt, fragment, fragment_len, gso_type);
+            net_tx_pkt_do_sw_csum(pkt, fragment + NET_TX_PKT_L2HDR_FRAG,
+                                  dst_idx - NET_TX_PKT_L2HDR_FRAG,
+                                  l4hdr_len + fragment_len);
             break;
 
         case VIRTIO_NET_HDR_GSO_UDP:
@@ -756,10 +762,6 @@ static bool net_tx_pkt_do_sw_fragmentation(struct NetTxPkt *pkt,
                                         fragment_len);
             break;
         }
-
-        net_tx_pkt_do_sw_csum(pkt, fragment + NET_TX_PKT_L2HDR_FRAG,
-                              dst_idx - NET_TX_PKT_L2HDR_FRAG,
-                              l4hdr_len + fragment_len);
 
         callback(context,
                  fragment + NET_TX_PKT_L2HDR_FRAG, dst_idx - NET_TX_PKT_L2HDR_FRAG,
