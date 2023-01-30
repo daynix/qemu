@@ -2219,7 +2219,7 @@ S: Maintained
 F: hw/net/e1000e*
 F: tests/qtest/fuzz-e1000e-test.c
 F: tests/qtest/e1000e-test.c
-F: tests/qtest/libqos/e1000e.c
+F: tests/qtest/libqos/e1000e.*
 
 igb
 M: Akihiko Odaki <akihiko.odaki@daynix.com>
