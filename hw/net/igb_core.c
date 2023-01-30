@@ -142,8 +142,6 @@ igb_intrmgr_on_msix_throttling_timer(void *opaque)
     IGBIntrDelayTimer *timer = opaque;
     int idx = timer - &timer->core->eitr[0];
 
-    assert(msix_enabled(timer->core->owner));
-
     timer->running = false;
 
     trace_e1000e_irq_msix_notify_postponed_vec(idx);
