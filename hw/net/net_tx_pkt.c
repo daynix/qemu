@@ -587,13 +587,13 @@ static bool net_tx_pkt_tcp_fragment_init(struct NetTxPkt *pkt,
         memcpy((char *)l4->iov_base + bytes_read, pkt->vec[*src_idx].iov_base,
                pkt->vec[*src_idx].iov_len);
 
+        bytes_read += pkt->vec[*src_idx].iov_len;
+
         (*src_idx)++;
         if (*src_idx >= pkt->payload_frags + NET_TX_PKT_PL_START_FRAG) {
             g_free(l4->iov_base);
             return false;
         }
-
-        bytes_read += pkt->vec[*src_idx].iov_len;
     }
 
     *src_offset = l4->iov_len - bytes_read;
