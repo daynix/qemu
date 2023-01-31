@@ -352,7 +352,7 @@ static const VMStateDescription vmstate_hpet = {
     }
 };
 
-static void arm(HPETTimer *t, uint64_t ticks)
+static void hpet_arm(HPETTimer *t, uint64_t ticks)
 {
     if (ticks < ns_to_ticks(INT64_MAX / 2)) {
         timer_mod(t->qemu_timer,
@@ -384,11 +384,11 @@ static void hpet_timer(void *opaque)
             }
         }
         diff = hpet_calculate_diff(t, cur_tick);
-        arm(t, diff);
+        hpet_arm(t, diff);
     } else if (t->config & HPET_TN_32BIT && !timer_is_periodic(t)) {
         if (t->wrap_flag) {
             diff = hpet_calculate_diff(t, cur_tick);
-            arm(t, diff);
+            hpet_arm(t, diff);
             t->wrap_flag = 0;
         }
     }
@@ -415,7 +415,7 @@ static void hpet_set_timer(HPETTimer *t)
             t->wrap_flag = 1;
         }
     }
-    arm(t, diff);
+    hpet_arm(t, diff);
 }
 
 static void hpet_del_timer(HPETTimer *t)
