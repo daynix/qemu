@@ -1569,8 +1569,6 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
 
         igb_rx_ring_init(core, &rxr, i);
 
-        trace_e1000e_rx_rss_dispatched_to_queue(rxr.i->idx);
-
         if (!igb_has_rxbufs(core, rxr.i, total_size)) {
             retval = 0;
         }
@@ -1598,10 +1596,10 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
             core->mac[EICR] |= igb_rx_wb_eic(core, rxr.i->idx);
         }
 
-        trace_e1000e_rx_written_to_guest(n);
+        trace_e1000e_rx_written_to_guest(rxr.i->idx);
     } else {
         n = E1000_ICS_RXO;
-        trace_e1000e_rx_not_written_to_guest(n);
+        trace_e1000e_rx_not_written_to_guest(rxr.i->idx);
     }
 
     trace_e1000e_rx_interrupt_set(n);
