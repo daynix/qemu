@@ -38,7 +38,7 @@
 #include "libqos/e1000e.h"
 #include "hw/net/igb_regs.h"
 
-static const struct eth_header test = {
+static const struct eth_header packet = {
     .h_dest = E1000E_ADDRESS,
     .h_source = E1000E_ADDRESS,
 };
@@ -52,7 +52,7 @@ static void igb_send_verify(QE1000E *d, int *test_sockets, QGuestAllocator *allo
 
     /* Prepare test data buffer */
     uint64_t data = guest_alloc(alloc, sizeof(buffer));
-    memwrite(data, &test, sizeof(test));
+    memwrite(data, &packet, sizeof(packet));
 
     /* Prepare TX descriptor */
     memset(&descr, 0, sizeof(descr));
@@ -77,7 +77,7 @@ static void igb_send_verify(QE1000E *d, int *test_sockets, QGuestAllocator *allo
     g_assert_cmpint(ret, == , sizeof(recv_len));
     ret = recv(test_sockets[0], buffer, sizeof(buffer), 0);
     g_assert_cmpint(ret, ==, sizeof(buffer));
-    g_assert_false(memcmp(buffer, &test, sizeof(test)));
+    g_assert_false(memcmp(buffer, &packet, sizeof(packet)));
 
     /* Free test data buffer */
     guest_free(alloc, data);
@@ -87,15 +87,15 @@ static void igb_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator *a
 {
     union e1000_adv_rx_desc descr;
 
-    struct eth_header test_iov = test;
-    int len = htonl(sizeof(test));
+    struct eth_header test_iov = packet;
+    int len = htonl(sizeof(packet));
     struct iovec iov[] = {
         {
             .iov_base = &len,
             .iov_len = sizeof(len),
         },{
             .iov_base = &test_iov,
-            .iov_len = sizeof(test),
+            .iov_len = sizeof(packet),
         },
     };
 
@@ -103,8 +103,8 @@ static void igb_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator *a
     int ret;
 
     /* Send a dummy packet to device's socket*/
-    ret = iov_send(test_sockets[0], iov, 2, 0, sizeof(len) + sizeof(test));
-    g_assert_cmpint(ret, == , sizeof(test) + sizeof(len));
+    ret = iov_send(test_sockets[0], iov, 2, 0, sizeof(len) + sizeof(packet));
+    g_assert_cmpint(ret, == , sizeof(packet) + sizeof(len));
 
     /* Prepare test data buffer */
     uint64_t data = guest_alloc(alloc, sizeof(buffer));
@@ -125,7 +125,7 @@ static void igb_receive_verify(QE1000E *d, int *test_sockets, QGuestAllocator *a
 
     /* Check data sent to the backend */
     memread(data, buffer, sizeof(buffer));
-    g_assert_false(memcmp(buffer, &test, sizeof(test)));
+    g_assert_false(memcmp(buffer, &packet, sizeof(packet)));
 
     /* Free test data buffer */
     guest_free(alloc, data);
