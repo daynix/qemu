@@ -1488,7 +1488,7 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
     static const int maximum_ethernet_hdr_len = (ETH_HLEN + 4);
 
     uint16_t queues = 0;
-    uint32_t n;
+    uint32_t n = 0;
     uint8_t min_buf[ETH_ZLEN];
     struct iovec min_iov;
     struct eth_header *ehdr;
@@ -1498,7 +1498,6 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
     E1000E_RxRing rxr;
     E1000E_RSSInfo rss_info;
     size_t total_size;
-    ssize_t retval;
     int i;
 
     trace_e1000e_rx_receive_iov(iovcnt);
@@ -1560,8 +1559,6 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
     total_size = net_rx_pkt_get_total_len(core->rx_pkt) +
         e1000x_fcs_len(core->mac);
 
-    retval = orig_size;
-
     for (i = 0; i < IGB_NUM_QUEUES; i++) {
         if (!(queues & BIT(i))) {
             continue;
@@ -1570,42 +1567,30 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
         igb_rx_ring_init(core, &rxr, i);
 
         if (!igb_has_rxbufs(core, rxr.i, total_size)) {
-            retval = 0;
+            n |= E1000_ICS_RXO;
+            trace_e1000e_rx_not_written_to_guest(rxr.i->idx);
+            continue;
         }
-    }
 
-    if (retval) {
-        n = E1000_ICR_RXT0;
+        n |= E1000_ICR_RXT0;
 
         igb_rx_fix_l4_csum(core, core->rx_pkt);
+        igb_write_packet_to_guest(core, core->rx_pkt, &rxr, &rss_info);
 
-        for (i = 0; i < IGB_NUM_QUEUES; i++) {
-            if (!(queues & BIT(i))) {
-                continue;
-            }
-
-            igb_rx_ring_init(core, &rxr, i);
-
-            igb_write_packet_to_guest(core, core->rx_pkt, &rxr, &rss_info);
-
-            /* Check if receive descriptor minimum threshold hit */
-            if (igb_rx_descr_threshold_hit(core, rxr.i)) {
-                n |= E1000_ICS_RXDMT0;
-            }
-
-            core->mac[EICR] |= igb_rx_wb_eic(core, rxr.i->idx);
+        /* Check if receive descriptor minimum threshold hit */
+        if (igb_rx_descr_threshold_hit(core, rxr.i)) {
+            n |= E1000_ICS_RXDMT0;
         }
 
+        core->mac[EICR] |= igb_rx_wb_eic(core, rxr.i->idx);
+
         trace_e1000e_rx_written_to_guest(rxr.i->idx);
-    } else {
-        n = E1000_ICS_RXO;
-        trace_e1000e_rx_not_written_to_guest(rxr.i->idx);
     }
 
     trace_e1000e_rx_interrupt_set(n);
     igb_set_interrupt_cause(core, n);
 
-    return retval;
+    return orig_size;
 }
 
 static inline bool
