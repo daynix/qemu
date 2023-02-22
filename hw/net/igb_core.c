@@ -257,27 +257,25 @@ typedef struct E1000E_RSSInfo_st {
 static uint32_t
 igb_rss_get_hash_type(IGBCore *core, struct NetRxPkt *pkt)
 {
-    bool isip4, isip6, isudp, istcp;
+    bool hasip4, hasip6, hasudp, hastcp;
 
     assert(igb_rss_enabled(core));
 
-    net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
+    net_rx_pkt_get_protocols(pkt, &hasip4, &hasip6, &hasudp, &hastcp);
 
-    if (isip4) {
-        bool fragment = net_rx_pkt_get_ip4_info(pkt)->fragment;
-
-        trace_e1000e_rx_rss_ip4(fragment, istcp, core->mac[MRQC],
+    if (hasip4) {
+        trace_e1000e_rx_rss_ip4(hastcp, core->mac[MRQC],
                                 E1000_MRQC_EN_TCPIPV4(core->mac[MRQC]),
                                 E1000_MRQC_EN_IPV4(core->mac[MRQC]));
 
-        if (!fragment && istcp && E1000_MRQC_EN_TCPIPV4(core->mac[MRQC])) {
+        if (hastcp && E1000_MRQC_EN_TCPIPV4(core->mac[MRQC])) {
             return E1000_MRQ_RSS_TYPE_IPV4TCP;
         }
 
         if (E1000_MRQC_EN_IPV4(core->mac[MRQC])) {
             return E1000_MRQ_RSS_TYPE_IPV4;
         }
-    } else if (isip6) {
+    } else if (hasip6) {
         eth_ip6_hdr_info *ip6info = net_rx_pkt_get_ip6_info(pkt);
 
         bool ex_dis = core->mac[RFCTL] & E1000_RFCTL_IPV6_EX_DIS;
@@ -291,7 +289,7 @@ igb_rss_get_hash_type(IGBCore *core, struct NetRxPkt *pkt)
          * backends like these.
          */
         trace_e1000e_rx_rss_ip6_rfctl(core->mac[RFCTL]);
-        trace_e1000e_rx_rss_ip6(ex_dis, new_ex_dis, istcp,
+        trace_e1000e_rx_rss_ip6(ex_dis, new_ex_dis, hastcp,
                                 ip6info->has_ext_hdrs,
                                 ip6info->rss_ex_dst_valid,
                                 ip6info->rss_ex_src_valid,
@@ -304,8 +302,7 @@ igb_rss_get_hash_type(IGBCore *core, struct NetRxPkt *pkt)
             (!new_ex_dis || !(ip6info->rss_ex_dst_valid ||
                               ip6info->rss_ex_src_valid))) {
 
-            if (istcp && !ip6info->fragment &&
-                E1000_MRQC_EN_TCPIPV6(core->mac[MRQC])) {
+            if (hastcp && E1000_MRQC_EN_TCPIPV6(core->mac[MRQC])) {
                 return E1000_MRQ_RSS_TYPE_IPV6TCP;
             }
 
@@ -1092,7 +1089,7 @@ static void
 igb_verify_csum_in_sw(IGBCore *core,
                       struct NetRxPkt *pkt,
                       uint32_t *status_flags,
-                      bool istcp, bool isudp)
+                      bool hastcp, bool hasudp)
 {
     bool csum_valid;
     uint32_t csum_error;
@@ -1120,10 +1117,10 @@ igb_verify_csum_in_sw(IGBCore *core,
 
     csum_error = csum_valid ? 0 : E1000_RXDEXT_STATERR_TCPE;
 
-    if (istcp) {
+    if (hastcp) {
         *status_flags |= E1000_RXD_STAT_TCPCS |
                          csum_error;
-    } else if (isudp) {
+    } else if (hasudp) {
         *status_flags |= E1000_RXD_STAT_TCPCS |
                          E1000_RXD_STAT_UDPCS |
                          csum_error;
@@ -1142,7 +1139,7 @@ igb_build_rx_metadata(IGBCore *core,
                       uint16_t *vlan_tag)
 {
     struct virtio_net_hdr *vhdr;
-    bool isip4, isip6, istcp, isudp;
+    bool hasip4, hasip6, hastcp, hasudp;
     uint32_t pkt_type;
 
     *status_flags = E1000_RXD_STAT_DD;
@@ -1155,8 +1152,8 @@ igb_build_rx_metadata(IGBCore *core,
 
     *status_flags |= E1000_RXD_STAT_EOP;
 
-    net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
-    trace_e1000e_rx_metadata_protocols(isip4, isip6, isudp, istcp);
+    net_rx_pkt_get_protocols(pkt, &hasip4, &hasip6, &hasudp, &hastcp);
+    trace_e1000e_rx_metadata_protocols(hasip4, hasip6, hasudp, hastcp);
 
     /* VLAN state */
     if (net_rx_pkt_is_vlan_stripped(pkt)) {
@@ -1171,24 +1168,24 @@ igb_build_rx_metadata(IGBCore *core,
             *rss = cpu_to_le32(rss_info->hash);
             trace_igb_rx_metadata_rss(*rss);
         }
-    } else if (isip4) {
+    } else if (hasip4) {
             *status_flags |= E1000_RXD_STAT_IPIDV;
             *ip_id = cpu_to_le16(net_rx_pkt_get_ip_id(pkt));
             trace_e1000e_rx_metadata_ip_id(*ip_id);
     }
 
-    if (istcp && net_rx_pkt_is_tcp_ack(pkt)) {
+    if (hastcp && net_rx_pkt_is_tcp_ack(pkt)) {
         *status_flags |= E1000_RXD_STAT_ACK;
         trace_e1000e_rx_metadata_ack();
     }
 
-    if (isip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_DIS)) {
+    if (hasip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_DIS)) {
         trace_e1000e_rx_metadata_ipv6_filtering_disabled();
         pkt_type = E1000_RXD_PKT_MAC;
-    } else if (istcp || isudp) {
-        pkt_type = isip4 ? E1000_RXD_PKT_IP4_XDP : E1000_RXD_PKT_IP6_XDP;
-    } else if (isip4 || isip6) {
-        pkt_type = isip4 ? E1000_RXD_PKT_IP4 : E1000_RXD_PKT_IP6;
+    } else if (hastcp || hasudp) {
+        pkt_type = hasip4 ? E1000_RXD_PKT_IP4_XDP : E1000_RXD_PKT_IP6_XDP;
+    } else if (hasip4 || hasip6) {
+        pkt_type = hasip4 ? E1000_RXD_PKT_IP4 : E1000_RXD_PKT_IP6;
     } else {
         pkt_type = E1000_RXD_PKT_MAC;
     }
@@ -1210,7 +1207,7 @@ igb_build_rx_metadata(IGBCore *core,
     }
 
     /* RX CSO information */
-    if (isip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_XSUM_DIS)) {
+    if (hasip6 && (core->mac[RFCTL] & E1000_RFCTL_IPV6_XSUM_DIS)) {
         trace_e1000e_rx_metadata_ipv6_sum_disabled();
         goto func_exit;
     }
@@ -1220,20 +1217,20 @@ igb_build_rx_metadata(IGBCore *core,
     if (!(vhdr->flags & VIRTIO_NET_HDR_F_DATA_VALID) &&
         !(vhdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)) {
         trace_e1000e_rx_metadata_virthdr_no_csum_info();
-        igb_verify_csum_in_sw(core, pkt, status_flags, istcp, isudp);
+        igb_verify_csum_in_sw(core, pkt, status_flags, hastcp, hasudp);
         goto func_exit;
     }
 
     if (igb_rx_l3_cso_enabled(core)) {
-        *status_flags |= isip4 ? E1000_RXD_STAT_IPCS : 0;
+        *status_flags |= hasip4 ? E1000_RXD_STAT_IPCS : 0;
     } else {
         trace_e1000e_rx_metadata_l3_cso_disabled();
     }
 
     if (igb_rx_l4_cso_enabled(core)) {
-        if (istcp) {
+        if (hastcp) {
             *status_flags |= E1000_RXD_STAT_TCPCS;
-        } else if (isudp) {
+        } else if (hasudp) {
             *status_flags |= E1000_RXD_STAT_TCPCS | E1000_RXD_STAT_UDPCS;
         }
     } else {
