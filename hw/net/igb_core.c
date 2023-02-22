@@ -495,7 +495,7 @@ igb_on_tx_done_update_stats(IGBCore *core, struct NetTxPkt *tx_pkt)
     static const int PTCregs[6] = { PTC64, PTC127, PTC255, PTC511,
                                     PTC1023, PTC1522 };
 
-    size_t tot_len = net_tx_pkt_get_total_len(tx_pkt);
+    size_t tot_len = net_tx_pkt_get_total_len(tx_pkt) + 4;
 
     e1000x_increase_size_stats(core->mac, PTCregs, tot_len);
     e1000x_inc_reg_if_not_full(core->mac, TPT);
