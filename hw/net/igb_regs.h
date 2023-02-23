@@ -22,23 +22,23 @@
 
 /* Context Descriptor */
 struct e1000_adv_tx_context_desc {
-    __le32 vlan_macip_lens;
-    __le32 seqnum_seed;
-    __le32 type_tucmd_mlhl;
-    __le32 mss_l4len_idx;
+    uint32_t vlan_macip_lens;
+    uint32_t seqnum_seed;
+    uint32_t type_tucmd_mlhl;
+    uint32_t mss_l4len_idx;
 };
 
 /* Advanced Transmit Descriptor */
 union e1000_adv_tx_desc {
     struct {
-        __le64 buffer_addr;     /* Address of descriptor's data buffer */
-        __le32 cmd_type_len;
-        __le32 olinfo_status;
+        uint64_t buffer_addr;     /* Address of descriptor's data buffer */
+        uint32_t cmd_type_len;
+        uint32_t olinfo_status;
     } read;
     struct {
-        __le64 rsvd;            /* Reserved */
-        __le32 nxtseq_seed;
-        __le32 status;
+        uint64_t rsvd;            /* Reserved */
+        uint32_t nxtseq_seed;
+        uint32_t status;
     } wb;
 };
 
@@ -56,27 +56,27 @@ union e1000_adv_tx_desc {
 /* Receive Descriptor - Advanced */
 union e1000_adv_rx_desc {
     struct {
-        __le64 pkt_addr;                /* Packet Buffer Address */
-        __le64 hdr_addr;                /* Header Buffer Address */
+        uint64_t pkt_addr;                /* Packet Buffer Address */
+        uint64_t hdr_addr;                /* Header Buffer Address */
     } read;
     struct {
         struct {
             struct {
-                __le16 pkt_info;        /* RSS Type, Packet Type */
-                __le16 hdr_info;        /* Split Head, Buffer Length */
+                uint16_t pkt_info;        /* RSS Type, Packet Type */
+                uint16_t hdr_info;        /* Split Head, Buffer Length */
             } lo_dword;
             union {
-                __le32 rss;             /* RSS Hash */
+                uint32_t rss;             /* RSS Hash */
                 struct {
-                        __le16 ip_id;   /* IP Id */
-                        __le16 csum;    /* Packet Checksum */
+                        uint16_t ip_id;   /* IP Id */
+                        uint16_t csum;    /* Packet Checksum */
                 } csum_ip;
             } hi_dword;
         } lower;
         struct {
-            __le32 status_error;        /* Ext Status/Error */
-            __le16 length;              /* Packet Length */
-            __le16 vlan;                /* VLAN tag */
+            uint32_t status_error;        /* Ext Status/Error */
+            uint16_t length;              /* Packet Length */
+            uint16_t vlan;                /* VLAN tag */
         } upper;
     } wb;  /* writeback */
 };
