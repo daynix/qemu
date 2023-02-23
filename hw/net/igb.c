@@ -553,6 +553,9 @@ static const VMStateDescription igb_vmstate = {
 
         VMSTATE_STRUCT_ARRAY(core.tx, IGBState, IGB_NUM_QUEUES, 0,
                              igb_vmstate_tx, struct igb_tx),
+
+        VMSTATE_INT64(core.timadj, IGBState),
+
         VMSTATE_END_OF_LIST()
     }
 };

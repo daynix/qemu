@@ -2587,6 +2587,35 @@ igb_set_gcr(IGBCore *core, int index, uint32_t val)
     core->mac[GCR] = (val & ~E1000_GCR_RO_BITS) | ro_bits;
 }
 
+static uint32_t igb_get_systiml(IGBCore *core, int index)
+{
+    e1000x_timestamp(core->mac, core->timadj, SYSTIML, SYSTIMH);
+    return core->mac[SYSTIML];
+}
+
+static uint32_t igb_get_rxsatrh(IGBCore *core, int index)
+{
+    core->mac[TSYNCRXCTL] &= ~E1000_TSYNCRXCTL_VALID;
+    return core->mac[RXSATRH];
+}
+
+static uint32_t igb_get_txstmph(IGBCore *core, int index)
+{
+    core->mac[TSYNCTXCTL] &= ~E1000_TSYNCTXCTL_VALID;
+    return core->mac[TXSTMPH];
+}
+
+static void igb_set_timinca(IGBCore *core, int index, uint32_t val)
+{
+    e1000x_set_timinca(core->mac, &core->timadj, val);
+}
+
+static void igb_set_timadjh(IGBCore *core, int index, uint32_t val)
+{
+    core->mac[TIMADJH] = val;
+    core->timadj += core->mac[TIMADJL] | ((int64_t)core->mac[TIMADJH] << 32);
+}
+
 #define igb_getreg(x)    [x] = igb_mac_readreg
 typedef uint32_t (*readops)(IGBCore *, int);
 static const readops igb_macreg_readops[] = {
@@ -2736,7 +2765,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(RJC),
     igb_getreg(IAM),
     igb_getreg(GSCL_2),
-    igb_getreg(RXSATRH),
     igb_getreg(TIPG),
     igb_getreg(FLMNGCTL),
     igb_getreg(FLMNGCNT),
@@ -2782,7 +2810,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(PBACLR),
     igb_getreg(FCTTV),
     igb_getreg(RXSATRL),
-    igb_getreg(SYSTIML),
     igb_getreg(TORL),
     igb_getreg(TDLEN0),
     igb_getreg(TDLEN1),
@@ -3039,7 +3066,6 @@ static const readops igb_macreg_readops[] = {
     igb_getreg(RXDCTL14),
     igb_getreg(RXDCTL15),
     igb_getreg(RXSTMPL),
-    igb_getreg(TXSTMPH),
     igb_getreg(TIMADJH),
     igb_getreg(FCRTL),
     igb_getreg(XONRXC),
@@ -3088,6 +3114,9 @@ static const readops igb_macreg_readops[] = {
     [CTRL]    = igb_get_ctrl,
     [SWSM]    = igb_mac_swsm_read,
     [IMS]     = igb_mac_ims_read,
+    [SYSTIML] = igb_get_systiml,
+    [RXSATRH] = igb_get_rxsatrh,
+    [TXSTMPH] = igb_get_txstmph,
 
     [CRCERRS ... MPC]      = igb_mac_readreg,
     [IP6AT ... IP6AT + 3]  = igb_mac_readreg,
@@ -3239,7 +3268,6 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(TDBAH13),
     igb_putreg(TDBAH14),
     igb_putreg(TDBAH15),
-    igb_putreg(TIMINCA),
     igb_putreg(IAM),
     igb_putreg(MANC),
     igb_putreg(MANC2H),
@@ -3331,7 +3359,6 @@ static const writeops igb_macreg_writeops[] = {
     igb_putreg(SYSTIML),
     igb_putreg(SYSTIMH),
     igb_putreg(TIMADJL),
-    igb_putreg(TIMADJH),
     igb_putreg(TSYNCRXCTL),
     igb_putreg(TSYNCTXCTL),
     igb_putreg(EEMNGCTL),
@@ -3500,6 +3527,8 @@ static const writeops igb_macreg_writeops[] = {
     [FCRTL]    = igb_set_fcrtl,
     [CTRL_DUP] = igb_set_ctrl,
     [RFCTL]    = igb_set_rfctl,
+    [TIMINCA]  = igb_set_timinca,
+    [TIMADJH]  = igb_set_timadjh,
 
     [IP6AT ... IP6AT + 3]    = igb_mac_writereg,
     [IP4AT ... IP4AT + 6]    = igb_mac_writereg,

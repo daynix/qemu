@@ -100,6 +100,8 @@ struct IGBCore {
     NICState *owner_nic;
     PCIDevice *owner;
     void (*owner_start_recv)(PCIDevice *d);
+
+    int64_t timadj;
 };
 
 void
