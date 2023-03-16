@@ -1239,6 +1239,7 @@ igb_build_rx_metadata(IGBCore *core,
             break;
 
         default:
+            goto func_exit;
         }
     } else {
         trace_e1000e_rx_metadata_l4_cso_disabled();

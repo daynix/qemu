@@ -1275,6 +1275,7 @@ e1000e_build_rx_metadata(E1000ECore *core,
             break;
 
         default:
+            break;
         }
     } else {
         trace_e1000e_rx_metadata_l4_cso_disabled();

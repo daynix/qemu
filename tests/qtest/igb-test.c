@@ -38,6 +38,8 @@
 #include "libqos/e1000e.h"
 #include "hw/net/igb_regs.h"
 
+#ifndef _WIN32
+
 static const struct eth_header packet = {
     .h_dest = E1000E_ADDRESS,
     .h_source = E1000E_ADDRESS,
@@ -189,20 +191,6 @@ static void test_igb_multiple_transfers(void *obj, void *data,
 
 }
 
-static void test_igb_hotplug(void *obj, void *data, QGuestAllocator * alloc)
-{
-    QTestState *qts = global_qtest;  /* TODO: get rid of global_qtest here */
-    QE1000E_PCI *dev = obj;
-
-    if (dev->pci_dev.bus->not_hotpluggable) {
-        g_test_skip("pci bus does not support hotplug");
-        return;
-    }
-
-    qtest_qmp_device_add(qts, "igb", "igb_net", "{'addr': '0x06'}");
-    qpci_unplug_acpi_device_test(qts, "igb_net", 0x06);
-}
-
 static void data_test_clear(void *sockets)
 {
     int *test_sockets = sockets;
@@ -226,17 +214,42 @@ static void *data_test_init(GString *cmd_line, void *arg)
     return test_sockets;
 }
 
+#endif
+
+static void *data_test_init_no_socket(GString *cmd_line, void *arg)
+{
+    g_string_append(cmd_line, " -netdev hubport,hubid=0,id=hs0 ");
+    return arg;
+}
+
+static void test_igb_hotplug(void *obj, void *data, QGuestAllocator * alloc)
+{
+    QTestState *qts = global_qtest;  /* TODO: get rid of global_qtest here */
+    QE1000E_PCI *dev = obj;
+
+    if (dev->pci_dev.bus->not_hotpluggable) {
+        g_test_skip("pci bus does not support hotplug");
+        return;
+    }
+
+    qtest_qmp_device_add(qts, "igb", "igb_net", "{'addr': '0x06'}");
+    qpci_unplug_acpi_device_test(qts, "igb_net", 0x06);
+}
+
 static void register_igb_test(void)
 {
-    QOSGraphTestOptions opts = {
-        .before = data_test_init,
-    };
+    QOSGraphTestOptions opts = { 0 };
 
+#ifndef _WIN32
+    opts.before = data_test_init,
     qos_add_test("init", "igb", test_e1000e_init, &opts);
     qos_add_test("tx", "igb", test_igb_tx, &opts);
     qos_add_test("rx", "igb", test_igb_rx, &opts);
     qos_add_test("multiple_transfers", "igb",
                  test_igb_multiple_transfers, &opts);
+#endif
+
+    opts.before = data_test_init_no_socket;
     qos_add_test("hotplug", "igb", test_igb_hotplug, &opts);
 }
 
