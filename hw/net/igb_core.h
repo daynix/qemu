@@ -72,10 +72,9 @@ struct IGBCore {
     QEMUTimer *autoneg_timer;
 
     struct igb_tx {
-        struct e1000_adv_tx_context_desc ctx;
-        bool tse;       /* TCP/UDP Segmentation Enable */
-        bool ixsm;      /* Insert IP Checksum */
-        bool txsm;      /* Insert TCP/UDP Checksum */
+        struct e1000_adv_tx_context_desc ctx[2];
+        uint32_t first_cmd_type_len;
+        uint32_t first_olinfo_status;
 
         bool first;
         bool skip_cp;
