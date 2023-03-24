@@ -549,7 +549,7 @@ igb_process_tx_desc(IGBCore *core,
                    E1000_ADVTXD_DTYP_CTXT) {
             /* advanced transmit context descriptor */
             tx_ctx_desc = (struct e1000_adv_tx_context_desc *)tx_desc;
-            idx = (tx_ctx_desc->mss_l4len_idx >> 4) & 1;
+            idx = (le32_to_cpu(tx_ctx_desc->mss_l4len_idx) >> 4) & 1;
             tx->ctx[idx].vlan_macip_lens = le32_to_cpu(tx_ctx_desc->vlan_macip_lens);
             tx->ctx[idx].seqnum_seed = le32_to_cpu(tx_ctx_desc->seqnum_seed);
             tx->ctx[idx].type_tucmd_mlhl = le32_to_cpu(tx_ctx_desc->type_tucmd_mlhl);
