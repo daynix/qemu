@@ -503,6 +503,7 @@ static const VMStateDescription igb_vmstate_tx_ctx = {
         VMSTATE_UINT32(seqnum_seed, struct e1000_adv_tx_context_desc),
         VMSTATE_UINT32(type_tucmd_mlhl, struct e1000_adv_tx_context_desc),
         VMSTATE_UINT32(mss_l4len_idx, struct e1000_adv_tx_context_desc),
+        VMSTATE_END_OF_LIST()
     }
 };
 
