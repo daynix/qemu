@@ -488,7 +488,7 @@ bool net_tx_pkt_add_raw_fragment_pci(struct NetTxPkt *pkt, PCIDevice *pci_dev,
     }
 
     if (mapped_len != len || !net_tx_pkt_add_raw_fragment(pkt, base, len)) {
-        net_tx_pkt_unmap_frag_pci(pci_dev, base, len);
+        net_tx_pkt_unmap_frag_pci(pci_dev, base, mapped_len);
         return false;
     }
 
