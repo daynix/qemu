@@ -2527,7 +2527,7 @@ static void invalidate_and_set_dirty(MemoryRegion *mr, hwaddr addr,
     }
     if (dirty_log_mask & (1 << DIRTY_MEMORY_CODE)) {
         assert(tcg_enabled());
-        tb_invalidate_phys_range(addr, addr + length);
+        tb_invalidate_phys_range(addr, addr + length - 1);
         dirty_log_mask &= ~(1 << DIRTY_MEMORY_CODE);
     }
     cpu_physical_memory_set_dirty_range(addr, length, dirty_log_mask);
@@ -3175,7 +3175,7 @@ int64_t address_space_cache_init(MemoryRegionCache *cache,
      * cache->xlat and the end of the section.
      */
     diff = int128_sub(cache->mrs.size,
-		      int128_make64(cache->xlat - cache->mrs.offset_within_region));
+                      int128_make64(cache->xlat - cache->mrs.offset_within_region));
     l = int128_get64(int128_min(diff, int128_make64(l)));
 
     mr = cache->mrs.mr;
