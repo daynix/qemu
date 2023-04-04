@@ -696,7 +696,9 @@ e1000e_on_tx_done_update_stats(E1000ECore *core, struct NetTxPkt *tx_pkt)
 
     e1000x_increase_size_stats(core->mac, PTCregs, tot_len);
     e1000x_inc_reg_if_not_full(core->mac, TPT);
+    e1000x_inc_reg_if_not_full(core->mac, GPTC);
     e1000x_grow_8reg_if_not_full(core->mac, TOTL, tot_len);
+    e1000x_grow_8reg_if_not_full(core->mac, GOTCL, tot_len);
 
     switch (net_tx_pkt_get_packet_type(tx_pkt)) {
     case ETH_PKT_BCAST:
@@ -710,10 +712,6 @@ e1000e_on_tx_done_update_stats(E1000ECore *core, struct NetTxPkt *tx_pkt)
     default:
         g_assert_not_reached();
     }
-
-    core->mac[GPTC] = core->mac[TPT];
-    core->mac[GOTCL] = core->mac[TOTL];
-    core->mac[GOTCH] = core->mac[TOTH];
 }
 
 static void

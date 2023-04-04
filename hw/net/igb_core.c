@@ -523,7 +523,9 @@ igb_on_tx_done_update_stats(IGBCore *core, struct NetTxPkt *tx_pkt, int qn)
 
     e1000x_increase_size_stats(core->mac, PTCregs, tot_len);
     e1000x_inc_reg_if_not_full(core->mac, TPT);
+    e1000x_inc_reg_if_not_full(core->mac, GPTC);
     e1000x_grow_8reg_if_not_full(core->mac, TOTL, tot_len);
+    e1000x_grow_8reg_if_not_full(core->mac, GOTCL, tot_len);
 
     switch (net_tx_pkt_get_packet_type(tx_pkt)) {
     case ETH_PKT_BCAST:
@@ -537,10 +539,6 @@ igb_on_tx_done_update_stats(IGBCore *core, struct NetTxPkt *tx_pkt, int qn)
     default:
         g_assert_not_reached();
     }
-
-    core->mac[GPTC] = core->mac[TPT];
-    core->mac[GOTCL] = core->mac[TOTL];
-    core->mac[GOTCH] = core->mac[TOTH];
 
     if (core->mac[MRQC] & 1) {
         uint16_t pool = qn % IGB_NUM_VM_POOLS;
