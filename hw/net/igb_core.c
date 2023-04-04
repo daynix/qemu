@@ -1715,7 +1715,7 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
         iovcnt = 1;
         iov = &min_iov;
         iov_ofs = 0;
-    } else if (iov->iov_len < maximum_ethernet_hdr_len) {
+    } else if (iov->iov_len < iov_ofs + maximum_ethernet_hdr_len) {
         /* This is very unlikely, but may happen. */
         iov_to_buf(iov, iovcnt, iov_ofs, min_buf, maximum_ethernet_hdr_len);
         filter_buf = min_buf;
