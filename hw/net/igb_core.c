@@ -1665,7 +1665,7 @@ static ssize_t
 igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
                      bool has_vnet, bool *external_tx)
 {
-    static const int maximum_ethernet_hdr_len = (ETH_HLEN + 4);
+    static const int maximum_ethernet_hdr_len = (ETH_HLEN + 8);
 
     uint16_t queues = 0;
     uint32_t n = 0;
