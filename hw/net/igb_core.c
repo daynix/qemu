@@ -947,16 +947,21 @@ igb_rx_l4_cso_enabled(IGBCore *core)
     return !!(core->mac[RXCSUM] & E1000_RXCSUM_TUOFLD);
 }
 
-static bool
-igb_rx_is_oversized(IGBCore *core, uint16_t qn, size_t size)
+static bool igb_rx_is_oversized(IGBCore *core, const struct eth_header *ehdr,
+                                size_t size, bool lpe, uint16_t rlpml)
 {
-    uint16_t pool = qn % IGB_NUM_VM_POOLS;
-    bool lpe = !!(core->mac[VMOLR0 + pool] & E1000_VMOLR_LPE);
-    int max_ethernet_lpe_size =
-        core->mac[VMOLR0 + pool] & E1000_VMOLR_RLPML_MASK;
-    int max_ethernet_vlan_size = 1522;
+    size += 4;
 
-    return size > (lpe ? max_ethernet_lpe_size : max_ethernet_vlan_size);
+    if (lpe) {
+        return size > rlpml;
+    }
+
+    if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
+        e1000x_vlan_rx_filter_enabled(core->mac)) {
+        return size > 1522;
+    }
+
+    return size > 1518;
 }
 
 static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
@@ -968,12 +973,22 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
     uint16_t queues = 0;
     uint16_t oversized = 0;
     uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci) & VLAN_VID_MASK;
+    bool lpe;
+    uint16_t rlpml;
     int i;
 
     memset(rss_info, 0, sizeof(E1000E_RSSInfo));
 
     if (external_tx) {
         *external_tx = true;
+    }
+
+    lpe = core->mac[RCTL] & E1000_RCTL_LPE;
+    rlpml = core->mac[RLPML];
+    if (!(core->mac[RCTL] & E1000_RCTL_SBP) &&
+        igb_rx_is_oversized(core, ehdr, size, lpe, rlpml)) {
+        trace_e1000x_rx_oversized(size);
+        return queues;
     }
 
     if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
@@ -1059,7 +1074,10 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
         queues &= core->mac[VFRE];
         if (queues) {
             for (i = 0; i < IGB_NUM_VM_POOLS; i++) {
-                if ((queues & BIT(i)) && igb_rx_is_oversized(core, i, size)) {
+                lpe = !!(core->mac[VMOLR0 + i] & E1000_VMOLR_LPE);
+                rlpml = core->mac[VMOLR0 + i] & E1000_VMOLR_RLPML_MASK;
+                if ((queues & BIT(i)) &&
+                    igb_rx_is_oversized(core, ehdr, size, lpe, rlpml)) {
                     oversized |= BIT(i);
                 }
             }
@@ -1603,11 +1621,6 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
         /* This is very unlikely, but may happen. */
         iov_to_buf(iov, iovcnt, iov_ofs, min_buf, maximum_ethernet_hdr_len);
         filter_buf = min_buf;
-    }
-
-    /* Discard oversized packets if !LPE and !SBP. */
-    if (e1000x_is_oversized(core->mac, size)) {
-        return orig_size;
     }
 
     ehdr = PKT_GET_ETH_HDR(filter_buf);
