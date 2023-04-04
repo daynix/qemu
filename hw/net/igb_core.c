@@ -1009,9 +1009,17 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
         return queues;
     }
 
-    if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
-        !e1000x_rx_vlan_filter(core->mac, PKT_GET_VLAN_HDR(ehdr))) {
-        return queues;
+    if (core->mac[CTRL_EXT] & BIT(26)) {
+        if (lduw_be_p(&ehdr->h_proto) == core->mac[VET] >> 16 &&
+            lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_proto) == (core->mac[VET] & 0xffff) &&
+            !e1000x_rx_vlan_filter(core->mac, PKT_GET_DVLAN_HDR(ehdr))) {
+            return queues;
+        }
+    } else {
+        if (lduw_be_p(&ehdr->h_proto) == (core->mac[VET] & 0xffff) &&
+            !e1000x_rx_vlan_filter(core->mac, PKT_GET_VLAN_HDR(ehdr))) {
+            return queues;
+        }
     }
 
     if (core->mac[MRQC] & 1) {
