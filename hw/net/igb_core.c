@@ -1016,6 +1016,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
     uint16_t queues = 0;
     uint16_t oversized = 0;
     uint16_t vid = lduw_be_p(&PKT_GET_VLAN_HDR(ehdr)->h_tci) & VLAN_VID_MASK;
+    PTP2 ptp2;
     bool lpe;
     uint16_t rlpml;
     int i;
@@ -1038,18 +1039,20 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
     for (*etqf = 0; *etqf < 8; (*etqf)++) {
         if ((core->mac[ETQF0 + *etqf] & E1000_ETQF_FILTER_ENABLE) &&
             lduw_be_p(&ehdr->h_proto) == (core->mac[ETQF0 + *etqf] & E1000_ETQF_ETYPE_MASK)) {
-            PTP2 *ptp2 = (PTP2 *)(ehdr + 1);
+            iov_to_buf(net_rx_pkt_get_iovec(core->rx_pkt),
+                       net_rx_pkt_get_iovec_len(core->rx_pkt), 0,
+                       &ptp2, sizeof(ptp2));
             if ((core->mac[ETQF0 + *etqf] & E1000_ETQF_1588) &&
                 (core->mac[TSYNCRXCTL] & E1000_TSYNCRXCTL_ENABLED) &&
                 !(core->mac[TSYNCRXCTL] & E1000_TSYNCRXCTL_VALID) &&
-                (ptp2->version_ptp & 15) == 2 &&
-                ptp2->message_id_transport_specific == ((core->mac[TSYNCRXCFG] >> 8) & 255)) {
+                (ptp2.version_ptp & 15) == 2 &&
+                ptp2.message_id_transport_specific == ((core->mac[TSYNCRXCFG] >> 8) & 255)) {
                 e1000x_timestamp(core->mac, core->timadj, RXSTMPL, RXSTMPH);
                 *ts = true;
                 core->mac[TSYNCRXCTL] |= E1000_TSYNCRXCTL_VALID;
-                core->mac[RXSATRL] = ldl_le_p(&ptp2->source_uuid_lo);
-                core->mac[RXSATRH] = ldl_le_p(&ptp2->source_uuid_hi) |
-                                     (ldl_le_p(&ptp2->sequence_id) << 16);
+                core->mac[RXSATRL] = ldl_le_p(&ptp2.source_uuid_lo);
+                core->mac[RXSATRH] = ldl_le_p(&ptp2.source_uuid_hi) |
+                                     (ldl_le_p(&ptp2.sequence_id) << 16);
             }
             break;
         }
