@@ -1748,7 +1748,8 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
             strip_vlan_index = 0;
         }
 
-        net_rx_pkt_attach_iovec_ex(core->rx_pkt, iov, iovcnt, iov_ofs, i,
+        net_rx_pkt_attach_iovec_ex(core->rx_pkt, iov, iovcnt, iov_ofs,
+                                   strip_vlan_index,
                                    core->mac[VET] & 0xffff,
                                    core->mac[VET] >> 16);
 
