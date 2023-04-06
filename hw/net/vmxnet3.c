@@ -2002,7 +2002,7 @@ vmxnet3_receive(NetClientState *nc, const uint8_t *buf, size_t size)
 
     if (vmxnet3_rx_filter_may_indicate(s, buf, size)) {
         struct iovec iov = {
-            .iov_base = buf,
+            .iov_base = (void *)buf,
             .iov_len = size
         };
 
