@@ -1012,8 +1012,10 @@ static bool igb_rx_is_oversized(IGBCore *core, const struct eth_header *ehdr,
     return size > 1518;
 }
 
-static uint16_t igb_receive_assign(IGBCore *core, const L2Header *l2_header,
-                                   size_t size, E1000E_RSSInfo *rss_info,
+static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
+                                   size_t iovcnt, size_t iov_ofs,
+                                   const L2Header *l2_header, size_t size,
+                                   E1000E_RSSInfo *rss_info,
                                    uint16_t *etqf, bool *ts, bool *external_tx)
 {
     static const int ta_shift[] = { 4, 3, 2, 0 };
@@ -1045,9 +1047,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const L2Header *l2_header,
     for (*etqf = 0; *etqf < 8; (*etqf)++) {
         if ((core->mac[ETQF0 + *etqf] & E1000_ETQF_FILTER_ENABLE) &&
             be16_to_cpu(ehdr->h_proto) == (core->mac[ETQF0 + *etqf] & E1000_ETQF_ETYPE_MASK)) {
-            iov_to_buf(net_rx_pkt_get_iovec(core->rx_pkt),
-                       net_rx_pkt_get_iovec_len(core->rx_pkt), 0,
-                       &ptp2, sizeof(ptp2));
+            iov_to_buf(iov, iovcnt, iov_ofs, &ptp2, sizeof(ptp2));
             if ((core->mac[ETQF0 + *etqf] & E1000_ETQF_1588) &&
                 (core->mac[TSYNCRXCTL] & E1000_TSYNCRXCTL_ENABLED) &&
                 !(core->mac[TSYNCRXCTL] & E1000_TSYNCRXCTL_VALID) &&
@@ -1730,7 +1730,8 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
                                get_eth_packet_type(&min_buf.l2_header.eth));
     net_rx_pkt_set_protocols(core->rx_pkt, iov, iovcnt, iov_ofs);
 
-    queues = igb_receive_assign(core, &min_buf.l2_header, size,
+    queues = igb_receive_assign(core, iov, iovcnt, iov_ofs,
+                                &min_buf.l2_header, size,
                                 &rss_info, &etqf, &ts, external_tx);
     if (!queues) {
         trace_e1000e_rx_flt_dropped();
