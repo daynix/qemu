@@ -1050,9 +1050,9 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct eth_header *ehdr,
                 e1000x_timestamp(core->mac, core->timadj, RXSTMPL, RXSTMPH);
                 *ts = true;
                 core->mac[TSYNCRXCTL] |= E1000_TSYNCRXCTL_VALID;
-                core->mac[RXSATRL] = ldl_le_p(&ptp2.source_uuid_lo);
-                core->mac[RXSATRH] = ldl_le_p(&ptp2.source_uuid_hi) |
-                                     (ldl_le_p(&ptp2.sequence_id) << 16);
+                core->mac[RXSATRL] = le32_to_cpu(ptp2.source_uuid_lo);
+                core->mac[RXSATRH] = le16_to_cpu(ptp2.source_uuid_hi) |
+                                     (le16_to_cpu(ptp2.sequence_id) << 16);
             }
             break;
         }
