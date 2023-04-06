@@ -1034,7 +1034,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const L2Header *l2_header,
         *external_tx = true;
     }
 
-    lpe = core->mac[RCTL] & E1000_RCTL_LPE;
+    lpe = !!(core->mac[RCTL] & E1000_RCTL_LPE);
     rlpml = core->mac[RLPML];
     if (!(core->mac[RCTL] & E1000_RCTL_SBP) &&
         igb_rx_is_oversized(core, ehdr, size, lpe, rlpml)) {
