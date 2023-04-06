@@ -1047,10 +1047,10 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
     for (*etqf = 0; *etqf < 8; (*etqf)++) {
         if ((core->mac[ETQF0 + *etqf] & E1000_ETQF_FILTER_ENABLE) &&
             be16_to_cpu(ehdr->h_proto) == (core->mac[ETQF0 + *etqf] & E1000_ETQF_ETYPE_MASK)) {
-            iov_to_buf(iov, iovcnt, iov_ofs + ETH_HLEN, &ptp2, sizeof(ptp2));
             if ((core->mac[ETQF0 + *etqf] & E1000_ETQF_1588) &&
                 (core->mac[TSYNCRXCTL] & E1000_TSYNCRXCTL_ENABLED) &&
                 !(core->mac[TSYNCRXCTL] & E1000_TSYNCRXCTL_VALID) &&
+                iov_to_buf(iov, iovcnt, iov_ofs + ETH_HLEN, &ptp2, sizeof(ptp2)) >= sizeof(ptp2) &&
                 (ptp2.version_ptp & 15) == 2 &&
                 ptp2.message_id_transport_specific == ((core->mac[TSYNCRXCFG] >> 8) & 255)) {
                 e1000x_timestamp(core->mac, core->timadj, RXSTMPL, RXSTMPH);
