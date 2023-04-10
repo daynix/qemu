@@ -393,7 +393,6 @@ void net_tx_pkt_setup_vlan_header_ex(struct NetTxPkt *pkt,
                            vlan, vlan_ethtype);
 
     pkt->hdr_len += sizeof(struct vlan_header);
-    pkt->vec[NET_TX_PKT_L2HDR_FRAG].iov_len += sizeof(struct vlan_header);
 }
 
 bool net_tx_pkt_add_raw_fragment(struct NetTxPkt *pkt, void *base, size_t len)
