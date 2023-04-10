@@ -27,10 +27,10 @@ void eth_setup_vlan_headers(struct eth_header *ehdr, size_t *ehdr_size,
     struct vlan_header *vhdr = PKT_GET_VLAN_HDR(ehdr);
 
     memmove(vhdr + 1, vhdr, *ehdr_size - ETH_HLEN);
-    *ehdr_size += sizeof(*vhdr);
     vhdr->h_tci = cpu_to_be16(vlan_tag);
-    ehdr->h_proto = cpu_to_be16(vlan_ethtype);
     vhdr->h_proto = ehdr->h_proto;
+    ehdr->h_proto = cpu_to_be16(vlan_ethtype);
+    *ehdr_size += sizeof(*vhdr);
 }
 
 uint8_t
