@@ -574,11 +574,13 @@ _net_rx_pkt_validate_sctp_sum(struct NetRxPkt *pkt)
         return false;
     }
 
-    if (!iov_from_buf(vec, vec_len, csum_off, &calculated, sizeof(calculated))) {
+    if (!iov_from_buf(vec, vec_len, csum_off,
+                      &calculated, sizeof(calculated))) {
         return false;
     }
 
-    calculated = crc32c(0xffffffff, (uint8_t *)vec->iov_base + off, vec->iov_len - off);
+    calculated = crc32c(0xffffffff,
+                        (uint8_t *)vec->iov_base + off, vec->iov_len - off);
     calculated = iov_crc32c(calculated ^ 0xffffffff, vec + 1, vec_len - 1);
     valid = calculated == le32_to_cpu(original);
     iov_from_buf(vec, vec_len, csum_off, &original, sizeof(original));

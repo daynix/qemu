@@ -26,8 +26,8 @@
 
 struct NetTxPkt;
 
-typedef void (* NetTxPktFreeFrag)(void *, void *, size_t);
-typedef void (* NetTxPktSend)(void *, const struct iovec *, int, const struct iovec *, int);
+typedef void (*NetTxPktFreeFrag)(void *, void *, size_t);
+typedef void (*NetTxPktSend)(void *, const struct iovec *, int, const struct iovec *, int);
 
 /**
  * Init function for tx packet functionality
