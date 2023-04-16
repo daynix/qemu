@@ -997,22 +997,11 @@ igb_rx_l4_cso_enabled(IGBCore *core)
 }
 
 static bool igb_rx_is_oversized(IGBCore *core, const struct eth_header *ehdr,
-                                size_t size, bool lpe, uint16_t rlpml)
+                                size_t size, size_t vlan_num,
+                                bool lpe, uint16_t rlpml)
 {
-    int32_t max_size;
-
-    if (lpe) {
-        max_size = rlpml - ETH_FCS_LEN;
-    } else {
-        max_size = sizeof(struct eth_header) + ETH_MTU;
-
-        if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
-            e1000x_vlan_rx_filter_enabled(core->mac)) {
-            max_size += sizeof(struct vlan_header);
-        }
-    }
-
-    return size > max_size;
+    size_t header_size = sizeof(struct eth_header) + sizeof(struct vlan_header) * vlan_num;
+    return lpe ? size + ETH_FCS_LEN > rlpml : size > header_size + ETH_MTU;
 }
 
 static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
@@ -1026,7 +1015,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
     uint32_t f, ra[2], *macp, rctl = core->mac[RCTL];
     uint16_t queues = 0;
     uint16_t oversized = 0;
-    uint16_t vid = be16_to_cpu(l2_header->vlan[0].h_tci) & VLAN_VID_MASK;
+    size_t vlan_num = 0;
     PTP2 ptp2;
     bool lpe;
     uint16_t rlpml;
@@ -1039,10 +1028,25 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
         *external_tx = true;
     }
 
+    if (core->mac[CTRL_EXT] & BIT(26)) {
+        if (be16_to_cpu(ehdr->h_proto) == core->mac[VET] >> 16 &&
+            be16_to_cpu(l2_header->vlan[0].h_proto) == (core->mac[VET] & 0xffff) &&
+            !e1000x_rx_vlan_filter(core->mac, l2_header->vlan + 1)) {
+            vlan_num = 2;
+            return queues;
+        }
+    } else {
+        if (be16_to_cpu(ehdr->h_proto) == (core->mac[VET] & 0xffff) &&
+            !e1000x_rx_vlan_filter(core->mac, l2_header->vlan)) {
+            vlan_num = 1;
+            return queues;
+        }
+    }
+
     lpe = !!(core->mac[RCTL] & E1000_RCTL_LPE);
     rlpml = core->mac[RLPML];
     if (!(core->mac[RCTL] & E1000_RCTL_SBP) &&
-        igb_rx_is_oversized(core, ehdr, size, lpe, rlpml)) {
+        igb_rx_is_oversized(core, ehdr, size, vlan_num, lpe, rlpml)) {
         trace_e1000x_rx_oversized(size);
         return queues;
     }
@@ -1064,19 +1068,6 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
                                      (le16_to_cpu(ptp2.sequence_id) << 16);
             }
             break;
-        }
-    }
-
-    if (core->mac[CTRL_EXT] & BIT(26)) {
-        if (be16_to_cpu(ehdr->h_proto) == core->mac[VET] >> 16 &&
-            be16_to_cpu(l2_header->vlan[0].h_proto) == (core->mac[VET] & 0xffff) &&
-            !e1000x_rx_vlan_filter(core->mac, l2_header->vlan + 1)) {
-            return queues;
-        }
-    } else {
-        if (be16_to_cpu(ehdr->h_proto) == (core->mac[VET] & 0xffff) &&
-            !e1000x_rx_vlan_filter(core->mac, l2_header->vlan)) {
-            return queues;
         }
     }
 
@@ -1130,7 +1121,9 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
         if (e1000x_vlan_rx_filter_enabled(core->mac)) {
             uint16_t mask = 0;
 
-            if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff)) {
+            if (vlan_num) {
+                uint16_t vid = be16_to_cpu(l2_header->vlan[vlan_num - 1].h_tci) & VLAN_VID_MASK;
+
                 for (i = 0; i < E1000_VLVF_ARRAY_SIZE; i++) {
                     if ((core->mac[VLVF0 + i] & E1000_VLVF_VLANID_MASK) == vid &&
                         (core->mac[VLVF0 + i] & E1000_VLVF_VLANID_ENABLE)) {
@@ -1161,7 +1154,7 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
                 lpe = !!(core->mac[VMOLR0 + i] & E1000_VMOLR_LPE);
                 rlpml = core->mac[VMOLR0 + i] & E1000_VMOLR_RLPML_MASK;
                 if ((queues & BIT(i)) &&
-                    igb_rx_is_oversized(core, ehdr, size, lpe, rlpml)) {
+                    igb_rx_is_oversized(core, ehdr, size, vlan_num, lpe, rlpml)) {
                     oversized |= BIT(i);
                 }
             }
