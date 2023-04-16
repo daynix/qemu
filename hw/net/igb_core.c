@@ -1000,7 +1000,8 @@ static bool igb_rx_is_oversized(IGBCore *core, const struct eth_header *ehdr,
                                 size_t size, size_t vlan_num,
                                 bool lpe, uint16_t rlpml)
 {
-    size_t header_size = sizeof(struct eth_header) + sizeof(struct vlan_header) * vlan_num;
+    size_t vlan_header_size = sizeof(struct vlan_header) * vlan_num;
+    size_t header_size = sizeof(struct eth_header) + vlan_header_size;
     return lpe ? size + ETH_FCS_LEN > rlpml : size > header_size + ETH_MTU;
 }
 
@@ -1155,7 +1156,8 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
                 lpe = !!(core->mac[VMOLR0 + i] & E1000_VMOLR_LPE);
                 rlpml = core->mac[VMOLR0 + i] & E1000_VMOLR_RLPML_MASK;
                 if ((queues & BIT(i)) &&
-                    igb_rx_is_oversized(core, ehdr, size, vlan_num, lpe, rlpml)) {
+                    igb_rx_is_oversized(core, ehdr, size, vlan_num,
+                                        lpe, rlpml)) {
                     oversized |= BIT(i);
                 }
             }
