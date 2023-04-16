@@ -1330,24 +1330,24 @@ igb_build_rx_metadata(IGBCore *core,
             *pkt_info |= BIT(11) | (etqf << 4);
         } else {
             if (hasip4) {
-                *pkt_info |= BIT(4);
+                *pkt_info |= E1000_ADVRXD_PKT_IP4;
             }
 
             if (hasip6) {
-                *pkt_info |= BIT(6);
+                *pkt_info |= E1000_ADVRXD_PKT_IP6;
             }
 
             switch (l4hdr_proto) {
             case ETH_L4_HDR_PROTO_TCP:
-                *pkt_info |= BIT(8);
+                *pkt_info |= E1000_ADVRXD_PKT_TCP;
                 break;
 
             case ETH_L4_HDR_PROTO_UDP:
-                *pkt_info |= BIT(9);
+                *pkt_info |= E1000_ADVRXD_PKT_UDP;
                 break;
 
             case ETH_L4_HDR_PROTO_SCTP:
-                *pkt_info |= BIT(10);
+                *pkt_info |= E1000_ADVRXD_PKT_SCTP;
                 break;
 
             default:
