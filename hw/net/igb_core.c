@@ -999,18 +999,20 @@ igb_rx_l4_cso_enabled(IGBCore *core)
 static bool igb_rx_is_oversized(IGBCore *core, const struct eth_header *ehdr,
                                 size_t size, bool lpe, uint16_t rlpml)
 {
-    size += 4;
+    int32_t max_size;
 
     if (lpe) {
-        return size > rlpml;
+        max_size = rlpml - ETH_FCS_LEN;
+    } else {
+        max_size = sizeof(struct eth_header) + ETH_MTU;
+
+        if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
+            e1000x_vlan_rx_filter_enabled(core->mac)) {
+            max_size += sizeof(struct vlan_header);
+        }
     }
 
-    if (e1000x_is_vlan_packet(ehdr, core->mac[VET] & 0xffff) &&
-        e1000x_vlan_rx_filter_enabled(core->mac)) {
-        return size > 1522;
-    }
-
-    return size > 1518;
+    return size > max_size;
 }
 
 static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
