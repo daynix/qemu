@@ -1030,16 +1030,12 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
 
     if (core->mac[CTRL_EXT] & BIT(26)) {
         if (be16_to_cpu(ehdr->h_proto) == core->mac[VET] >> 16 &&
-            be16_to_cpu(l2_header->vlan[0].h_proto) == (core->mac[VET] & 0xffff) &&
-            !e1000x_rx_vlan_filter(core->mac, l2_header->vlan + 1)) {
+            be16_to_cpu(l2_header->vlan[0].h_proto) == (core->mac[VET] & 0xffff)) {
             vlan_num = 2;
-            return queues;
         }
     } else {
-        if (be16_to_cpu(ehdr->h_proto) == (core->mac[VET] & 0xffff) &&
-            !e1000x_rx_vlan_filter(core->mac, l2_header->vlan)) {
+        if (be16_to_cpu(ehdr->h_proto) == (core->mac[VET] & 0xffff)) {
             vlan_num = 1;
-            return queues;
         }
     }
 
@@ -1069,6 +1065,11 @@ static uint16_t igb_receive_assign(IGBCore *core, const struct iovec *iov,
             }
             break;
         }
+    }
+ 
+    if (vlan_num &&
+        !e1000x_rx_vlan_filter(core->mac, l2_header->vlan + vlan_num - 1)) {
+        return queues;
     }
 
     if (core->mac[MRQC] & 1) {
