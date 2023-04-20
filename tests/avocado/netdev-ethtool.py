@@ -6,55 +6,50 @@
 # SPDX-License-Identifier: GPL-2.0-or-late
 
 from avocado import skip
-from avocado_qemu import QemuSystemTest
+from avocado.utils.iso9660 import ISO9660PyCDLib
+from avocado_qemu import LinuxTest
 from avocado_qemu import wait_for_console_pattern
+import os
 
-class NetDevEthtool(QemuSystemTest):
+class NetDevEthtool(LinuxTest):
     """
     :avocado: tags=arch:x86_64
     :avocado: tags=machine:q35
+    :avocado: tags=distro:fedora
+    :avocado: tags=distro_version:38
     """
 
     # Runs in about 17s under KVM, 19s under TCG, 25s under GCOV
     timeout = 45
 
-    # Fetch assets from the netdev-ethtool subdir of my shared test
-    # images directory on fileserver.linaro.org.
-    def get_asset(self, name, sha1):
-        base_url = ('https://fileserver.linaro.org/s/'
-                    'kE4nCFLdQcoBF9t/download?'
-                    'path=%2Fnetdev-ethtool&files=' )
-        url = base_url + name
-        # use explicit name rather than failing to neatly parse the
-        # URL into a unique one
-        return self.fetch_asset(name=name, locations=(url), asset_hash=sha1)
-
     def common_test_code(self, netdev, extra_args=None):
+        ethtool_url = 'https://dl.fedoraproject.org/pub/fedora/linux/releases/38/Everything/x86_64/os/Packages/e/ethtool-6.2-1.fc38.x86_64.rpm'
+        ethtool_hash = '72c0123b8966371fa93fb1fa1839ec34139d0b48'
+        ethtool = self.fetch_asset(ethtool_url, asset_hash=ethtool_hash)
 
-        # This custom kernel has drivers for all the supported network
-        # devices we can emulate in QEMU
-        kernel = self.get_asset("bzImage",
-                                "33469d7802732d5815226166581442395cb289e2")
+        kernel_url = 'http://dl.fedoraproject.org/pub/fedora/linux/releases/38/Server/x86_64/os/images/pxeboot/vmlinuz'
+        kernel_hash = '5cf10eaae2cc64d9c17d0128df05c1a9d98e221a'
+        kernel = self.fetch_asset(kernel_url, asset_hash=kernel_hash)
 
-        rootfs = self.get_asset("rootfs.squashfs",
-                                "9793cea7021414ae844bda51f558bd6565b50cdc")
-
-        append = 'printk.time=0 console=ttyS0 '
-        append += 'root=/dev/sr0 rootfstype=squashfs '
+        append = 'root=PARTUUID=c310a368-941b-4830-bdf2-5f7ebbced630 rw rootflags=subvol=root no_timer_check net.ifnames=0 console=tty1 console=ttyS0,115200n8'
 
         # any additional kernel tweaks for the test
         if extra_args:
             append += extra_args
 
         # finally invoke ethtool directly
-        append += ' init=/usr/sbin/ethtool -- -t eth1 offline'
+        append += ' init=/bin/sh -- -c "/sbin/modprobe igb && mount -o ro /dev/sr0 /mnt && rpm -i /mnt/ethtool.rpm && /sbin/ethtool -t eth0 offline"'
 
-        # add the rootfs via a readonly cdrom image
-        drive = f"file={rootfs},if=ide,index=0,media=cdrom"
+        ethtool_iso = os.path.join(self.workdir, 'ethtool.iso')
+        cd = ISO9660PyCDLib(ethtool_iso)
+        cd.create()
+        with open(ethtool, 'rb') as ethtool_file:
+            cd.write("ethtool.rpm", ethtool_file.read())
+        cd.close()
 
         self.vm.add_args('-kernel', kernel,
                          '-append', append,
-                         '-drive', drive,
+                         '-drive', f"file={ethtool_iso},format=raw,media=cdrom",
                          '-device', netdev)
 
         self.vm.set_console(console_index=0)
@@ -67,10 +62,6 @@ class NetDevEthtool(QemuSystemTest):
         # no need to gracefully shutdown, just finish
         self.vm.kill()
 
-    # Skip testing for MSI for now. Allegedly it was fixed by:
-    #   28e96556ba (igb: Allocate MSI-X vector when testing)
-    # but I'm seeing oops in the kernel
-    @skip("Kernel bug with MSI enabled")
     def test_igb(self):
         """
         :avocado: tags=device:igb
