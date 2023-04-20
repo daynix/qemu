@@ -94,7 +94,7 @@ net_tx_pkt_setup_vlan_header(struct NetTxPkt *pkt, uint16_t vlan)
  * populate data fragment into pkt context.
  *
  * @pkt:            packet
- * @pa:             pointer to fragment
+ * @base:           pointer to fragment
  * @len:            length of fragment
  *
  */
