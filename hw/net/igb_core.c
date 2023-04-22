@@ -1975,34 +1975,13 @@ igb_fix_icr_asserted(IGBCore *core)
     trace_e1000e_irq_fix_icr_asserted(core->mac[ICR]);
 }
 
-static uint32_t igb_map_icr_to_eicr(IGBCore *core, uint32_t icr)
-{
-    uint32_t eicr = 0;
-    uint32_t int_alloc;
-
-    if (icr & E1000_ICR_DRSTA) {
-        int_alloc = core->mac[IVAR_MISC] & 0xff;
-        if (int_alloc & E1000_IVAR_VALID) {
-            eicr |= BIT(int_alloc & 0x1f);
-        }
-    }
-    /* Check if other bits (excluding the TCP Timer) are enabled. */
-    if (icr & ~E1000_ICR_DRSTA) {
-        int_alloc = (core->mac[IVAR_MISC] >> 8) & 0xff;
-        if (int_alloc & E1000_IVAR_VALID) {
-            eicr |= BIT(int_alloc & 0x1f);
-        }
-    }
-
-    return eicr;
-}
-
 static void igb_raise_interrupts(IGBCore *core, size_t index, uint32_t causes)
 {
     uint32_t old_causes = core->mac[ICR] & core->mac[IMS];
     uint32_t old_ecauses = core->mac[EICR] & core->mac[EIMS];
     uint32_t raised_causes;
     uint32_t raised_ecauses;
+    uint32_t int_alloc;
 
     trace_e1000e_irq_set(index << 2,
                          core->mac[index], core->mac[index] | causes);
@@ -2011,7 +1990,21 @@ static void igb_raise_interrupts(IGBCore *core, size_t index, uint32_t causes)
 
     if (core->mac[GPIE] & E1000_GPIE_MSIX_MODE) {
         raised_causes = core->mac[ICR] & core->mac[IMS] & ~old_causes;
-        core->mac[EICR] |= igb_map_icr_to_eicr(core, raised_causes);
+
+        if (raised_causes & E1000_ICR_DRSTA) {
+            int_alloc = core->mac[IVAR_MISC] & 0xff;
+            if (int_alloc & E1000_IVAR_VALID) {
+                core->mac[EICR] |= BIT(int_alloc & 0x1f);
+            }
+        }
+        /* Check if other bits (excluding the TCP Timer) are enabled. */
+        if (raised_causes & ~E1000_ICR_DRSTA) {
+            int_alloc = (core->mac[IVAR_MISC] >> 8) & 0xff;
+            if (int_alloc & E1000_IVAR_VALID) {
+                core->mac[EICR] |= BIT(int_alloc & 0x1f);
+            }
+        }
+
         raised_ecauses = core->mac[EICR] & core->mac[EIMS] & ~old_ecauses;
         if (!raised_ecauses) {
             return;
