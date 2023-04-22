@@ -1674,6 +1674,7 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
 {
     uint16_t queues = 0;
     uint32_t causes = 0;
+    uint32_t ecauses = 0;
     union {
         L2Header l2_header;
         uint8_t octets[ETH_ZLEN];
@@ -1776,12 +1777,13 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
             causes |= E1000_ICS_RXDMT0;
         }
 
-        igb_raise_interrupts(core, EICR, igb_rx_wb_eic(core, rxr.i->idx));
+        ecauses |= igb_rx_wb_eic(core, rxr.i->idx);
 
         trace_e1000e_rx_written_to_guest(rxr.i->idx);
     }
 
     trace_e1000e_rx_interrupt_set(causes);
+    igb_raise_interrupts(core, EICR, ecauses);
     igb_raise_interrupts(core, ICR, causes);
 
     return orig_size;
