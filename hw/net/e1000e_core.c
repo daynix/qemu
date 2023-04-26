@@ -1651,7 +1651,7 @@ e1000e_receive_internal(E1000ECore *core, const struct iovec *iov, int iovcnt,
                         bool has_vnet)
 {
     uint32_t causes = 0;
-    uint8_t min_buf[ETH_ZLEN];
+    uint8_t buf[ETH_ZLEN];
     struct iovec min_iov;
     size_t size, orig_size;
     size_t iov_ofs = 0;
@@ -1679,17 +1679,17 @@ e1000e_receive_internal(E1000ECore *core, const struct iovec *iov, int iovcnt,
     size = orig_size - iov_ofs;
 
     /* Pad to minimum Ethernet frame length */
-    if (size < sizeof(min_buf)) {
-        iov_to_buf(iov, iovcnt, iov_ofs, min_buf, size);
-        memset(&min_buf[size], 0, sizeof(min_buf) - size);
+    if (size < sizeof(buf)) {
+        iov_to_buf(iov, iovcnt, iov_ofs, buf, size);
+        memset(&buf[size], 0, sizeof(buf) - size);
         e1000x_inc_reg_if_not_full(core->mac, RUC);
-        min_iov.iov_base = min_buf;
-        min_iov.iov_len = size = sizeof(min_buf);
+        min_iov.iov_base = buf;
+        min_iov.iov_len = size = sizeof(buf);
         iovcnt = 1;
         iov = &min_iov;
         iov_ofs = 0;
     } else {
-        iov_to_buf(iov, iovcnt, iov_ofs, min_buf, ETH_HLEN + 4);
+        iov_to_buf(iov, iovcnt, iov_ofs, buf, ETH_HLEN + 4);
     }
 
     /* Discard oversized packets if !LPE and !SBP. */
@@ -1698,9 +1698,9 @@ e1000e_receive_internal(E1000ECore *core, const struct iovec *iov, int iovcnt,
     }
 
     net_rx_pkt_set_packet_type(core->rx_pkt,
-        get_eth_packet_type(PKT_GET_ETH_HDR(min_buf)));
+        get_eth_packet_type(PKT_GET_ETH_HDR(buf)));
 
-    if (!e1000e_receive_filter(core, min_buf)) {
+    if (!e1000e_receive_filter(core, buf)) {
         trace_e1000e_rx_flt_dropped();
         return orig_size;
     }
