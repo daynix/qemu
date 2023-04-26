@@ -1686,7 +1686,7 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
     union {
         L2Header l2_header;
         uint8_t octets[ETH_ZLEN];
-    } min_buf;
+    } buf;
     struct iovec min_iov;
     size_t size, orig_size;
     size_t iov_ofs = 0;
@@ -1720,25 +1720,25 @@ igb_receive_internal(IGBCore *core, const struct iovec *iov, int iovcnt,
     size = orig_size - iov_ofs;
 
     /* Pad to minimum Ethernet frame length */
-    if (size < sizeof(min_buf)) {
-        iov_to_buf(iov, iovcnt, iov_ofs, &min_buf, size);
-        memset(&min_buf.octets[size], 0, sizeof(min_buf) - size);
+    if (size < sizeof(buf)) {
+        iov_to_buf(iov, iovcnt, iov_ofs, &buf, size);
+        memset(&buf.octets[size], 0, sizeof(buf) - size);
         e1000x_inc_reg_if_not_full(core->mac, RUC);
-        min_iov.iov_base = &min_buf;
-        min_iov.iov_len = size = sizeof(min_buf);
+        min_iov.iov_base = &buf;
+        min_iov.iov_len = size = sizeof(buf);
         iovcnt = 1;
         iov = &min_iov;
         iov_ofs = 0;
     } else {
-        iov_to_buf(iov, iovcnt, iov_ofs, &min_buf, sizeof(min_buf.l2_header));
+        iov_to_buf(iov, iovcnt, iov_ofs, &buf, sizeof(buf.l2_header));
     }
 
     net_rx_pkt_set_packet_type(core->rx_pkt,
-                               get_eth_packet_type(&min_buf.l2_header.eth));
+                               get_eth_packet_type(&buf.l2_header.eth));
     net_rx_pkt_set_protocols(core->rx_pkt, iov, iovcnt, iov_ofs);
 
     queues = igb_receive_assign(core, iov, iovcnt, iov_ofs,
-                                &min_buf.l2_header, size,
+                                &buf.l2_header, size,
                                 &rss_info, &etqf, &ts, external_tx);
     if (!queues) {
         trace_e1000e_rx_flt_dropped();
