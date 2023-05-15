@@ -32,7 +32,7 @@ typedef struct QEMUCPUState {
 int is_system(QEMUCPUState *s);
 
 typedef struct QEMU_Elf {
-    GMappedFile *gmf;
+    int fd;
     size_t size;
     void *map;
     QEMUCPUState **state;
