@@ -244,7 +244,7 @@ static int fill_header(WinDumpHeader64 *hdr, struct pa_space *ps,
             KUSD_OFFSET_PRODUCT_TYPE);
     DBGKD_GET_VERSION64 kvb;
     WinDumpHeader64 h;
-    size_t i;
+    size_t i, j = 0, merge_count = 0;
 
     QEMU_BUILD_BUG_ON(KUSD_OFFSET_SUITE_MASK >= ELF2DMP_PAGE_SIZE);
     QEMU_BUILD_BUG_ON(KUSD_OFFSET_PRODUCT_TYPE >= ELF2DMP_PAGE_SIZE);
@@ -277,18 +277,32 @@ static int fill_header(WinDumpHeader64 *hdr, struct pa_space *ps,
         .ProductType = *product_type,
         .SecondaryDataState = kvb.KdSecondaryVersion,
         .PhysicalMemoryBlock = (WinDumpPhyMemDesc64) {
-            .NumberOfRuns = ps->block_nr,
+            .NumberOfRuns = 0,
         },
         .RequiredDumpSpace = sizeof(h),
     };
 
     for (i = 0; i < ps->block_nr; i++) {
         h.PhysicalMemoryBlock.NumberOfPages +=
-                ps->block[i].size / ELF2DMP_PAGE_SIZE;
-        h.PhysicalMemoryBlock.Run[i] = (WinDumpPhyMemRun64) {
-            .BasePage = ps->block[i].paddr / ELF2DMP_PAGE_SIZE,
-            .PageCount = ps->block[i].size / ELF2DMP_PAGE_SIZE,
-        };
+            ps->block[i].size / ELF2DMP_PAGE_SIZE;
+        if (i + 1!= ps->block_nr &&
+                ps->block[i].paddr + ps->block[i].size == ps->block[i + 1].paddr) {
+            printf("Block #%lu 0x%lx+:0x%lx will be merged with next\n", i,
+                    ps->block[i].paddr, ps->block[i].size);
+            merge_count++;
+        } else {
+            printf("Block #%lu 0x%lx+:0x%lx will be expanded to 0x%lx+:0x%lx and saved as run #%lu\n",
+                    i, ps->block[i].paddr, ps->block[i].size,
+                    ps->block[i - merge_count].paddr,
+                    ps->block[i].paddr + ps->block[i].size - ps->block[i - merge_count].paddr, j);
+            h.PhysicalMemoryBlock.Run[j] = (WinDumpPhyMemRun64) {
+                .BasePage = ps->block[i - merge_count].paddr / ELF2DMP_PAGE_SIZE,
+                .PageCount = (ps->block[i].paddr + ps->block[i].size - ps->block[i - merge_count].paddr) / ELF2DMP_PAGE_SIZE,
+            };
+            h.PhysicalMemoryBlock.NumberOfRuns++;
+            j++;
+            merge_count = 0;
+        }
     }
 
     h.RequiredDumpSpace +=
