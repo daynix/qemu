@@ -180,7 +180,7 @@ int QEMU_Elf_init(QEMU_Elf *qe, const char *filename)
     qe->size = st.st_size;
 
     qe->map = mmap(NULL, qe->size, PROT_READ | PROT_WRITE,
-            MAP_PRIVATE, qe->fd, 0);
+            MAP_PRIVATE | MAP_NORESERVE, qe->fd, 0);
     if (qe->map == MAP_FAILED) {
         eprintf("Failed to map ELF file\n");
         err = 1;
