@@ -190,6 +190,7 @@ typedef struct {
     uint16_t unk6;
     uint16_t FPO_EXT;
     uint16_t unk7;
+    uint16_t padding;
 } PDB_STREAM_INDEXES;
 
 union codeview_symbol {
