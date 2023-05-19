@@ -64,8 +64,8 @@ struct vtd_as_key {
 struct vtd_iotlb_key {
     uint64_t gfn;
     uint32_t pasid;
-    uint32_t level;
     uint16_t sid;
+    uint8_t level;
 };
 
 static void vtd_address_space_refresh_all(IntelIOMMUState *s);
@@ -221,10 +221,11 @@ static gboolean vtd_iotlb_equal(gconstpointer v1, gconstpointer v2)
 static guint vtd_iotlb_hash(gconstpointer v)
 {
     const struct vtd_iotlb_key *key = v;
+    uint64_t hash64 = key->gfn | ((uint64_t)(key->sid) << VTD_IOTLB_SID_SHIFT) |
+        (uint64_t)(key->level - 1) << VTD_IOTLB_LVL_SHIFT |
+        (uint64_t)(key->pasid) << VTD_IOTLB_PASID_SHIFT;
 
-    return key->gfn | ((key->sid) << VTD_IOTLB_SID_SHIFT) |
-           (key->level) << VTD_IOTLB_LVL_SHIFT |
-           (key->pasid) << VTD_IOTLB_PASID_SHIFT;
+    return (guint)((hash64 >> 32) ^ (hash64 & 0xffffffffU));
 }
 
 static gboolean vtd_as_equal(gconstpointer v1, gconstpointer v2)
@@ -3850,7 +3851,7 @@ static void vtd_iommu_replay(IOMMUMemoryRegion *iommu_mr, IOMMUNotifier *n)
                 .domain_id = vtd_get_domain_id(s, &ce, vtd_as->pasid),
             };
 
-            vtd_page_walk(s, &ce, n->start, n->end, &info, vtd_as->pasid);
+            vtd_page_walk(s, &ce, 0, ~0ULL, &info, vtd_as->pasid);
         }
     } else {
         trace_vtd_replay_ce_invalid(bus_n, PCI_SLOT(vtd_as->devfn),

@@ -17,6 +17,7 @@
 #include "qemu/guest-random.h"
 #include "qemu/units.h"
 #include "qemu/selfmap.h"
+#include "qemu/lockable.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
 #include "target_signal.h"
@@ -423,32 +424,12 @@ enum {
 
 static bool init_guest_commpage(void)
 {
-    ARMCPU *cpu = ARM_CPU(thread_cpu);
-    abi_ptr want = HI_COMMPAGE & TARGET_PAGE_MASK;
-    abi_ptr addr;
+    abi_ptr commpage = HI_COMMPAGE & -qemu_host_page_size;
+    void *want = g2h_untagged(commpage);
+    void *addr = mmap(want, qemu_host_page_size, PROT_READ | PROT_WRITE,
+                      MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
 
-    /*
-     * M-profile allocates maximum of 2GB address space, so can never
-     * allocate the commpage.  Skip it.
-     */
-    if (arm_feature(&cpu->env, ARM_FEATURE_M)) {
-        return true;
-    }
-
-    /*
-     * If reserved_va does not cover the commpage, we get an assert
-     * in page_set_flags.  Produce an intelligent error instead.
-     */
-    if (reserved_va != 0 && want + TARGET_PAGE_SIZE - 1 > reserved_va) {
-        error_report("Allocating guest commpage: -R 0x%" PRIx64 " too small",
-                     (uint64_t)reserved_va + 1);
-        exit(EXIT_FAILURE);
-    }
-
-    addr = target_mmap(want, TARGET_PAGE_SIZE, PROT_READ | PROT_WRITE,
-                       MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
-
-    if (addr == -1) {
+    if (addr == MAP_FAILED) {
         perror("Allocating guest commpage");
         exit(EXIT_FAILURE);
     }
@@ -457,12 +438,15 @@ static bool init_guest_commpage(void)
     }
 
     /* Set kernel helper versions; rest of page is 0.  */
-    put_user_u32(5, 0xffff0ffcu);
+    __put_user(5, (uint32_t *)g2h_untagged(0xffff0ffcu));
 
-    if (target_mprotect(addr, qemu_host_page_size, PROT_READ | PROT_EXEC)) {
+    if (mprotect(addr, qemu_host_page_size, PROT_READ)) {
         perror("Protecting guest commpage");
         exit(EXIT_FAILURE);
     }
+
+    page_set_flags(commpage, commpage | ~qemu_host_page_mask,
+                   PAGE_READ | PAGE_EXEC | PAGE_VALID);
     return true;
 }
 
@@ -978,9 +962,7 @@ static void elf_core_copy_regs(target_elf_gregset_t *regs, const CPUPPCState *en
     (*regs)[36] = tswapreg(env->lr);
     (*regs)[37] = tswapreg(cpu_read_xer(env));
 
-    for (i = 0; i < ARRAY_SIZE(env->crf); i++) {
-        ccr |= env->crf[i] << (32 - ((i + 1) * 4));
-    }
+    ccr = ppc_get_cr(env);
     (*regs)[38] = tswapreg(ccr);
 }
 
@@ -3346,9 +3328,10 @@ static void load_elf_interp(const char *filename, struct image_info *info,
 
 static int symfind(const void *s0, const void *s1)
 {
-    target_ulong addr = *(target_ulong *)s0;
     struct elf_sym *sym = (struct elf_sym *)s1;
+    __typeof(sym->st_value) addr = *(uint64_t *)s0;
     int result = 0;
+
     if (addr < sym->st_value) {
         result = -1;
     } else if (addr >= sym->st_value + sym->st_size) {
@@ -3357,7 +3340,7 @@ static int symfind(const void *s0, const void *s1)
     return result;
 }
 
-static const char *lookup_symbolxx(struct syminfo *s, target_ulong orig_addr)
+static const char *lookup_symbolxx(struct syminfo *s, uint64_t orig_addr)
 {
 #if ELF_CLASS == ELFCLASS32
     struct elf_sym *syms = s->disas_symtab.elf32;
@@ -4256,14 +4239,14 @@ static int fill_note_info(struct elf_note_info *info,
         info->notes_size += note_size(&info->notes[i]);
 
     /* read and fill status of all threads */
-    cpu_list_lock();
-    CPU_FOREACH(cpu) {
-        if (cpu == thread_cpu) {
-            continue;
+    WITH_QEMU_LOCK_GUARD(&qemu_cpu_list_lock) {
+        CPU_FOREACH(cpu) {
+            if (cpu == thread_cpu) {
+                continue;
+            }
+            fill_thread_info(info, cpu->env_ptr);
         }
-        fill_thread_info(info, cpu->env_ptr);
     }
-    cpu_list_unlock();
 
     return (0);
 }

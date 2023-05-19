@@ -1640,7 +1640,8 @@ void gen_addsat64(Context *c,
 {
     HexValue op1_m = rvalue_materialize(c, locp, op1);
     HexValue op2_m = rvalue_materialize(c, locp, op2);
-    OUT(c, locp, "gen_add_sat_i64(", dst, ", ", &op1_m, ", ", &op2_m, ");\n");
+    OUT(c, locp, "gen_add_sat_i64(ctx, ", dst, ", ", &op1_m, ", ",
+                                  &op2_m, ");\n");
 }
 
 void gen_inst(Context *c, GString *iname)
@@ -1736,36 +1737,34 @@ void gen_load_cancel(Context *c, YYLTYPE *locp)
 void gen_load(Context *c, YYLTYPE *locp, HexValue *width,
               HexSignedness signedness, HexValue *ea, HexValue *dst)
 {
-    char size_suffix[4] = {0};
-    const char *sign_suffix;
+    unsigned dst_bit_width;
+    unsigned src_bit_width;
+
     /* Memop width is specified in the load macro */
     assert_signedness(c, locp, signedness);
-    sign_suffix = (width->imm.value > 4)
-                   ? ""
-                   : ((signedness == UNSIGNED) ? "u" : "s");
+
     /* If dst is a variable, assert that is declared and load the type info */
     if (dst->type == VARID) {
         find_variable(c, locp, dst, dst);
     }
 
-    snprintf(size_suffix, 4, "%" PRIu64, width->imm.value * 8);
+    src_bit_width = width->imm.value * 8;
+    dst_bit_width = MAX(dst->bit_width, 32);
+
     /* Lookup the effective address EA */
     find_variable(c, locp, ea, ea);
     OUT(c, locp, "if (insn->slot == 0 && pkt->pkt_has_store_s1) {\n");
     OUT(c, locp, "probe_noshuf_load(", ea, ", ", width, ", ctx->mem_idx);\n");
     OUT(c, locp, "process_store(ctx, 1);\n");
     OUT(c, locp, "}\n");
-    OUT(c, locp, "tcg_gen_qemu_ld", size_suffix, sign_suffix);
+
+    OUT(c, locp, "tcg_gen_qemu_ld_i", &dst_bit_width);
     OUT(c, locp, "(");
-    if (dst->bit_width > width->imm.value * 8) {
-        /*
-         * Cast to the correct TCG type if necessary, to avoid implict cast
-         * warnings. This is needed when the width of the destination var is
-         * larger than the size of the requested load.
-         */
-        OUT(c, locp, "(TCGv) ");
+    OUT(c, locp, dst, ", ", ea, ", ctx->mem_idx, MO_", &src_bit_width);
+    if (signedness == SIGNED) {
+        OUT(c, locp, " | MO_SIGN");
     }
-    OUT(c, locp, dst, ", ", ea, ", ctx->mem_idx);\n");
+    OUT(c, locp, " | MO_TE);\n");
 }
 
 void gen_store(Context *c, YYLTYPE *locp, HexValue *width, HexValue *ea,
@@ -1971,7 +1970,7 @@ HexValue gen_rvalue_sat(Context *c, YYLTYPE *locp, HexSat *sat,
     OUT(c, locp, "gen_sat", unsigned_str, "_", bit_suffix, "_ovfl(");
     OUT(c, locp, &ovfl, ", ", &res, ", ", value, ", ", &width->imm.value,
         ");\n");
-    OUT(c, locp, "gen_set_usr_field_if(USR_OVF,", &ovfl, ");\n");
+    OUT(c, locp, "gen_set_usr_field_if(ctx, USR_OVF,", &ovfl, ");\n");
 
     return res;
 }

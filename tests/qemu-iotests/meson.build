@@ -2,7 +2,7 @@ if not have_tools or targetos == 'windows' or get_option('gprof')
   subdir_done()
 endif
 
-foreach cflag: config_host['QEMU_CFLAGS'].split()
+foreach cflag: qemu_ldflags
   if cflag.startswith('-fsanitize') and \
      not cflag.contains('safe-stack') and not cflag.contains('cfi-icall')
     message('Sanitizers are enabled ==> Disabled the qemu-iotests.')
@@ -47,19 +47,20 @@ foreach format, speed: qemu_iotests_formats
   endif
 
   rc = run_command(
-      [qemu_iotests_check_cmd] + args + ['-n'],
+      [python, qemu_iotests_check_cmd] + args + ['-n'],
       check: true,
   )
 
   foreach item: rc.stdout().strip().split()
-      args = ['-tap', '-' + format, item,
+      args = [qemu_iotests_check_cmd,
+              '-tap', '-' + format, item,
               '--source-dir', meson.current_source_dir(),
               '--build-dir', meson.current_build_dir()]
       # Some individual tests take as long as 45 seconds
       # Bump the timeout to 3 minutes for some headroom
       # on slow machines to minimize spurious failures
       test('io-' + format + '-' + item,
-           qemu_iotests_check_cmd,
+           python,
            args: args,
            depends: qemu_iotests_binaries,
            env: qemu_iotests_env,

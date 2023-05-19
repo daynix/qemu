@@ -116,6 +116,9 @@
     { "qemu64-" TYPE_X86_CPU, "model-id", "QEMU Virtual CPU version " v, },\
     { "athlon-" TYPE_X86_CPU, "model-id", "QEMU Virtual CPU version " v, },
 
+GlobalProperty pc_compat_8_0[] = {};
+const size_t pc_compat_8_0_len = G_N_ELEMENTS(pc_compat_8_0);
+
 GlobalProperty pc_compat_7_2[] = {
     { "ICH9-LPC", "noreboot", "true" },
 };
@@ -1943,6 +1946,7 @@ static void pc_machine_class_init(ObjectClass *oc, void *data)
     pcmc->acpi_data_size = 0x20000 + 0x8000;
     pcmc->pvh_enabled = true;
     pcmc->kvmclock_create_always = true;
+    pcmc->resizable_acpi_blob = true;
     assert(!mc->get_hotplug_handler);
     mc->get_hotplug_handler = pc_get_hotplug_handler;
     mc->hotplug_allowed = pc_hotplug_allowed;

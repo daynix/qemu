@@ -159,7 +159,7 @@ uint32_t curr_cflags(CPUState *cpu)
      */
     if (unlikely(cpu->singlestep_enabled)) {
         cflags |= CF_NO_GOTO_TB | CF_NO_GOTO_PTR | CF_SINGLE_STEP | 1;
-    } else if (singlestep) {
+    } else if (qatomic_read(&one_insn_per_tb)) {
         cflags |= CF_NO_GOTO_TB | 1;
     } else if (qemu_loglevel_mask(CPU_LOG_TB_NOCHAIN)) {
         cflags |= CF_NO_GOTO_TB;
@@ -257,7 +257,7 @@ static inline TranslationBlock *tb_lookup(CPUState *cpu, target_ulong pc,
 
     if (cflags & CF_PCREL) {
         /* Use acquire to ensure current load of pc from jc. */
-        tb =  qatomic_load_acquire(&jc->array[hash].tb);
+        tb = qatomic_load_acquire(&jc->array[hash].tb);
 
         if (likely(tb &&
                    jc->array[hash].pc == pc &&
@@ -272,7 +272,7 @@ static inline TranslationBlock *tb_lookup(CPUState *cpu, target_ulong pc,
             return NULL;
         }
         jc->array[hash].pc = pc;
-        /* Use store_release on tb to ensure pc is written first. */
+        /* Ensure pc is written first. */
         qatomic_store_release(&jc->array[hash].tb, tb);
     } else {
         /* Use rcu_read to ensure current load of pc from *tb. */
@@ -971,18 +971,27 @@ cpu_exec_loop(CPUState *cpu, SyncClocks *sc)
 
             tb = tb_lookup(cpu, pc, cs_base, flags, cflags);
             if (tb == NULL) {
+                CPUJumpCache *jc;
                 uint32_t h;
 
                 mmap_lock();
                 tb = tb_gen_code(cpu, pc, cs_base, flags, cflags);
                 mmap_unlock();
+
                 /*
                  * We add the TB in the virtual pc hash table
                  * for the fast lookup
                  */
                 h = tb_jmp_cache_hash_func(pc);
-                /* Use the pc value already stored in tb->pc. */
-                qatomic_set(&cpu->tb_jmp_cache->array[h].tb, tb);
+                jc = cpu->tb_jmp_cache;
+                if (cflags & CF_PCREL) {
+                    jc->array[h].pc = pc;
+                    /* Ensure pc is written first. */
+                    qatomic_store_release(&jc->array[h].tb, tb);
+                } else {
+                    /* Use the pc value already stored in tb->pc. */
+                    qatomic_set(&jc->array[h].tb, tb);
+                }
             }
 
 #ifndef CONFIG_USER_ONLY

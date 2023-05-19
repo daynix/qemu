@@ -127,7 +127,7 @@ void bdrv_graph_wrlock(void)
          * reader lock.
          */
         qatomic_set(&has_writer, 0);
-        AIO_WAIT_WHILE(qemu_get_aio_context(), reader_count() >= 1);
+        AIO_WAIT_WHILE_UNLOCKED(NULL, reader_count() >= 1);
         qatomic_set(&has_writer, 1);
 
         /*
@@ -265,7 +265,10 @@ void bdrv_graph_rdunlock_main_loop(void)
 
 void assert_bdrv_graph_readable(void)
 {
+    /* reader_count() is slow due to aio_context_list_lock lock contention */
+#ifdef CONFIG_DEBUG_GRAPH_LOCK
     assert(qemu_in_main_thread() || reader_count());
+#endif
 }
 
 void assert_bdrv_graph_writable(void)

@@ -935,6 +935,9 @@ struct ArchCPU {
      */
     uint32_t psci_conduit;
 
+    /* CPU has Memory Tag Extension */
+    bool has_mte;
+
     /* For v8M, initial value of the Secure VTOR */
     uint32_t init_svtor;
     /* For v8M, initial value of the Non-secure VTOR */
@@ -1053,6 +1056,7 @@ struct ArchCPU {
     bool prop_pauth;
     bool prop_pauth_impdef;
     bool prop_lpa2;
+    OnOffAuto prop_mte;
 
     /* DCZ blocksize, in log_2(words), ie low 4 bits of DCZID_EL0 */
     uint32_t dcz_blocksize;
@@ -3821,6 +3825,11 @@ static inline bool isar_feature_aa64_pan(const ARMISARegisters *id)
 static inline bool isar_feature_aa64_ats1e1(const ARMISARegisters *id)
 {
     return FIELD_EX64(id->id_aa64mmfr1, ID_AA64MMFR1, PAN) >= 2;
+}
+
+static inline bool isar_feature_aa64_pan3(const ARMISARegisters *id)
+{
+    return FIELD_EX64(id->id_aa64mmfr1, ID_AA64MMFR1, PAN) >= 3;
 }
 
 static inline bool isar_feature_aa64_hcx(const ARMISARegisters *id)

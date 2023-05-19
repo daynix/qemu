@@ -29,6 +29,7 @@
 #include "migration.h"
 #include "qemu-file.h"
 #include "trace.h"
+#include "options.h"
 #include "qapi/error.h"
 
 #define IO_BUF_SIZE 32768
@@ -43,15 +44,15 @@ struct QEMUFile {
      * Maximum amount of data in bytes to transfer during one
      * rate limiting time window
      */
-    int64_t rate_limit_max;
+    uint64_t rate_limit_max;
     /*
      * Total amount of data in bytes queued for transfer
      * during this rate limiting time window
      */
-    int64_t rate_limit_used;
+    uint64_t rate_limit_used;
 
     /* The sum of bytes transferred on the wire */
-    int64_t total_transferred;
+    uint64_t total_transferred;
 
     int buf_index;
     int buf_size; /* 0 when writing */
@@ -63,8 +64,6 @@ struct QEMUFile {
 
     int last_error;
     Error *last_error_obj;
-    /* has the file has been shutdown */
-    bool shutdown;
 };
 
 /*
@@ -77,8 +76,6 @@ struct QEMUFile {
 int qemu_file_shutdown(QEMUFile *f)
 {
     int ret = 0;
-
-    f->shutdown = true;
 
     /*
      * We must set qemufile error before the real shutdown(), otherwise
@@ -294,7 +291,7 @@ void qemu_fflush(QEMUFile *f)
         return;
     }
 
-    if (f->shutdown) {
+    if (qemu_file_get_error(f)) {
         return;
     }
     if (f->iovcnt > 0) {
@@ -340,19 +337,9 @@ void ram_control_after_iterate(QEMUFile *f, uint64_t flags)
 
 void ram_control_load_hook(QEMUFile *f, uint64_t flags, void *data)
 {
-    int ret = -EINVAL;
-
     if (f->hooks && f->hooks->hook_ram_load) {
-        ret = f->hooks->hook_ram_load(f, flags, data);
+        int ret = f->hooks->hook_ram_load(f, flags, data);
         if (ret < 0) {
-            qemu_file_set_error(f, ret);
-        }
-    } else {
-        /*
-         * Hook is a hook specifically requested by the source sending a flag
-         * that expects there to be a hook on the destination.
-         */
-        if (flags == RAM_CONTROL_HOOK) {
             qemu_file_set_error(f, ret);
         }
     }
@@ -366,7 +353,7 @@ size_t ram_control_save_page(QEMUFile *f, ram_addr_t block_offset,
         int ret = f->hooks->save_page(f, block_offset,
                                       offset, size, bytes_sent);
         if (ret != RAM_SAVE_CONTROL_NOT_SUPP) {
-            f->rate_limit_used += size;
+            qemu_file_acct_rate_limit(f, size);
         }
 
         if (ret != RAM_SAVE_CONTROL_DELAYED &&
@@ -392,7 +379,7 @@ size_t ram_control_save_page(QEMUFile *f, ram_addr_t block_offset,
  * case if the underlying file descriptor gives a short read, and that can
  * happen even on a blocking fd.
  */
-static ssize_t qemu_fill_buffer(QEMUFile *f)
+static ssize_t coroutine_mixed_fn qemu_fill_buffer(QEMUFile *f)
 {
     int len;
     int pending;
@@ -407,7 +394,7 @@ static ssize_t qemu_fill_buffer(QEMUFile *f)
     f->buf_index = 0;
     f->buf_size = pending;
 
-    if (f->shutdown) {
+    if (qemu_file_get_error(f)) {
         return 0;
     }
 
@@ -496,7 +483,7 @@ static int add_to_iovec(QEMUFile *f, const uint8_t *buf, size_t size,
     } else {
         if (f->iovcnt >= MAX_IOV_SIZE) {
             /* Should only happen if a previous fflush failed */
-            assert(f->shutdown || !qemu_file_is_writable(f));
+            assert(qemu_file_get_error(f) || !qemu_file_is_writable(f));
             return 1;
         }
         if (may_free) {
@@ -585,7 +572,7 @@ void qemu_file_skip(QEMUFile *f, int size)
  * return as many as it managed to read (assuming blocking fd's which
  * all current QEMUFile are)
  */
-size_t qemu_peek_buffer(QEMUFile *f, uint8_t **buf, size_t size, size_t offset)
+size_t coroutine_mixed_fn qemu_peek_buffer(QEMUFile *f, uint8_t **buf, size_t size, size_t offset)
 {
     ssize_t pending;
     size_t index;
@@ -633,7 +620,7 @@ size_t qemu_peek_buffer(QEMUFile *f, uint8_t **buf, size_t size, size_t offset)
  * return as many as it managed to read (assuming blocking fd's which
  * all current QEMUFile are)
  */
-size_t qemu_get_buffer(QEMUFile *f, uint8_t *buf, size_t size)
+size_t coroutine_mixed_fn qemu_get_buffer(QEMUFile *f, uint8_t *buf, size_t size)
 {
     size_t pending = size;
     size_t done = 0;
@@ -674,7 +661,7 @@ size_t qemu_get_buffer(QEMUFile *f, uint8_t *buf, size_t size)
  * Note: Since **buf may get changed, the caller should take care to
  *       keep a pointer to the original buffer if it needs to deallocate it.
  */
-size_t qemu_get_buffer_in_place(QEMUFile *f, uint8_t **buf, size_t size)
+size_t coroutine_mixed_fn qemu_get_buffer_in_place(QEMUFile *f, uint8_t **buf, size_t size)
 {
     if (size < IO_BUF_SIZE) {
         size_t res;
@@ -696,7 +683,7 @@ size_t qemu_get_buffer_in_place(QEMUFile *f, uint8_t **buf, size_t size)
  * Peeks a single byte from the buffer; this isn't guaranteed to work if
  * offset leaves a gap after the previous read/peeked data.
  */
-int qemu_peek_byte(QEMUFile *f, int offset)
+int coroutine_mixed_fn qemu_peek_byte(QEMUFile *f, int offset)
 {
     int index = f->buf_index + offset;
 
@@ -713,7 +700,7 @@ int qemu_peek_byte(QEMUFile *f, int offset)
     return f->buf[index];
 }
 
-int qemu_get_byte(QEMUFile *f)
+int coroutine_mixed_fn qemu_get_byte(QEMUFile *f)
 {
     int result;
 
@@ -722,9 +709,9 @@ int qemu_get_byte(QEMUFile *f)
     return result;
 }
 
-int64_t qemu_file_total_transferred_fast(QEMUFile *f)
+uint64_t qemu_file_transferred_fast(QEMUFile *f)
 {
-    int64_t ret = f->total_transferred;
+    uint64_t ret = f->total_transferred;
     int i;
 
     for (i = 0; i < f->iovcnt; i++) {
@@ -734,7 +721,7 @@ int64_t qemu_file_total_transferred_fast(QEMUFile *f)
     return ret;
 }
 
-int64_t qemu_file_total_transferred(QEMUFile *f)
+uint64_t qemu_file_transferred(QEMUFile *f)
 {
     qemu_fflush(f);
     return f->total_transferred;
@@ -742,9 +729,6 @@ int64_t qemu_file_total_transferred(QEMUFile *f)
 
 int qemu_file_rate_limit(QEMUFile *f)
 {
-    if (f->shutdown) {
-        return 1;
-    }
     if (qemu_file_get_error(f)) {
         return 1;
     }
@@ -754,14 +738,17 @@ int qemu_file_rate_limit(QEMUFile *f)
     return 0;
 }
 
-int64_t qemu_file_get_rate_limit(QEMUFile *f)
+uint64_t qemu_file_get_rate_limit(QEMUFile *f)
 {
     return f->rate_limit_max;
 }
 
-void qemu_file_set_rate_limit(QEMUFile *f, int64_t limit)
+void qemu_file_set_rate_limit(QEMUFile *f, uint64_t limit)
 {
-    f->rate_limit_max = limit;
+    /*
+     * 'limit' is per second.  But we check it each 100 miliseconds.
+     */
+    f->rate_limit_max = limit / XFER_LIMIT_RATIO;
 }
 
 void qemu_file_reset_rate_limit(QEMUFile *f)
@@ -769,7 +756,7 @@ void qemu_file_reset_rate_limit(QEMUFile *f)
     f->rate_limit_used = 0;
 }
 
-void qemu_file_acct_rate_limit(QEMUFile *f, int64_t len)
+void qemu_file_acct_rate_limit(QEMUFile *f, uint64_t len)
 {
     f->rate_limit_used += len;
 }
@@ -888,13 +875,24 @@ int qemu_put_qemu_file(QEMUFile *f_des, QEMUFile *f_src)
 }
 
 /*
+ * Check if the writable buffer is empty
+ */
+
+bool qemu_file_buffer_empty(QEMUFile *file)
+{
+    assert(qemu_file_is_writable(file));
+
+    return !file->iovcnt;
+}
+
+/*
  * Get a string whose length is determined by a single preceding byte
  * A preallocated 256 byte buffer must be passed in.
  * Returns: len on success and a 0 terminated string in the buffer
  *          else 0
  *          (Note a 0 length string will return 0 either way)
  */
-size_t qemu_get_counted_string(QEMUFile *f, char buf[256])
+size_t coroutine_fn qemu_get_counted_string(QEMUFile *f, char buf[256])
 {
     size_t len = qemu_get_byte(f);
     size_t res = qemu_get_buffer(f, (uint8_t *)buf, len);

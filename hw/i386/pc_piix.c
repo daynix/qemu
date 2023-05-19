@@ -454,11 +454,23 @@ static void pc_i440fx_machine_options(MachineClass *m)
     machine_class_allow_dynamic_sysbus_dev(m, TYPE_VMBUS_BRIDGE);
 }
 
-static void pc_i440fx_8_0_machine_options(MachineClass *m)
+static void pc_i440fx_8_1_machine_options(MachineClass *m)
 {
     pc_i440fx_machine_options(m);
     m->alias = "pc";
     m->is_default = true;
+}
+
+DEFINE_I440FX_MACHINE(v8_1, "pc-i440fx-8.1", NULL,
+                      pc_i440fx_8_1_machine_options);
+
+static void pc_i440fx_8_0_machine_options(MachineClass *m)
+{
+    pc_i440fx_8_1_machine_options(m);
+    m->alias = NULL;
+    m->is_default = false;
+    compat_props_add(m->compat_props, hw_compat_8_0, hw_compat_8_0_len);
+    compat_props_add(m->compat_props, pc_compat_8_0, pc_compat_8_0_len);
 }
 
 DEFINE_I440FX_MACHINE(v8_0, "pc-i440fx-8.0", NULL,
@@ -467,8 +479,6 @@ DEFINE_I440FX_MACHINE(v8_0, "pc-i440fx-8.0", NULL,
 static void pc_i440fx_7_2_machine_options(MachineClass *m)
 {
     pc_i440fx_8_0_machine_options(m);
-    m->alias = NULL;
-    m->is_default = false;
     compat_props_add(m->compat_props, hw_compat_7_2, hw_compat_7_2_len);
     compat_props_add(m->compat_props, pc_compat_7_2, pc_compat_7_2_len);
 }
@@ -746,6 +756,7 @@ static void pc_i440fx_2_2_machine_options(MachineClass *m)
     compat_props_add(m->compat_props, hw_compat_2_2, hw_compat_2_2_len);
     compat_props_add(m->compat_props, pc_compat_2_2, pc_compat_2_2_len);
     pcmc->rsdp_in_ram = false;
+    pcmc->resizable_acpi_blob = false;
 }
 
 DEFINE_I440FX_MACHINE(v2_2, "pc-i440fx-2.2", pc_compat_2_2_fn,
