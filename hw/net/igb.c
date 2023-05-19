@@ -282,17 +282,21 @@ static void igb_core_realize(IGBState *s)
 static void
 igb_init_msix(IGBState *s)
 {
-    int i;
+    int i, res;
 
-    msix_init(PCI_DEVICE(s), IGB_MSIX_VEC_NUM,
-              &s->msix,
-              E1000E_MSIX_IDX, 0,
-              &s->msix,
-              E1000E_MSIX_IDX, 0x2000,
-              0x70, &error_abort);
+    res = msix_init(PCI_DEVICE(s), IGB_MSIX_VEC_NUM,
+                    &s->msix,
+                    E1000E_MSIX_IDX, 0,
+                    &s->msix,
+                    E1000E_MSIX_IDX, 0x2000,
+                    0x70, NULL);
 
-    for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
-        msix_vector_use(PCI_DEVICE(s), i);
+    if (res < 0) {
+        trace_e1000e_msix_init_fail(res);
+    } else {
+        for (i = 0; i < IGB_MSIX_VEC_NUM; i++) {
+            msix_vector_use(PCI_DEVICE(s), i);
+        }
     }
 }
 
@@ -370,6 +374,7 @@ static void igb_pci_realize(PCIDevice *pci_dev, Error **errp)
 {
     IGBState *s = IGB(pci_dev);
     uint8_t *macaddr;
+    int ret;
 
     trace_e1000e_cb_pci_realize();
 
@@ -412,7 +417,10 @@ static void igb_pci_realize(PCIDevice *pci_dev, Error **errp)
 
     igb_init_msix(s);
 
-    msi_init(pci_dev, 0x50, 1, true, true, &error_abort);
+    ret = msi_init(pci_dev, 0x50, 1, true, true, NULL);
+    if (ret) {
+        trace_e1000e_msi_init_fail(ret);
+    }
 
     if (igb_add_pm_capability(pci_dev, 0x40, PCI_PM_CAP_DSI) < 0) {
         hw_error("Failed to initialize PM capability");
