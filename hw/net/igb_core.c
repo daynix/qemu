@@ -1335,7 +1335,7 @@ igb_build_rx_metadata(IGBCore *core,
         *pkt_info = rss_info->enabled ? rss_info->type : 0;
 
         if (etqf < 8) {
-            *pkt_info |= BIT(11) | (etqf << 4);
+            *pkt_info |= (BIT(11) | etqf) << 4;
         } else {
             if (hasip4) {
                 *pkt_info |= E1000_ADVRXD_PKT_IP4;
