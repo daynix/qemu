@@ -106,7 +106,7 @@ struct QEMUVFIOState {
  */
 static char *sysfs_find_group_file(const char *device, Error **errp)
 {
-    g_autoptr(GError) gerr;
+    g_autoptr(GError) gerr = NULL;
     char *sysfs_link;
     char *sysfs_group;
     char *p;
