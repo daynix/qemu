@@ -2654,6 +2654,10 @@ e1000e_get_status(E1000ECore *core, int index)
 {
     uint32_t res = core->mac[STATUS];
 
+    if (!(core->mac[CTRL] & E1000_CTRL_GIO_MASTER_DISABLE)) {
+        res |= E1000_STATUS_GIO_MASTER_ENABLE;
+    }
+
     if (core->mac[CTRL] & E1000_CTRL_FRCDPX) {
         res |= (core->mac[CTRL] & E1000_CTRL_FD) ? E1000_STATUS_FD : 0;
     } else {
