@@ -1379,16 +1379,31 @@ static bool virtio_net_configure_rss_host(VirtIONet *n, Error **errp)
 {
     NetVnetHashCap cap;
 
+    n->rss_data.supported_hash_types = VIRTIO_NET_RSS_SUPPORTED_HASHES;
+
     if (qemu_get_vnet_hash_cap(qemu_get_queue(n->nic)->peer, &cap) &&
         cap.max_indirection_table_length >= VIRTIO_NET_RSS_MAX_TABLE_LEN) {
         n->rss_data.peer_hash_available = true;
-        n->rss_data.supported_hash_types = cap.types;
         n->rss_data.peer_hash_types = cap.types;
 
-        return true;
+        for (size_t i = 0; ; i++) {
+            if (i >= ARRAY_SIZE(n->rss_data.specified_hash_types)) {
+                n->rss_data.supported_hash_types = cap.types;
+                break;
+            }
+
+            if (n->rss_data.specified_hash_types[i] == ON_OFF_AUTO_ON &&
+                !(cap.types & BIT(i + 1))) {
+                break;
+            }
+        }
     }
 
-    n->rss_data.supported_hash_types = VIRTIO_NET_RSS_SUPPORTED_HASHES;
+    for (size_t i = 0; i < ARRAY_SIZE(n->rss_data.specified_hash_types); i++) {
+        if (n->rss_data.specified_hash_types[i] == ON_OFF_AUTO_OFF) {
+            n->rss_data.supported_hash_types &= ~BIT(i + 1);
+        }
+    }
 
     return virtio_net_commit_rss_host_config(n, errp);
 }
@@ -4013,6 +4028,33 @@ static Property virtio_net_properties[] = {
     DEFINE_PROP_INT32("speed", VirtIONet, net_conf.speed, SPEED_UNKNOWN),
     DEFINE_PROP_STRING("duplex", VirtIONet, net_conf.duplex_str),
     DEFINE_PROP_BOOL("failover", VirtIONet, failover, false),
+    DEFINE_PROP_ON_OFF_AUTO("hash-ipv4", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_IPv4 - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-tcp4", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_TCPv4 - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-udp4", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_UDPv4 - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-ipv6", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_IPv6 - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-tcp6", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_TCPv6 - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-udp6", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_UDPv6 - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-ipv6ex", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_IPv6_EX - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-tcp6ex", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_TCPv6_EX - 1],
+                            ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO("hash-udp6ex", VirtIONet,
+                            rss_data.specified_hash_types[VIRTIO_NET_HASH_REPORT_UDPv6_EX - 1],
+                            ON_OFF_AUTO_AUTO),
     DEFINE_PROP_END_OF_LIST(),
 };
 
