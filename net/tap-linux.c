@@ -193,6 +193,11 @@ int tap_probe_vnet_hdr_len(int fd, int len)
     return 1;
 }
 
+bool tap_probe_vnet_hash_cap(int fd, NetVnetHashCap *cap)
+{
+    return !ioctl(fd, TUNGETVNETHASHCAP, cap);
+}
+
 void tap_fd_set_vnet_hdr_len(int fd, int len)
 {
     if (ioctl(fd, TUNSETVNETHDRSZ, &len) == -1) {
@@ -200,6 +205,11 @@ void tap_fd_set_vnet_hdr_len(int fd, int len)
                 strerror(errno));
         abort();
     }
+}
+
+void tap_fd_set_vnet_hash(int fd, const void *hash)
+{
+    assert(!ioctl(fd, TUNSETVNETHASH, hash));
 }
 
 int tap_fd_set_vnet_le(int fd, int is_le)

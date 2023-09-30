@@ -221,8 +221,18 @@ int tap_probe_vnet_hdr_len(int fd, int len)
     return 0;
 }
 
+bool tap_probe_vnet_hash_cap(int fd, NetVnetHashCap *cap)
+{
+    return false;
+}
+
 void tap_fd_set_vnet_hdr_len(int fd, int len)
 {
+}
+
+void tap_fd_set_vnet_hash(int fd, const void *hash)
+{
+    g_assert_not_reached();
 }
 
 int tap_fd_set_vnet_le(int fd, int is_le)

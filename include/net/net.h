@@ -35,6 +35,47 @@ typedef struct NICConf {
     int32_t bootindex;
 } NICConf;
 
+#ifdef CONFIG_LINUX
+#ifndef TUNGETVNETHASHCAP
+#define TUNGETVNETHASHCAP _IO('T', 228)
+#define TUNSETVNETHASH _IOW('T', 229, unsigned int)
+
+struct tun_vnet_hash_cap {
+    uint16_t max_indirection_table_length;
+    uint32_t types;
+};
+
+#define TUN_VNET_HASH_RSS 0x01
+#define TUN_VNET_HASH_REPORT 0x02
+struct tun_vnet_hash {
+    uint8_t flags;
+    uint32_t types;
+    uint16_t indirection_table_mask;
+    uint16_t unclassified_queue;
+};
+#endif
+
+typedef struct tun_vnet_hash_cap NetVnetHashCap;
+typedef struct tun_vnet_hash NetVnetHash;
+#define NET_VNET_HASH_RSS TUN_VNET_HASH_RSS
+#define NET_VNET_HASH_REPORT TUN_VNET_HASH_REPORT
+#else
+#define NET_VNET_HASH_RSS 1
+#define NET_VNET_HASH_REPORT 2
+
+typedef struct NetVnetHashCap {
+    uint16_t max_indirection_table_length;
+    uint32_t types;
+} NetVnetHashCap;
+
+typedef struct NetVnetHash {
+    uint8_t flags;
+    uint32_t types;
+    uint16_t indirection_table_mask;
+    uint16_t unclassified_queue;
+} NetVnetHash;
+#endif
+
 #define DEFINE_NIC_PROPERTIES(_state, _conf)                            \
     DEFINE_PROP_MACADDR("mac",   _state, _conf.macaddr),                \
     DEFINE_PROP_NETDEV("netdev", _state, _conf.peers)
@@ -61,6 +102,8 @@ typedef void (UsingVnetHdr)(NetClientState *, bool);
 typedef void (SetOffload)(NetClientState *, int, int, int, int, int);
 typedef int (GetVnetHdrLen)(NetClientState *);
 typedef void (SetVnetHdrLen)(NetClientState *, int);
+typedef bool (GetVnetHashCap)(NetClientState *, NetVnetHashCap *);
+typedef void (SetVnetHash)(NetClientState *, const void *);
 typedef int (SetVnetLE)(NetClientState *, bool);
 typedef int (SetVnetBE)(NetClientState *, bool);
 typedef struct SocketReadState SocketReadState;
@@ -93,6 +136,8 @@ typedef struct NetClientInfo {
     SetVnetHdrLen *set_vnet_hdr_len;
     SetVnetLE *set_vnet_le;
     SetVnetBE *set_vnet_be;
+    GetVnetHashCap *get_vnet_hash_cap;
+    SetVnetHash *set_vnet_hash;
     NetAnnounce *announce;
     SetSteeringEBPF *set_steering_ebpf;
     NetCheckPeerType *check_peer_type;
@@ -197,6 +242,8 @@ void qemu_set_offload(NetClientState *nc, int csum, int tso4, int tso6,
                       int ecn, int ufo);
 int qemu_get_vnet_hdr_len(NetClientState *nc);
 void qemu_set_vnet_hdr_len(NetClientState *nc, int len);
+bool qemu_get_vnet_hash_cap(NetClientState *nc, NetVnetHashCap *cap);
+void qemu_set_vnet_hash(NetClientState *nc, const void *hash);
 int qemu_set_vnet_le(NetClientState *nc, bool is_le);
 int qemu_set_vnet_be(NetClientState *nc, bool is_be);
 void qemu_macaddr_default_if_unset(MACAddr *macaddr);

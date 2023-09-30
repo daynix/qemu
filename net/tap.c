@@ -275,6 +275,18 @@ static void tap_set_vnet_hdr_len(NetClientState *nc, int len)
     s->host_vnet_hdr_len = len;
 }
 
+static bool tap_get_vnet_hash_cap(NetClientState *nc, NetVnetHashCap *cap)
+{
+    TAPState *s = DO_UPCAST(TAPState, nc, nc);
+    return tap_probe_vnet_hash_cap(s->fd, cap);
+}
+
+static void tap_set_vnet_hash(NetClientState *nc, const void *hash)
+{
+    TAPState *s = DO_UPCAST(TAPState, nc, nc);
+    return tap_fd_set_vnet_hash(s->fd, hash);
+}
+
 static bool tap_get_using_vnet_hdr(NetClientState *nc)
 {
     TAPState *s = DO_UPCAST(TAPState, nc, nc);
@@ -391,6 +403,8 @@ static NetClientInfo net_tap_info = {
     .set_offload = tap_set_offload,
     .get_vnet_hdr_len = tap_get_vnet_hdr_len,
     .set_vnet_hdr_len = tap_set_vnet_hdr_len,
+    .get_vnet_hash_cap = tap_get_vnet_hash_cap,
+    .set_vnet_hash = tap_set_vnet_hash,
     .set_vnet_le = tap_set_vnet_le,
     .set_vnet_be = tap_set_vnet_be,
     .set_steering_ebpf = tap_set_steering_ebpf,
