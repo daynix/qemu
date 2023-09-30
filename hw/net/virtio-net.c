@@ -3808,9 +3808,14 @@ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
     if (qemu_get_vnet_hash_supported_types(qemu_get_queue(n->nic)->peer,
                                            &n->rss_data.peer_hash_types)) {
         n->rss_data.peer_hash_available = true;
-        n->rss_data.supported_hash_types = n->rss_data.peer_hash_types;
+        n->rss_data.supported_hash_types =
+            n->rss_data.specified_hash_types.on_bits |
+            (n->rss_data.specified_hash_types.auto_bits &
+             n->rss_data.peer_hash_types);
     } else {
-        n->rss_data.supported_hash_types = VIRTIO_NET_RSS_SUPPORTED_HASHES;
+        n->rss_data.supported_hash_types =
+            n->rss_data.specified_hash_types.on_bits |
+            n->rss_data.specified_hash_types.auto_bits;
     }
 }
 
@@ -4035,6 +4040,42 @@ static Property virtio_net_properties[] = {
                       VIRTIO_NET_F_GUEST_USO6, true),
     DEFINE_PROP_BIT64("host_uso", VirtIONet, host_features,
                       VIRTIO_NET_F_HOST_USO, true),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-ipv4", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_IPv4 - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-tcp4", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_TCPv4 - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-udp4", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_UDPv4 - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-ipv6", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_IPv6 - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-tcp6", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_TCPv6 - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-udp6", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_UDPv6 - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-ipv6ex", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_IPv6_EX - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-tcp6ex", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_TCPv6_EX - 1,
+                                ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_ON_OFF_AUTO_BIT("hash-udp6ex", VirtIONet,
+                                rss_data.specified_hash_types,
+                                VIRTIO_NET_HASH_REPORT_UDPv6_EX - 1,
+                                ON_OFF_AUTO_AUTO),
     DEFINE_PROP_END_OF_LIST(),
 };
 
