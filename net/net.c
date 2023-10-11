@@ -752,8 +752,13 @@ ssize_t qemu_receive_packet_iov(NetClientState *nc, const struct iovec *iov,
 
 ssize_t qemu_send_packet_raw(NetClientState *nc, const uint8_t *buf, int size)
 {
-    return qemu_send_packet_async_with_flags(nc, QEMU_NET_PACKET_FLAG_RAW,
-                                             buf, size, NULL);
+    struct virtio_net_hdr_v1_hash vnet_hdr = { };
+    struct iovec iov[] = {
+        { .iov_base = &vnet_hdr, .iov_len = nc->vnet_hdr_len },
+        { .iov_base = (void *)buf, .iov_len = size }
+    };
+
+    return qemu_sendv_packet_async(nc, iov, ARRAY_SIZE(iov), NULL);
 }
 
 static ssize_t nc_sendv_compat(NetClientState *nc, const struct iovec *iov,
@@ -777,11 +782,7 @@ static ssize_t nc_sendv_compat(NetClientState *nc, const struct iovec *iov,
         offset = iov_to_buf(iov, iovcnt, 0, buf, offset);
     }
 
-    if (flags & QEMU_NET_PACKET_FLAG_RAW && nc->info->receive_raw) {
-        ret = nc->info->receive_raw(nc, buffer, offset);
-    } else {
-        ret = nc->info->receive(nc, buffer, offset);
-    }
+    ret = nc->info->receive(nc, buffer, offset);
 
     g_free(buf);
     return ret;
@@ -814,7 +815,7 @@ static ssize_t qemu_deliver_packet_iov(NetClientState *sender,
         owned_reentrancy_guard->engaged_in_io = true;
     }
 
-    if (nc->info->receive_iov && !(flags & QEMU_NET_PACKET_FLAG_RAW)) {
+    if (nc->info->receive_iov) {
         ret = nc->info->receive_iov(nc, iov, iovcnt);
     } else {
         ret = nc_sendv_compat(nc, iov, iovcnt, flags);

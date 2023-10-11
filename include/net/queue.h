@@ -31,7 +31,6 @@ typedef struct NetQueue NetQueue;
 typedef void (NetPacketSent) (NetClientState *sender, ssize_t ret);
 
 #define QEMU_NET_PACKET_FLAG_NONE  0
-#define QEMU_NET_PACKET_FLAG_RAW  (1<<0)
 
 /* Returns:
  *   >0 - success
