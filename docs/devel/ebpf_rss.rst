@@ -27,7 +27,8 @@ Simplified decision formula:
 
 Not for all packets, the hash can/should be calculated.
 
-Note: currently, eBPF RSS does not support hash reporting.
+Note: eBPF hash reporting a kernel and libbpf patched with:
+https://lore.kernel.org/all/20231015141644.260646-1-akihiko.odaki@daynix.com/
 
 eBPF RSS turned on by different combinations of vhost-net, vitrio-net and tap configurations:
 
@@ -43,7 +44,7 @@ eBPF RSS turned on by different combinations of vhost-net, vitrio-net and tap co
 
         tap,vhost=off & virtio-net-pci,rss=on,hash=on
 
-- eBPF is used, hash population feature is not reported to the guest:
+- eBPF is used, hash population feature is reported to the guest:
 
         tap,vhost=on & virtio-net-pci,rss=on,hash=on
 
