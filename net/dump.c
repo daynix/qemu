@@ -150,8 +150,8 @@ struct NetFilterDumpState {
 };
 
 static ssize_t filter_dump_receive_iov(NetFilterState *nf, NetClientState *sndr,
-                                       unsigned flags, const struct iovec *iov,
-                                       int iovcnt, NetPacketSent *sent_cb)
+                                       const struct iovec *iov, int iovcnt,
+                                       NetPacketSent *sent_cb)
 {
     NetFilterDumpState *nfds = FILTER_DUMP(nf);
 

@@ -145,12 +145,12 @@ static void redirector_to_filter(NetFilterState *nf,
 
     if (nf->direction == NET_FILTER_DIRECTION_ALL ||
         nf->direction == NET_FILTER_DIRECTION_TX) {
-        qemu_netfilter_pass_to_next(nf->netdev, 0, &iov, 1, nf);
+        qemu_netfilter_pass_to_next(nf->netdev, &iov, 1, nf);
     }
 
     if (nf->direction == NET_FILTER_DIRECTION_ALL ||
         nf->direction == NET_FILTER_DIRECTION_RX) {
-        qemu_netfilter_pass_to_next(nf->netdev->peer, 0, &iov, 1, nf);
+        qemu_netfilter_pass_to_next(nf->netdev->peer, &iov, 1, nf);
      }
 }
 
@@ -190,7 +190,6 @@ static void redirector_chr_event(void *opaque, QEMUChrEvent event)
 
 static ssize_t filter_mirror_receive_iov(NetFilterState *nf,
                                          NetClientState *sender,
-                                         unsigned flags,
                                          const struct iovec *iov,
                                          int iovcnt,
                                          NetPacketSent *sent_cb)
@@ -212,7 +211,6 @@ static ssize_t filter_mirror_receive_iov(NetFilterState *nf,
 
 static ssize_t filter_redirector_receive_iov(NetFilterState *nf,
                                              NetClientState *sender,
-                                             unsigned flags,
                                              const struct iovec *iov,
                                              int iovcnt,
                                              NetPacketSent *sent_cb)

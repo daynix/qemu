@@ -26,7 +26,6 @@ typedef void (FilterCleanup) (NetFilterState *nf);
  */
 typedef ssize_t (FilterReceiveIOV)(NetFilterState *nc,
                                    NetClientState *sender,
-                                   unsigned flags,
                                    const struct iovec *iov,
                                    int iovcnt,
                                    NetPacketSent *sent_cb);
@@ -65,14 +64,12 @@ struct NetFilterState {
 ssize_t qemu_netfilter_receive(NetFilterState *nf,
                                NetFilterDirection direction,
                                NetClientState *sender,
-                               unsigned flags,
                                const struct iovec *iov,
                                int iovcnt,
                                NetPacketSent *sent_cb);
 
 /* pass the packet to the next filter */
 ssize_t qemu_netfilter_pass_to_next(NetClientState *sender,
-                                    unsigned flags,
                                     const struct iovec *iov,
                                     int iovcnt,
                                     void *opaque);

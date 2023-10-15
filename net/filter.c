@@ -28,7 +28,6 @@ static inline bool qemu_can_skip_netfilter(NetFilterState *nf)
 ssize_t qemu_netfilter_receive(NetFilterState *nf,
                                NetFilterDirection direction,
                                NetClientState *sender,
-                               unsigned flags,
                                const struct iovec *iov,
                                int iovcnt,
                                NetPacketSent *sent_cb)
@@ -39,7 +38,7 @@ ssize_t qemu_netfilter_receive(NetFilterState *nf,
     if (nf->direction == direction ||
         nf->direction == NET_FILTER_DIRECTION_ALL) {
         return NETFILTER_GET_CLASS(OBJECT(nf))->receive_iov(
-                                   nf, sender, flags, iov, iovcnt, sent_cb);
+                                   nf, sender, iov, iovcnt, sent_cb);
     }
 
     return 0;
@@ -62,7 +61,6 @@ static NetFilterState *netfilter_next(NetFilterState *nf,
 }
 
 ssize_t qemu_netfilter_pass_to_next(NetClientState *sender,
-                                    unsigned flags,
                                     const struct iovec *iov,
                                     int iovcnt,
                                     void *opaque)
@@ -96,7 +94,7 @@ ssize_t qemu_netfilter_pass_to_next(NetClientState *sender,
          * to the sender, so sent_cb shouldn't be called later, just
          * pass NULL to next.
          */
-        ret = qemu_netfilter_receive(next, direction, sender, flags, iov,
+        ret = qemu_netfilter_receive(next, direction, sender, iov,
                                      iovcnt, NULL);
         if (ret) {
             return ret;
@@ -111,7 +109,7 @@ ssize_t qemu_netfilter_pass_to_next(NetClientState *sender,
      */
     if (sender && sender->peer) {
         qemu_net_queue_send_iov(sender->peer->incoming_queue,
-                                sender, flags, iov, iovcnt, NULL);
+                                sender, iov, iovcnt, NULL);
     }
 
 out:

@@ -158,7 +158,7 @@ ReplayNetState *replay_register_net(NetFilterState *nfs);
 /*! Unregisters replay network filter. */
 void replay_unregister_net(ReplayNetState *rns);
 /*! Called to write network packet to the replay log. */
-void replay_net_packet_event(ReplayNetState *rns, unsigned flags,
+void replay_net_packet_event(ReplayNetState *rns,
                              const struct iovec *iov, int iovcnt);
 
 /* Audio */
