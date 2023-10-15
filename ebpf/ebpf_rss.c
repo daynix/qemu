@@ -20,7 +20,8 @@
 #include "hw/virtio/virtio-net.h" /* VIRTIO_NET_RSS_MAX_TABLE_LEN */
 
 #include "ebpf/ebpf_rss.h"
-#include "ebpf/rss.bpf.skeleton.h"
+#include "ebpf/socket.bpf.skeleton.h"
+#include "ebpf/vnet_hash.bpf.skeleton.h"
 #include "trace.h"
 
 void ebpf_rss_init(struct EBPFRSSContext *ctx)
@@ -37,33 +38,67 @@ bool ebpf_rss_is_loaded(struct EBPFRSSContext *ctx)
 
 bool ebpf_rss_load(struct EBPFRSSContext *ctx)
 {
-    struct rss_bpf *rss_bpf_ctx;
+    struct socket_bpf *socket_bpf_ctx;
 
     if (ctx == NULL) {
         return false;
     }
 
-    rss_bpf_ctx = rss_bpf__open();
-    if (rss_bpf_ctx == NULL) {
+    socket_bpf_ctx = socket_bpf__open();
+    if (socket_bpf_ctx == NULL) {
         trace_ebpf_error("eBPF RSS", "can not open eBPF RSS object");
         return false;
     }
 
-    if (rss_bpf__load(rss_bpf_ctx)) {
+    if (socket_bpf__load(socket_bpf_ctx)) {
         trace_ebpf_error("eBPF RSS", "can not load RSS program");
-        rss_bpf__destroy(rss_bpf_ctx);
+        socket_bpf__destroy(socket_bpf_ctx);
         return false;
     }
 
-    ctx->obj = rss_bpf_ctx;
+    ctx->obj = socket_bpf_ctx;
     ctx->program_fd = bpf_program__fd(
-            rss_bpf_ctx->progs.tun_rss_steering_prog);
+            socket_bpf_ctx->progs.tun_rss_steering_prog);
     ctx->map_configuration = bpf_map__fd(
-            rss_bpf_ctx->maps.tap_rss_map_configurations);
+            socket_bpf_ctx->maps.tap_rss_map_configurations);
     ctx->map_indirections_table = bpf_map__fd(
-            rss_bpf_ctx->maps.tap_rss_map_indirection_table);
+            socket_bpf_ctx->maps.tap_rss_map_indirection_table);
     ctx->map_toeplitz_key = bpf_map__fd(
-            rss_bpf_ctx->maps.tap_rss_map_toeplitz_key);
+            socket_bpf_ctx->maps.tap_rss_map_toeplitz_key);
+
+    return true;
+}
+
+bool ebpf_rss_hash_report_load(struct EBPFRSSContext *ctx)
+{
+    struct vnet_hash_bpf *vnet_hash_bpf_ctx;
+
+    if (ctx == NULL) {
+        return false;
+    }
+
+    vnet_hash_bpf_ctx = vnet_hash_bpf__open();
+    if (vnet_hash_bpf_ctx == NULL) {
+        trace_ebpf_error("eBPF RSS", "can not open eBPF RSS object");
+        return false;
+    }
+
+    if (vnet_hash_bpf__load(vnet_hash_bpf_ctx)) {
+        trace_ebpf_error("eBPF RSS", "can not load RSS program");
+        vnet_hash_bpf__destroy(vnet_hash_bpf_ctx);
+        return false;
+    }
+
+    ctx->obj = vnet_hash_bpf_ctx;
+    ctx->program_fd = bpf_program__fd(
+            vnet_hash_bpf_ctx->progs.tun_rss_steering_prog);
+    ctx->map_configuration = bpf_map__fd(
+            vnet_hash_bpf_ctx->maps.tap_rss_map_configurations);
+    ctx->map_indirections_table = bpf_map__fd(
+            vnet_hash_bpf_ctx->maps.tap_rss_map_indirection_table);
+    ctx->map_toeplitz_key = bpf_map__fd(
+            vnet_hash_bpf_ctx->maps.tap_rss_map_toeplitz_key);
+    ctx->hash_report = true;
 
     return true;
 }
@@ -132,6 +167,11 @@ void ebpf_rss_unload(struct EBPFRSSContext *ctx)
         return;
     }
 
-    rss_bpf__destroy(ctx->obj);
+    if (ctx->hash_report) {
+        vnet_hash_bpf__destroy(ctx->obj);
+    } else {
+        socket_bpf__destroy(ctx->obj);
+    }
+
     ctx->obj = NULL;
 }

@@ -9,12 +9,6 @@
  *
  * This work is licensed under the terms of the GNU GPL, version 2.  See
  * the COPYING file in the top-level directory.
- *
- * Prepare:
- * Requires llvm, clang, bpftool, linux kernel tree
- *
- * Build rss.bpf.skeleton.h:
- * make -f Makefile.ebpf clean all
  */
 
 #include <stddef.h>
@@ -380,7 +374,8 @@ error:
 static inline bool calculate_rss_hash(struct __sk_buff *skb,
                                       struct rss_config_t *config,
                                       struct toeplitz_key_data_t *toe,
-                                      __u32 *result)
+                                      __u32 *value,
+                                      __u16 *report)
 {
     __u8 rss_input[HASH_CALCULATION_BUFFER_SIZE] = {};
     size_t bytes_written = 0;
@@ -395,7 +390,7 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
     if (packet_info.is_ipv4) {
         if (packet_info.is_tcp &&
             config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv4) {
-
+            *report = VIRTIO_NET_HASH_REPORT_TCPv4;
             net_rx_rss_add_chunk(rss_input, &bytes_written,
                                  &packet_info.in_src,
                                  sizeof(packet_info.in_src));
@@ -410,7 +405,7 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
                                  sizeof(packet_info.dst_port));
         } else if (packet_info.is_udp &&
                    config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDPv4) {
-
+            *report = VIRTIO_NET_HASH_REPORT_UDPv4;
             net_rx_rss_add_chunk(rss_input, &bytes_written,
                                  &packet_info.in_src,
                                  sizeof(packet_info.in_src));
@@ -424,6 +419,7 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
                                  &packet_info.dst_port,
                                  sizeof(packet_info.dst_port));
         } else if (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IPv4) {
+            *report = VIRTIO_NET_HASH_REPORT_IPv4;
             net_rx_rss_add_chunk(rss_input, &bytes_written,
                                  &packet_info.in_src,
                                  sizeof(packet_info.in_src));
@@ -434,7 +430,10 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
     } else if (packet_info.is_ipv6) {
         if (packet_info.is_tcp &&
             config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCPv6) {
-
+            *report = (packet_info.is_ipv6_ext_src || packet_info.is_ipv6_ext_dst) &&
+                      (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCP_EX) ?
+                      VIRTIO_NET_HASH_REPORT_TCPv6_EX :
+                      VIRTIO_NET_HASH_REPORT_TCPv6;
             if (packet_info.is_ipv6_ext_src &&
                 config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_TCP_EX) {
 
@@ -465,7 +464,10 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
                                  sizeof(packet_info.dst_port));
         } else if (packet_info.is_udp &&
                    config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDPv6) {
-
+            *report = (packet_info.is_ipv6_ext_src || packet_info.is_ipv6_ext_dst) &&
+                      (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDP_EX) ?
+                      VIRTIO_NET_HASH_REPORT_UDPv6_EX :
+                      VIRTIO_NET_HASH_REPORT_UDPv6;
             if (packet_info.is_ipv6_ext_src &&
                config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_UDP_EX) {
 
@@ -497,6 +499,10 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
                                  sizeof(packet_info.dst_port));
 
         } else if (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IPv6) {
+            *report = (packet_info.is_ipv6_ext_src || packet_info.is_ipv6_ext_dst) &&
+                      (config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IP_EX) ?
+                      VIRTIO_NET_HASH_REPORT_IPv6_EX :
+                      VIRTIO_NET_HASH_REPORT_IPv6;
             if (packet_info.is_ipv6_ext_src &&
                config->hash_types & VIRTIO_NET_RSS_HASH_TYPE_IP_EX) {
 
@@ -526,41 +532,42 @@ static inline bool calculate_rss_hash(struct __sk_buff *skb,
         return false;
     }
 
-    net_toeplitz_add(result, rss_input, bytes_written, toe);
+    *value = 0;
+    net_toeplitz_add(value, rss_input, bytes_written, toe);
 
     return true;
 }
 
-SEC("socket")
-int tun_rss_steering_prog(struct __sk_buff *skb)
+static inline void all(struct __sk_buff *skb, __u32 *hash_value,
+                       __u16 *hash_report, __u16 *rss_queue)
 {
-
     struct rss_config_t *config;
     struct toeplitz_key_data_t *toe;
 
     __u32 key = 0;
-    __u32 hash = 0;
 
     config = bpf_map_lookup_elem(&tap_rss_map_configurations, &key);
     toe = bpf_map_lookup_elem(&tap_rss_map_toeplitz_key, &key);
 
     if (!config || !toe) {
-        return 0;
+        return;
     }
 
-    if (config->redirect && calculate_rss_hash(skb, config, toe, &hash)) {
-        __u32 table_idx = hash % config->indirections_len;
+    if (config->redirect &&
+        calculate_rss_hash(skb, config, toe, hash_value, hash_report)) {
+        __u32 table_idx = *hash_value % config->indirections_len;
         __u16 *queue = 0;
 
         queue = bpf_map_lookup_elem(&tap_rss_map_indirection_table,
                                     &table_idx);
 
         if (queue) {
-            return *queue;
+            *rss_queue = *queue;
+            return;
         }
     }
 
-    return config->default_queue;
+    *rss_queue = config->default_queue;
 }
 
 char _license[] SEC("license") = "GPL v2";
