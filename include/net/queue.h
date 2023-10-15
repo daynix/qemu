@@ -30,15 +30,12 @@ typedef struct NetQueue NetQueue;
 
 typedef void (NetPacketSent) (NetClientState *sender, ssize_t ret);
 
-#define QEMU_NET_PACKET_FLAG_NONE  0
-
 /* Returns:
  *   >0 - success
  *    0 - queue packet for future redelivery
  *   <0 - failure (discard packet)
  */
 typedef ssize_t (NetQueueDeliverFunc)(NetClientState *sender,
-                                      unsigned flags,
                                       const struct iovec *iov,
                                       int iovcnt,
                                       void *opaque);
@@ -47,7 +44,6 @@ NetQueue *qemu_new_net_queue(NetQueueDeliverFunc *deliver, void *opaque);
 
 void qemu_net_queue_append_iov(NetQueue *queue,
                                NetClientState *sender,
-                               unsigned flags,
                                const struct iovec *iov,
                                int iovcnt,
                                NetPacketSent *sent_cb);
@@ -64,14 +60,12 @@ ssize_t qemu_net_queue_receive_iov(NetQueue *queue,
 
 ssize_t qemu_net_queue_send(NetQueue *queue,
                             NetClientState *sender,
-                            unsigned flags,
                             const uint8_t *data,
                             size_t size,
                             NetPacketSent *sent_cb);
 
 ssize_t qemu_net_queue_send_iov(NetQueue *queue,
                                 NetClientState *sender,
-                                unsigned flags,
                                 const struct iovec *iov,
                                 int iovcnt,
                                 NetPacketSent *sent_cb);

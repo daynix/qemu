@@ -251,7 +251,6 @@ static int handle_secondary_tcp_pkt(RewriterState *rf,
 
 static ssize_t colo_rewriter_receive_iov(NetFilterState *nf,
                                          NetClientState *sender,
-                                         unsigned flags,
                                          const struct iovec *iov,
                                          int iovcnt,
                                          NetPacketSent *sent_cb)
@@ -294,7 +293,7 @@ static ssize_t colo_rewriter_receive_iov(NetFilterState *nf,
         if (sender == nf->netdev) {
             /* NET_FILTER_DIRECTION_TX */
             if (!handle_primary_tcp_pkt(s, conn, pkt, &key)) {
-                qemu_net_queue_send(s->incoming_queue, sender, 0,
+                qemu_net_queue_send(s->incoming_queue, sender,
                 (const uint8_t *)pkt->data, pkt->size, NULL);
                 packet_destroy(pkt, NULL);
                 pkt = NULL;
@@ -307,7 +306,7 @@ static ssize_t colo_rewriter_receive_iov(NetFilterState *nf,
         } else {
             /* NET_FILTER_DIRECTION_RX */
             if (!handle_secondary_tcp_pkt(s, conn, pkt, &key)) {
-                qemu_net_queue_send(s->incoming_queue, sender, 0,
+                qemu_net_queue_send(s->incoming_queue, sender,
                 (const uint8_t *)pkt->data, pkt->size, NULL);
                 packet_destroy(pkt, NULL);
                 pkt = NULL;

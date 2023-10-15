@@ -250,7 +250,6 @@ static void qemu_net_client_destructor(NetClientState *nc)
     g_free(nc);
 }
 static ssize_t qemu_deliver_packet_iov(NetClientState *sender,
-                                       unsigned flags,
                                        const struct iovec *iov,
                                        int iovcnt,
                                        void *opaque);
@@ -613,7 +612,6 @@ int qemu_can_send_packet(NetClientState *sender)
 static ssize_t filter_receive_iov(NetClientState *nc,
                                   NetFilterDirection direction,
                                   NetClientState *sender,
-                                  unsigned flags,
                                   const struct iovec *iov,
                                   int iovcnt,
                                   NetPacketSent *sent_cb)
@@ -623,7 +621,7 @@ static ssize_t filter_receive_iov(NetClientState *nc,
 
     if (direction == NET_FILTER_DIRECTION_TX) {
         QTAILQ_FOREACH(nf, &nc->filters, next) {
-            ret = qemu_netfilter_receive(nf, direction, sender, flags, iov,
+            ret = qemu_netfilter_receive(nf, direction, sender, iov,
                                          iovcnt, sent_cb);
             if (ret) {
                 return ret;
@@ -631,7 +629,7 @@ static ssize_t filter_receive_iov(NetClientState *nc,
         }
     } else {
         QTAILQ_FOREACH_REVERSE(nf, &nc->filters, next) {
-            ret = qemu_netfilter_receive(nf, direction, sender, flags, iov,
+            ret = qemu_netfilter_receive(nf, direction, sender, iov,
                                          iovcnt, sent_cb);
             if (ret) {
                 return ret;
@@ -645,7 +643,6 @@ static ssize_t filter_receive_iov(NetClientState *nc,
 static ssize_t filter_receive(NetClientState *nc,
                               NetFilterDirection direction,
                               NetClientState *sender,
-                              unsigned flags,
                               const uint8_t *data,
                               size_t size,
                               NetPacketSent *sent_cb)
@@ -655,7 +652,7 @@ static ssize_t filter_receive(NetClientState *nc,
         .iov_len = size
     };
 
-    return filter_receive_iov(nc, direction, sender, flags, &iov, 1, sent_cb);
+    return filter_receive_iov(nc, direction, sender, &iov, 1, sent_cb);
 }
 
 void qemu_purge_queued_packets(NetClientState *nc)
@@ -692,10 +689,9 @@ void qemu_flush_queued_packets(NetClientState *nc)
     qemu_flush_or_purge_queued_packets(nc, false);
 }
 
-static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
-                                                 unsigned flags,
-                                                 const uint8_t *buf, int size,
-                                                 NetPacketSent *sent_cb)
+ssize_t qemu_send_packet_async(NetClientState *sender,
+                               const uint8_t *buf, int size,
+                               NetPacketSent *sent_cb)
 {
     NetQueue *queue;
     int ret;
@@ -711,28 +707,20 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
 
     /* Let filters handle the packet first */
     ret = filter_receive(sender, NET_FILTER_DIRECTION_TX,
-                         sender, flags, buf, size, sent_cb);
+                         sender, buf, size, sent_cb);
     if (ret) {
         return ret;
     }
 
     ret = filter_receive(sender->peer, NET_FILTER_DIRECTION_RX,
-                         sender, flags, buf, size, sent_cb);
+                         sender, buf, size, sent_cb);
     if (ret) {
         return ret;
     }
 
     queue = sender->peer->incoming_queue;
 
-    return qemu_net_queue_send(queue, sender, flags, buf, size, sent_cb);
-}
-
-ssize_t qemu_send_packet_async(NetClientState *sender,
-                               const uint8_t *buf, int size,
-                               NetPacketSent *sent_cb)
-{
-    return qemu_send_packet_async_with_flags(sender, QEMU_NET_PACKET_FLAG_NONE,
-                                             buf, size, sent_cb);
+    return qemu_net_queue_send(queue, sender, buf, size, sent_cb);
 }
 
 ssize_t qemu_send_packet(NetClientState *nc, const uint8_t *buf, int size)
@@ -771,7 +759,7 @@ ssize_t qemu_send_packet_raw(NetClientState *nc, const uint8_t *buf, int size)
 }
 
 static ssize_t nc_sendv_compat(NetClientState *nc, const struct iovec *iov,
-                               int iovcnt, unsigned flags)
+                               int iovcnt)
 {
     uint8_t *buf = NULL;
     uint8_t *buffer;
@@ -798,7 +786,6 @@ static ssize_t nc_sendv_compat(NetClientState *nc, const struct iovec *iov,
 }
 
 static ssize_t qemu_deliver_packet_iov(NetClientState *sender,
-                                       unsigned flags,
                                        const struct iovec *iov,
                                        int iovcnt,
                                        void *opaque)
@@ -827,7 +814,7 @@ static ssize_t qemu_deliver_packet_iov(NetClientState *sender,
     if (nc->info->receive_iov) {
         ret = nc->info->receive_iov(nc, iov, iovcnt);
     } else {
-        ret = nc_sendv_compat(nc, iov, iovcnt, flags);
+        ret = nc_sendv_compat(nc, iov, iovcnt);
     }
 
     if (owned_reentrancy_guard) {
@@ -859,22 +846,20 @@ ssize_t qemu_sendv_packet_async(NetClientState *sender,
 
     /* Let filters handle the packet first */
     ret = filter_receive_iov(sender, NET_FILTER_DIRECTION_TX, sender,
-                             QEMU_NET_PACKET_FLAG_NONE, iov, iovcnt, sent_cb);
+                             iov, iovcnt, sent_cb);
     if (ret) {
         return ret;
     }
 
     ret = filter_receive_iov(sender->peer, NET_FILTER_DIRECTION_RX, sender,
-                             QEMU_NET_PACKET_FLAG_NONE, iov, iovcnt, sent_cb);
+                             iov, iovcnt, sent_cb);
     if (ret) {
         return ret;
     }
 
     queue = sender->peer->incoming_queue;
 
-    return qemu_net_queue_send_iov(queue, sender,
-                                   QEMU_NET_PACKET_FLAG_NONE,
-                                   iov, iovcnt, sent_cb);
+    return qemu_net_queue_send_iov(queue, sender, iov, iovcnt, sent_cb);
 }
 
 ssize_t

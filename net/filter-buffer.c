@@ -58,7 +58,6 @@ static void filter_buffer_release_timer(void *opaque)
 /* filter APIs */
 static ssize_t filter_buffer_receive_iov(NetFilterState *nf,
                                          NetClientState *sender,
-                                         unsigned flags,
                                          const struct iovec *iov,
                                          int iovcnt,
                                          NetPacketSent *sent_cb)
@@ -79,8 +78,7 @@ static ssize_t filter_buffer_receive_iov(NetFilterState *nf,
      * the packets without caring about the receiver. This is suboptimal.
      * May need more thoughts (e.g keeping sent_cb).
      */
-    qemu_net_queue_append_iov(s->incoming_queue, sender, flags,
-                              iov, iovcnt, NULL);
+    qemu_net_queue_append_iov(s->incoming_queue, sender, iov, iovcnt, NULL);
     return iov_size(iov, iovcnt);
 }
 

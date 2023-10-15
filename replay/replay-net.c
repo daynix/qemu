@@ -24,7 +24,6 @@ struct ReplayNetState {
 
 typedef struct NetEvent {
     uint8_t id;
-    uint32_t flags;
     uint8_t *data;
     size_t size;
 } NetEvent;
@@ -50,11 +49,10 @@ void replay_unregister_net(ReplayNetState *rns)
     g_free(rns);
 }
 
-void replay_net_packet_event(ReplayNetState *rns, unsigned flags,
+void replay_net_packet_event(ReplayNetState *rns,
                              const struct iovec *iov, int iovcnt)
 {
     NetEvent *event = g_new(NetEvent, 1);
-    event->flags = flags;
     event->data = g_malloc(iov_size(iov, iovcnt));
     event->size = iov_size(iov, iovcnt);
     event->id = rns->id;
@@ -74,7 +72,7 @@ void replay_event_net_run(void *opaque)
     assert(event->id < network_filters_count);
 
     qemu_netfilter_pass_to_next(network_filters[event->id]->netdev,
-        event->flags, &iov, 1, network_filters[event->id]);
+        &iov, 1, network_filters[event->id]);
 
     g_free(event->data);
     g_free(event);
@@ -85,7 +83,6 @@ void replay_event_net_save(void *opaque)
     NetEvent *event = opaque;
 
     replay_put_byte(event->id);
-    replay_put_dword(event->flags);
     replay_put_array(event->data, event->size);
 }
 
@@ -94,7 +91,6 @@ void *replay_event_net_load(void)
     NetEvent *event = g_new(NetEvent, 1);
 
     event->id = replay_get_byte();
-    event->flags = replay_get_dword();
     replay_get_array_alloc(&event->data, &event->size);
 
     return event;
