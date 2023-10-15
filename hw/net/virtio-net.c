@@ -1254,8 +1254,9 @@ static void virtio_net_detach_epbf_rss(VirtIONet *n)
 static void virtio_net_commit_rss_config(VirtIONet *n)
 {
     if (n->rss_data.enabled) {
-        n->rss_data.enabled_software_rss = n->rss_data.populate_hash;
-        if (n->rss_data.populate_hash) {
+        n->rss_data.enabled_software_rss = n->rss_data.populate_hash &&
+                                           !n->ebpf_rss.hash_report;
+        if (n->rss_data.enabled_software_rss) {
             virtio_net_detach_epbf_rss(n);
         } else if (!virtio_net_attach_epbf_rss(n)) {
             n->rss_data.enabled_software_rss = true;
@@ -1280,14 +1281,42 @@ static void virtio_net_disable_rss(VirtIONet *n)
     virtio_net_commit_rss_config(n);
 }
 
-static bool virtio_net_load_ebpf(VirtIONet *n)
+static bool virtio_net_load_ebpf(VirtIONet *n, Error **errp)
 {
-    if (!virtio_net_attach_ebpf_to_backend(n->nic, -1)) {
-        /* backend does't support steering ebpf */
-        return false;
+    bool rss = virtio_has_feature(n->host_features, VIRTIO_NET_F_RSS);
+    bool hash_report = virtio_has_feature(n->host_features, VIRTIO_NET_F_HASH_REPORT);
+    bool attachable;
+
+    if (!rss && !hash_report) {
+        return true;
     }
 
-    return ebpf_rss_load(&n->ebpf_rss);
+    attachable = virtio_net_attach_ebpf_to_backend(n->nic, -1);
+
+    if (hash_report) {
+        if (attachable && ebpf_rss_hash_report_load(&n->ebpf_rss)) {
+            return true;
+        }
+
+        if (get_vhost_net(qemu_get_queue(n->nic)->peer)) {
+            error_setg(errp, "Can't report hashes with eBPF for vhost");
+            return false;
+        }
+    }
+
+    if (rss) {
+        bool loaded = attachable && ebpf_rss_load(&n->ebpf_rss);
+        if (!loaded && get_vhost_net(qemu_get_queue(n->nic)->peer)) {
+            error_setg(errp, "Can't load eBPF RSS for vhost");
+            return false;
+        }
+
+        if (hash_report || !loaded) {
+            warn_report_once("Can't use eBPF RSS - fallback to software RSS");
+        }
+    }
+
+    return true;
 }
 
 static void virtio_net_unload_ebpf(VirtIONet *n)
@@ -1639,7 +1668,7 @@ static void receive_header(VirtIONet *n, const struct iovec *iov, int iov_cnt,
         if (n->needs_vnet_hdr_swap) {
             virtio_net_hdr_swap(VIRTIO_DEVICE(n), wbuf);
         }
-        iov_from_buf(iov, iov_cnt, 0, buf, sizeof(struct virtio_net_hdr));
+        iov_from_buf(iov, iov_cnt, 0, buf, n->host_hdr_len);
     } else {
         struct virtio_net_hdr hdr = {
             .flags = 0,
@@ -1898,7 +1927,7 @@ static ssize_t virtio_net_receive_rcu(NetClientState *nc, const uint8_t *buf,
             }
 
             receive_header(n, sg, elem->in_num, buf, size);
-            if (n->rss_data.populate_hash) {
+            if (n->rss_data.enabled_software_rss && n->rss_data.populate_hash) {
                 offset = offsetof(typeof(extra_hdr), hash_value);
                 iov_from_buf(sg, elem->in_num, offset,
                              (char *)&extra_hdr + offset,
@@ -3505,9 +3534,7 @@ static void virtio_net_device_unrealize(DeviceState *dev)
     VirtIONet *n = VIRTIO_NET(dev);
     int i, max_queue_pairs;
 
-    if (virtio_has_feature(n->host_features, VIRTIO_NET_F_RSS)) {
-        virtio_net_unload_ebpf(n);
-    }
+    virtio_net_unload_ebpf(n);
 
     /* This will stop vhost backend if appropriate. */
     virtio_net_set_status(vdev, 0);
@@ -3714,15 +3741,8 @@ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
 
     net_rx_pkt_init(&n->rx_pkt);
 
-    if (virtio_has_feature(n->host_features, VIRTIO_NET_F_RSS) &&
-        !virtio_net_load_ebpf(n)) {
-        if (get_vhost_net(nc->peer)) {
-            error_setg(errp, "Can't load eBPF RSS for vhost");
-            virtio_net_device_unrealize(dev);
-            return;
-        }
-
-        warn_report_once("Can't load eBPF RSS - fallback to software RSS");
+    if (!virtio_net_load_ebpf(n, errp)) {
+        virtio_net_device_unrealize(dev);
     }
 }
 
