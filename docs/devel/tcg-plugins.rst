@@ -332,6 +332,26 @@ run::
   160          1      0
   135          1      0
 
+- contrib/plugins/bb.c
+
+The bb plugin allows you to generates basic block vectors for use with the
+`SimPoint <https://cseweb.ucsd.edu/~calder/simpoint/>`__ analysis tool.
+
+It has two options, ``interval`` and ``outfile``. ``interval`` specifies the
+interval to generate a basic block vector by the number of instructions. It is
+optional, and its default value is 100000000. ``outfile`` is the path to
+output files, and it will be suffixed with ``.N.bb`` where ``N`` is a vCPU
+index.
+
+Example::
+
+  $ qemu-aarch64 \
+    -plugin contrib/plugins/libb.so,interval=100,outfile=sha1 \
+    tests/tcg/aarch64-linux-user/sha1
+  SHA1=15dd99a1991e0b3826fede3deffc1feba42278e6
+  $ du sha1.0.bb
+  23128   sha1.0.bb
+
 - contrib/plugins/hotblocks.c
 
 The hotblocks plugin allows you to examine the where hot paths of

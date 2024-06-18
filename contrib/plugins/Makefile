@@ -13,6 +13,7 @@ TOP_SRC_PATH = $(SRC_PATH)/../..
 VPATH += $(SRC_PATH)
 
 NAMES :=
+NAMES += bb
 NAMES += execlog
 NAMES += hotblocks
 NAMES += hotpages
