@@ -43,10 +43,21 @@ struct PropertyInfo {
     ObjectPropertyRelease *release;
 };
 
+/**
+ * struct OnOffAutoBit - OnOffAuto storage with 64 elements.
+ * @on_bits: Bitmap of elements with "on".
+ * @auto_bits: Bitmap of elements with "auto".
+ */
+typedef struct OnOffAutoBit {
+    uint32_t on_bits;
+    uint32_t auto_bits;
+} OnOffAutoBit;
+
 
 /*** qdev-properties.c ***/
 
 extern const PropertyInfo qdev_prop_bit;
+extern const PropertyInfo qdev_prop_on_off_auto_bit;
 extern const PropertyInfo qdev_prop_bit64;
 extern const PropertyInfo qdev_prop_bool;
 extern const PropertyInfo qdev_prop_enum;
@@ -85,6 +96,13 @@ extern const PropertyInfo qdev_prop_link;
                 .bitnr       = (_bit),                          \
                 .set_default = true,                            \
                 .defval.u    = (bool)_defval)
+
+#define DEFINE_PROP_ON_OFF_AUTO_BIT(_name, _state, _field, _bit, _defval) \
+    DEFINE_PROP(_name, _state, _field, qdev_prop_on_off_auto_bit,         \
+                OnOffAutoBit,                                             \
+                .bitnr    = (_bit),                                       \
+                .set_default = true,                                      \
+                .defval.i = (OnOffAuto)_defval)
 
 #define DEFINE_PROP_UNSIGNED(_name, _state, _field, _defval, _prop, _type) \
     DEFINE_PROP(_name, _state, _field, _prop, _type,                       \
